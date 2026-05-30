@@ -92,7 +92,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     logger,
                     baseUrl: settings.LMStudioUrl ?? BrainarrConstants.DefaultLMStudioUrl,
                     model: settings.LMStudioModel ?? BrainarrConstants.DefaultLMStudioModel);
-                return new LlmProviderAdapter(llm, logger);
+                // LM Studio is the tunable local provider: honor the user's LMStudioTemperature
+                // (default 0.5 for curation) instead of the generic 0.8 adapter default. max_tokens
+                // stays on the timeout-aware budget (TimeoutContext), so it is NOT overridden here.
+                // Clamp to the OpenAI-compatible [0.0, 2.0] range — the field has no range validator,
+                // so an out-of-range value would otherwise reach LM Studio's API unchecked (fail-soft).
+                var lmTemp = settings.LMStudioTemperature;
+                if (lmTemp < 0.0 || lmTemp > 2.0)
+                {
+                    logger.Warn($"LM Studio temperature {lmTemp} is outside [0.0, 2.0]; clamping.");
+                    lmTemp = Math.Clamp(lmTemp, 0.0, 2.0);
+                }
+                return new LlmProviderAdapter(llm, logger, temperature: (float)lmTemp);
             });
 
             Register(AIProvider.Perplexity, (settings, http, logger) =>

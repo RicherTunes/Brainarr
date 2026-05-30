@@ -71,6 +71,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// </summary>
         public ILlmProvider Inner => _llm;
 
+        /// <summary>
+        /// The construction-time sampling temperature applied to every <see cref="LlmRequest"/>.
+        /// Exposed (internal) so the provider-registry wiring can be pinned by tests — e.g. that
+        /// LM Studio receives <c>settings.LMStudioTemperature</c> rather than the generic default.
+        /// </summary>
+        internal float Temperature => _temperature;
+
         /// <inheritdoc />
         public Task<List<Recommendation>> GetRecommendationsAsync(string prompt)
         {
