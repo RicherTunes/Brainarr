@@ -189,22 +189,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
         private Recommendation CopyWithArtistId(Recommendation rec, string id)
         {
-            return new Recommendation
-            {
-                Artist = rec.Artist,
-                Album = rec.Album,
-                Genre = rec.Genre,
-                Confidence = rec.Confidence,
-                Reason = rec.Reason,
-                Year = rec.Year,
-                ReleaseYear = rec.ReleaseYear,
-                ArtistMusicBrainzId = id,
-                AlbumMusicBrainzId = rec.AlbumMusicBrainzId,
-                MusicBrainzId = rec.MusicBrainzId,
-                Source = rec.Source,
-                Provider = rec.Provider,
-                SpotifyId = rec.SpotifyId
-            };
+            // `with` preserves every unchanged field (incl. ConfidenceProvided) — only the artist MBID
+            // changes here. A field-by-field rebuild silently dropped the confidence provenance flag.
+            return rec with { ArtistMusicBrainzId = id };
         }
     }
 }

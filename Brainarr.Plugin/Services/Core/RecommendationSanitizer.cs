@@ -74,6 +74,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     Album = SanitizeString(rec.Album),
                     Genre = SanitizeString(rec.Genre),
                     Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)),
+                    // Preserve confidence provenance: this rebuild runs BEFORE the safety gate, so
+                    // dropping the flag here would reset it to the default (true) and silently
+                    // re-introduce the fabricated-confidence floor cliff the flag exists to prevent.
+                    ConfidenceProvided = rec.ConfidenceProvided,
                     Reason = SanitizeString(rec.Reason),
                     ArtistMusicBrainzId = string.IsNullOrWhiteSpace(rec.ArtistMusicBrainzId) ? null : rec.ArtistMusicBrainzId,
                     AlbumMusicBrainzId = string.IsNullOrWhiteSpace(rec.AlbumMusicBrainzId) ? null : rec.AlbumMusicBrainzId,

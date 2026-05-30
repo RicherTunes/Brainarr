@@ -49,7 +49,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var hasMbids = recommendArtists
                     ? !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)
                     : (!string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId));
-                var confOk = r.Confidence >= minConf;
+                // The floor only filters items the model EXPLICITLY scored below it. An item whose
+                // confidence was fabricated (model gave none) wasn't "scored below" — gating it out
+                // would silently drop every score-less recommendation once the user raises the floor
+                // above the parser's fabricated default. Such items bypass the confidence gate (the
+                // MBID gate below still applies independently).
+                var confOk = !r.ConfidenceProvided || r.Confidence >= minConf;
                 if (confOk && (!requireMbids || hasMbids)) passNow.Add(r); else toQueue.Add(r);
             }
 

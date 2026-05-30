@@ -181,7 +181,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Safety Gates
         [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
-                    HelpText = "Confidence floor (0.0–1.0). Recommendations the AI scores below this are dropped, or sent to the Review Queue when 'Queue Borderline Items' is on. Lower it (e.g. 0.5) for more discovery/lower precision. NOTE: many models don't report a confidence score — those default to 0.7, so raising the floor above 0.7 will filter out every recommendation that lacks an explicit score (you may get far fewer or no results). Default 0.7.",
+                    HelpText = "Confidence floor (0.0–1.0). Recommendations the model explicitly scores below this are dropped, or sent to the Review Queue when 'Queue Borderline Items' is on. Items the model didn't score are kept (the floor only filters explicit low scores), so raising it won't silently zero out providers that omit confidence. Raise it (e.g. 0.85) for higher precision among scored picks; lower it (e.g. 0.5) for more discovery. Default 0.7.",
                     HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
 

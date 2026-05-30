@@ -111,6 +111,36 @@ namespace Brainarr.Tests.Services.Providers.Parsing
         }
 
         [Fact]
+        public void ConfidenceProvided_True_WhenModelSuppliesScore()
+        {
+            var json = "[{ \"artist\": \"A\", \"album\": \"B\", \"confidence\": 0.9 }]";
+            var list = RecommendationJsonParser.Parse(json, _logger);
+            list.Should().ContainSingle();
+            list[0].Confidence.Should().Be(0.9);
+            list[0].ConfidenceProvided.Should().BeTrue("the model supplied an explicit score");
+        }
+
+        [Fact]
+        public void ConfidenceProvided_False_WhenModelOmitsScore()
+        {
+            // Missing confidence → display default is used but provenance is marked false so the
+            // confidence floor won't silently drop it (the fabricated-confidence cliff fix).
+            var json = "[{ \"artist\": \"A\", \"album\": \"B\" }]";
+            var list = RecommendationJsonParser.Parse(json, _logger);
+            list.Should().ContainSingle();
+            list[0].ConfidenceProvided.Should().BeFalse("the model gave no score");
+        }
+
+        [Fact]
+        public void ConfidenceProvided_False_WhenScoreIsNonFinite()
+        {
+            var json = "[{ \"artist\": \"A\", \"album\": \"B\", \"confidence\": \"NaN\" }]";
+            var list = RecommendationJsonParser.Parse(json, _logger);
+            list.Should().ContainSingle();
+            list[0].ConfidenceProvided.Should().BeFalse("a non-finite score is not a usable model confidence");
+        }
+
+        [Fact]
         public void TruncatedObjectWrappedArray_SalvagesElements()
         {
             // GLM emits both bare arrays AND object-wrapped arrays interchangeably. When the wrapped

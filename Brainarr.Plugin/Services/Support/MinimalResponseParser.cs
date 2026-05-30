@@ -267,7 +267,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                             {
                                 Album = string.IsNullOrEmpty(r.Album) ? "Albums" : r.Album,
                                 Genre = string.IsNullOrEmpty(r.Genre) ? "Unknown" : r.Genre,
-                                Confidence = r.Confidence == 0 ? 0.7 : r.Confidence
+                                // Fabricated default when the model gave 0/none — mark not-provided so
+                                // the confidence floor doesn't silently drop these (see SafetyGateService).
+                                Confidence = r.Confidence == 0 ? 0.7 : r.Confidence,
+                                ConfidenceProvided = r.Confidence != 0
                             }).ToList();
                         }
                     }
@@ -290,6 +293,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                                     Album = FirstNonEmpty(c.l, c.album, "Albums"),
                                     Genre = FirstNonEmpty(c.g, c.genre, "Unknown"),
                                     Confidence = c.c > 0 ? c.c : 0.7,
+                                    ConfidenceProvided = c.c > 0,
                                     Reason = FirstNonEmpty(c.r, "AI recommendation")
                                 }).ToList();
                             }
