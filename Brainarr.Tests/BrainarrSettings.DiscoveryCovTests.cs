@@ -62,6 +62,30 @@ namespace Brainarr.Tests
                 "because the constructor sets BackfillStrategy to Standard (line 36)");
         }
 
+        [Fact]
+        public void BackfillStrategy_FieldLabelAndHelp_MatchActualDefault()
+        {
+            // Drift guard: the UI label once advertised "Default: Aggressive" while the constructor
+            // (and the test above) set Standard — a user-facing contradiction. Pin the label/help-text
+            // "(Default)" annotation to the ACTUAL default so the two can never diverge again.
+            var defaultStrategy = Create().BackfillStrategy.ToString();
+            var attr = typeof(BrainarrSettings)
+                .GetProperty(nameof(BrainarrSettings.BackfillStrategy))!
+                .GetCustomAttributes(typeof(NzbDrone.Core.Annotations.FieldDefinitionAttribute), false)
+                .Cast<NzbDrone.Core.Annotations.FieldDefinitionAttribute>()
+                .Single();
+
+            attr.Label.Should().Contain($"Default: {defaultStrategy}",
+                "the field label must name the actual constructor default");
+            attr.HelpText.Should().Contain($"{defaultStrategy} (Default)",
+                "the help text must mark the actual default option as (Default)");
+            foreach (var other in System.Enum.GetNames(typeof(BackfillStrategy)).Where(n => n != defaultStrategy))
+            {
+                attr.HelpText.Should().NotContain($"{other} (Default)",
+                    $"a non-default option ({other}) must not be marked (Default)");
+            }
+        }
+
         #endregion
 
         #region Constructor Defaults — Core Numeric & Bool Fields

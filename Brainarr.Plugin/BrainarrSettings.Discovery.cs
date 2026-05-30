@@ -32,8 +32,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
-        [FieldDefinition(9, Label = "Backfill Strategy (Default: Aggressive)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
-            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard: A few passes + initial oversampling\n- Aggressive (Default): More passes, relaxed gating, tries to guarantee target\nNote: Advanced top-up controls are hidden in v1.2.1; strategy is sufficient for most users.",
+        [FieldDefinition(9, Label = "Backfill Strategy (Default: Standard)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
+            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard (Default): A few passes + initial oversampling\n- Aggressive: More passes, relaxed gating, tries to guarantee target\nNote: Advanced top-up controls are hidden in v1.2.1; strategy is sufficient for most users.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#backfill-strategy")]
         public BackfillStrategy BackfillStrategy { get; set; }
 
