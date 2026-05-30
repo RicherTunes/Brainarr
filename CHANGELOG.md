@@ -6,6 +6,9 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Changed (settings — 2026-05-30)
+- **`Minimum Confidence` is now a visible advanced setting** (was hidden). The confidence floor — recommendations the AI scores below it are dropped, or queued when *Queue Borderline Items* is on — is now adjustable from the UI with help text and `0.0–1.0` validation (out-of-range is rejected with a clear message instead of silently clamped). The help text warns about a non-obvious cliff: many models don't report a confidence score, so the parser defaults those to `0.7`; raising the floor above `0.7` therefore filters out every recommendation that lacks an explicit score (a deeper fix to the fabricated-score behavior is queued).
+
 ### Fixed (tests — 2026-05-30)
 - **`LimiterRegistryBounded` full-suite flake eliminated at the root.** The collection name was used by three test classes but had no `[CollectionDefinition]`, so it ran in parallel with collections that mutate `LimiterRegistry`'s process-wide static dictionaries — racing the bounded-dict assertion (passed isolated, flaked ~1/3 full runs). Added `[CollectionDefinition("LimiterRegistryBounded", DisableParallelization = true)]` to serialize all LimiterRegistry-static-state tests (same mechanism `OrchestratorIntegration` uses), which also fixes the latent same-cause flake in `LimiterRegistryMaintenanceTests`. Restored the strong clear-then-insert assertion + added a race-immune bound check. Green across 8 consecutive full-suite runs.
 
