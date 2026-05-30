@@ -152,6 +152,15 @@ At least one asset name must contain `net8.0.zip`.
 
 See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog and [`docs/ECOSYSTEM_PARITY_MATRIX.md`](../ext/Lidarr.Plugin.Common/docs/ECOSYSTEM_PARITY_MATRIX.md) for the cross-plugin parity scorecard (30+ axes × 4 plugins).
 
+## Z.AI Coding-Plan provider gotchas (`BrainarrZaiCodingProvider`)
+
+Hard-won, live-confirmed (Lidarr E2E, real Coding-Plan key, May 2026). All three are easy to regress:
+
+- **Never put `temperature` in the request body.** Z.AI's Anthropic-format Coding endpoint rejects *any* request carrying `temperature` with `[1210][Invalid API parameter]` (generic message, no field name — must be bisected). Claude Code, which the endpoint emulates, doesn't send it. Guarded by `CompleteAsync_OmitsTemperature`.
+- **Keep `max_tokens` at the host default (2000); do NOT raise it for GLM's verbosity.** GLM wraps output in a ```json fence and pads with reasoning. At 2000 a 50-item list truncates at the tail but the request *completes* (~10s); at 4096/8192 GLM fills the headroom and overruns the request timeout → `TimeoutException` → 0 items. Truncation is recovered downstream — `RecommendationJsonParser.SalvageObjectsFromText` extracts the complete `{...}` objects from the unterminated array (depth-tracking, string/escape-aware). That salvage path benefits every provider, not just GLM.
+- **The first request after a Lidarr restart can time out** (TLS + raw-`HttpClient` first connection + model cold-start), including the 10s health-check probe. It self-heals on the next sync; don't mistake it for an auth/endpoint failure.
+- The provider dispatches via a raw `System.Net.Http.HttpClient` (not Lidarr's `IHttpClient`) because `ManagedHttpDispatcher` throws on the `claude-cli` User-Agent the Coding-Plan filter requires.
+
 ## Development Status
 
 **Current Status**: Production-ready v1.6.0 - Full implementation with comprehensive test suite
