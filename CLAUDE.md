@@ -119,6 +119,12 @@ gh api repos/RicherTunes/Brainarr/releases --jq '.[0] | {tag_name, draft, target
 
 At least one asset name must contain `net8.0.zip`.
 
+## Release versioning: bump VERSION before tagging (CRITICAL)
+
+The plugin's assembly version comes **only** from the repo-root `VERSION` file: `Brainarr.Plugin.csproj` sets `<GenerateAssemblyInfo>true</GenerateAssemblyInfo>` with no `<AssemblyVersion>` literal, and `Directory.Build.props` derives `VersionPrefix`/`AssemblyVersion` from `VERSION`. The release pipeline (`.github/workflows/release.yml` → the shared reusable `release-plugin.yml@workflows/v1`) stamps `plugin.json` and `manifest.json` from the **git tag**, and stamps any csproj `<AssemblyVersion>` tag — but brainarr's csproj has none (only a comment), and **the reusable workflow does NOT stamp the `VERSION` file**. So if you tag a version that differs from the committed `VERSION`, the build produces an assembly with the *old* version while `plugin.json` shows the *new* one → `/api/v1/system/plugins` reports the wrong `installedVersion` (the 1.3.2-vs-1.4.1 bug `VersionContractTests` exists to prevent).
+
+**Release procedure:** bump `VERSION` **and** `plugin.json` **and** `manifest.json` to the same value, commit (CI's `VersionContractTests` enforce they agree), then tag `v<that-version>`. A `verify-version` pre-flight job in `release.yml` (gates the `release` job via `needs:`) fails the release early if the tag's version ≠ committed `VERSION`/`plugin.json`/`manifest.json`, so a mismatched tag can't ship. (`plugin-package.yml` builds committed sources and never stamps, so it can't drift.)
+
 ## Submodule pin coordination (ext-common-sha.txt)
 
 `ext/Lidarr.Plugin.Common` is a git submodule pinned to a specific Common SHA. Two things must always agree on that SHA:
