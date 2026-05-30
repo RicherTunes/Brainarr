@@ -163,6 +163,10 @@ Hard-won, live-confirmed (Lidarr E2E, real Coding-Plan key, May 2026). All three
 - **The first request after a Lidarr restart can time out** (TLS + raw-`HttpClient` first connection + model cold-start), including the 10s health-check probe. It self-heals on the next sync; don't mistake it for an auth/endpoint failure.
 - The provider dispatches via a raw `System.Net.Http.HttpClient` (not Lidarr's `IHttpClient`) because `ManagedHttpDispatcher` throws on the `claude-cli` User-Agent the Coding-Plan filter requires.
 
+### Claude Code Subscription (`BrainarrClaudeCodeSubscriptionProvider`) — OAuth Bearer, not x-api-key
+
+The credential is a Claude Pro/Max **OAuth access token** (`claudeAiOauth.accessToken` from `claude login`), NOT an `sk-ant-` API key. Anthropic authenticates the OAuth family via **`Authorization: Bearer <token>` + `anthropic-beta: oauth-2025-04-20`** — sending it as `x-api-key` 401s (the original day-one bug, fixed 2026-05-30). Do NOT "simplify" back to x-api-key. The `anthropic-beta` value is dated and can rotate server-side. A `claude-cli` User-Agent is intentionally NOT set (Lidarr's `ManagedHttpDispatcher` throws on non-Lidarr UAs); if Bearer+beta prove insufficient for a real subscriber, migrate to a raw `HttpClient` like `BrainarrZaiCodingProvider` (queued). Auth header pinned by `CompleteAsync_UsesBearerOAuth_NotXApiKey`. Not live-testable without a subscription.
+
 ### Z.AI GLM (`BrainarrZaiGlmProvider`) — the OPPOSITE-contract sibling
 
 `BrainarrZaiGlmProvider` (PaaS, OpenAI-format `chat/completions`) and `BrainarrZaiCodingProvider` (Coding-Plan, Anthropic-format) are siblings that share `MapZaiHttpError` but have **deliberately opposite contracts** — do not unify them:
