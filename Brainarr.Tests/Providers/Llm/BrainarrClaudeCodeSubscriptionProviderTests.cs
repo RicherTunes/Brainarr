@@ -138,6 +138,35 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesBearerOAuth_NotXApiKey()
+        {
+            // Subscription credentials are OAuth access tokens (claudeAiOauth.accessToken). Anthropic
+            // authenticates those via `Authorization: Bearer` + the `anthropic-beta` oauth flag — NOT
+            // `x-api-key`, which is only for sk-ant- API keys. Sending the OAuth token as x-api-key
+            // 401s every subscriber. The sibling BrainarrZaiCodingProvider (which emulates Claude Code)
+            // uses the same Bearer scheme. Regression guard for the day-one auth bug.
+            WriteValidCredentials("oauth-token-abc");
+            var provider = new BrainarrClaudeCodeSubscriptionProvider(
+                _http.Object, _logger, _tempCredentialsPath, "claude-sonnet-4-5-20250514");
+
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"content\":[{\"type\":\"text\",\"text\":\"{}\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer oauth-token-abc",
+                "OAuth subscription tokens authenticate via Authorization: Bearer");
+            captured.Headers.GetSingleValue("x-api-key").Should().BeNullOrEmpty(
+                "the OAuth token must NOT be sent as x-api-key (that header is for sk-ant- API keys)");
+            captured.Headers.GetSingleValue("anthropic-beta").Should().Be("oauth-2025-04-20",
+                "the Anthropic OAuth path requires the oauth anthropic-beta flag");
+        }
+
+        [Fact]
         public async Task CompleteAsync_MissingCredentials_ThrowsAuthenticationException()
         {
             // No file written — loader will fail with a not-found message.
