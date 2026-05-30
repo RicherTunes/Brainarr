@@ -102,26 +102,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var slugs = _styleCatalog.Normalize(settings.StyleFilters);
                 if (slugs.Count > 0)
                 {
-                    var relax = settings.RelaxStyleMatching;
-                    validated = validated
-                        .Where(r =>
-                        {
-                            // Build genre list from recommendation's genre (may have multiple comma-separated)
-                            var genres = new List<string>();
-                            if (!string.IsNullOrWhiteSpace(r.Genre))
-                            {
-                                genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select(g => g.Trim())
-                                    .Where(g => !string.IsNullOrWhiteSpace(g)));
-                            }
-                            return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
-                        })
-                        .ToList();
-
-                    var styleFiltered = preStyleFilter - validated.Count;
-                    if (styleFiltered > 0)
+                    // Style-seeded ("genre-first") discovery: the user asked for styles their library
+                    // doesn't contain (e.g. "lo-fi" over a rock library). The prompt already enforces
+                    // style membership; the LLM's free-text genre labels are approximate (lo-fi vs
+                    // chillhop vs downtempo) and would be wrongly dropped here, gutting the whole point.
+                    // So skip the hard drop in that case and trust the prompt.
+                    if (IsStyleSeededDiscovery(_styleCatalog, settings, libraryProfile))
                     {
-                        _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                        _logger.Info("Style-seeded discovery (library lacks the selected styles): skipping post-validation style filter; style membership is enforced at the prompt level.");
+                    }
+                    else
+                    {
+                        var relax = settings.RelaxStyleMatching;
+                        validated = validated
+                            .Where(r =>
+                            {
+                                // Build genre list from recommendation's genre (may have multiple comma-separated)
+                                var genres = new List<string>();
+                                if (!string.IsNullOrWhiteSpace(r.Genre))
+                                {
+                                    genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(g => g.Trim())
+                                        .Where(g => !string.IsNullOrWhiteSpace(g)));
+                                }
+                                return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
+                            })
+                            .ToList();
+
+                        var styleFiltered = preStyleFilter - validated.Count;
+                        if (styleFiltered > 0)
+                        {
+                            _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                        }
                     }
                 }
             }
@@ -224,6 +236,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log final recommendation count"); }
 
             return importItems;
+        }
+
+        /// <summary>
+        /// Style-seeded ("genre-first") discovery is when the user selected styles their library does
+        /// NOT contain — the recommendations should come from those styles outright, with the library
+        /// used only for dedup. Detected by normalizing the selected styles and checking whether the
+        /// library's genres match any of them (parent-relaxed). No library genres at all → discovery.
+        /// Pure for testability; mirrors the planner's sparse-coverage signal at the filter layer.
+        /// </summary>
+        internal static bool IsStyleSeededDiscovery(IStyleCatalogService catalog, BrainarrSettings settings, LibraryProfile profile)
+        {
+            if (catalog == null || settings?.StyleFilters == null || !settings.StyleFilters.Any())
+            {
+                return false;
+            }
+
+            var slugs = catalog.Normalize(settings.StyleFilters);
+            if (slugs.Count == 0)
+            {
+                return false;
+            }
+
+            var libraryGenres = profile?.TopGenres?.Keys?
+                .Where(g => !string.IsNullOrWhiteSpace(g))
+                .ToList() ?? new List<string>();
+
+            // No genre signal at all → treat as pure discovery (don't gate on style match).
+            if (libraryGenres.Count == 0)
+            {
+                return true;
+            }
+
+            // If the library matches none of the selected styles (even via parent), it's genre-first.
+            return !catalog.IsMatch(libraryGenres, slugs, relaxParentMatch: true);
         }
 
         private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
