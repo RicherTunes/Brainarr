@@ -121,6 +121,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 }
             }
 
+            // Last-resort salvage for TRUNCATED responses: when a provider hits its max_tokens cap
+            // mid-array the JSON has no closing ']' (and TryExtractJsonArrayFromText finds no terminator),
+            // so both attempts above recover nothing even though dozens of complete objects precede the
+            // cut. This is routine for verbose models (e.g. Z.AI Coding / GLM, which pads ```json output).
+            // Scan for balanced top-level {...} objects and parse each, discarding only the partial tail.
+            if (results.Count == 0)
+            {
+                var before = results.Count;
+                SalvageObjectsFromText(json, results);
+                if (results.Count > before)
+                {
+                    logger?.Debug("Recovered {0} recommendation(s) by salvaging objects from a truncated/invalid JSON array", results.Count - before);
+                }
+            }
+
             return results;
         }
 
@@ -155,6 +170,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             catch
             {
                 // Skip malformed item
+            }
+        }
+
+        /// <summary>
+        /// Recovers complete JSON objects from text that is not valid JSON as a whole — typically a
+        /// recommendation array truncated at the provider's max_tokens cap (no closing brace/bracket).
+        /// Walks the text tracking brace depth while respecting string literals and escapes, extracts
+        /// each balanced top-level <c>{...}</c> object, and parses it independently. The final partial
+        /// object (whose closing brace never arrives) is left unextracted and silently dropped.
+        /// </summary>
+        private static void SalvageObjectsFromText(string text, List<Recommendation> results)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            int depth = 0;
+            int objStart = -1;
+            bool inString = false;
+            bool escape = false;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+
+                if (inString)
+                {
+                    if (escape) { escape = false; }
+                    else if (c == '\\') { escape = true; }
+                    else if (c == '"') { inString = false; }
+                    continue;
+                }
+
+                switch (c)
+                {
+                    case '"':
+                        inString = true;
+                        break;
+                    case '{':
+                        if (depth == 0) objStart = i;
+                        depth++;
+                        break;
+                    case '}':
+                        if (depth > 0)
+                        {
+                            depth--;
+                            if (depth == 0 && objStart >= 0)
+                            {
+                                var objText = text.Substring(objStart, i - objStart + 1);
+                                objStart = -1;
+                                try
+                                {
+                                    using var objDoc = SecureJsonSerializer.ParseDocumentRelaxed(objText);
+                                    if (objDoc.RootElement.ValueKind == JsonValueKind.Object)
+                                    {
+                                        TryAddRecommendation(objDoc.RootElement, results);
+                                    }
+                                }
+                                catch
+                                {
+                                    // Skip an individual object that still won't parse.
+                                }
+                            }
+                        }
+                        break;
+                }
             }
         }
 
