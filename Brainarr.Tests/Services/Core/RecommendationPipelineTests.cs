@@ -533,6 +533,80 @@ namespace Brainarr.Tests.Services.Core
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
+
+        [Fact]
+        public void ResolveValidator_WithEmptyPatternsAndNonStrict_ReturnsInjectedValidator()
+        {
+            // Default case: no custom patterns + not strict → reuse the injected (singleton) validator,
+            // so the common path has zero behavior change and a mock validator stays in effect.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                Assert.Same(validator.Object, pipeline.ResolveValidator(string.Empty, false));
+                Assert.Same(validator.Object, pipeline.ResolveValidator(null, false));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithCustomPatterns_BuildsValidatorThatFiltersThem()
+        {
+            // #67: settings.CustomFilterPatterns must actually reach the validator. With a pattern set,
+            // the pipeline builds a configured validator (NOT the injected default) that filters matches.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                var resolved = pipeline.ResolveValidator("(demo version)", false);
+                Assert.NotSame(validator.Object, resolved);
+
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Real Artist", Album = "Real Album", Year = 2001 },
+                    new Recommendation { Artist = "Hallucinated", Album = "Some Album (demo version)", Year = 2001 },
+                };
+                var result = resolved.ValidateBatch(recs, allowArtistOnly: false);
+                Assert.Equal(1, result.ValidCount);
+                Assert.Equal(1, result.FilteredCount);
+                Assert.Contains(result.FilteredRecommendations, r => r.Album.Contains("(demo version)"));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithStrictModeOnly_BuildsConfiguredValidator()
+        {
+            // EnableStrictValidation shares the same ctor/gap; strict-only must also build a configured validator.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                Assert.NotSame(validator.Object, pipeline.ResolveValidator(string.Empty, true));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithPatternsAndStrict_BothApply()
+        {
+            // Patterns + strict together: custom patterns and strict-mode parenthetical filtering are
+            // independent and compose (custom-pattern check runs first, then strict rules).
+            var (pipeline, _, _, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                var resolved = pipeline.ResolveValidator("(radio mix)", true);
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "A", Album = "Clean Album", Year = 1999 },                 // passes
+                    new Recommendation { Artist = "B", Album = "Track (radio mix)", Year = 1999 },           // custom pattern
+                    new Recommendation { Artist = "C", Album = "Greatest Hits (deluxe)", Year = 1999 },      // strict: possibly-legit pattern not in strict allow-list
+                };
+                var result = resolved.ValidateBatch(recs, allowArtistOnly: false);
+                Assert.Equal(1, result.ValidCount);
+                Assert.Equal(2, result.FilteredCount);
+                Assert.Contains(result.ValidRecommendations, r => r.Album == "Clean Album");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
         private static (RecommendationPipeline pipeline,
             Mock<IDuplicateFilterService> dupFilter,
             Mock<IRecommendationValidator> validator,

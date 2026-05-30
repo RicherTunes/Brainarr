@@ -77,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log run header"); }
 
             var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
-            var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions).ConfigureAwait(false);
+            var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions, settings.CustomFilterPatterns, settings.EnableStrictValidation).ConfigureAwait(false);
             try
             {
                 var msg = $"Validation produced {validationSummary.ValidCount}/{validationSummary.TotalCount} candidates (pre-dedup). Duplicates will be removed next.";
@@ -279,10 +279,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return selectedCoverage == 0;
         }
 
-        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
+        /// <summary>
+        /// Resolves the validator for this run. <c>CustomFilterPatterns</c> / <c>EnableStrictValidation</c>
+        /// are per-import-list-definition settings, but the injected <see cref="_validator"/> is a
+        /// process-wide singleton constructed without them. When the user configures either, build a
+        /// per-run <see cref="RecommendationValidator"/> carrying those settings; otherwise reuse the
+        /// injected default (zero behavior change for the common case, and a mock validator stays in
+        /// effect under test). Patterns are matched as lowercased substrings (no regex), so there is no
+        /// ReDoS/injection surface, and blank entries are dropped in the validator ctor.
+        /// </summary>
+        internal IRecommendationValidator ResolveValidator(string customPatterns, bool strictMode)
+        {
+            if (string.IsNullOrWhiteSpace(customPatterns) && !strictMode)
+            {
+                return _validator;
+            }
+
+            return new NzbDrone.Core.ImportLists.Brainarr.Services.RecommendationValidator(_logger, customPatterns, strictMode);
+        }
+
+        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true, string customPatterns = null, bool strictMode = false)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
-            var result = _validator.ValidateBatch(recommendations, allowArtistOnly);
+            var result = ResolveValidator(customPatterns, strictMode).ValidateBatch(recommendations, allowArtistOnly);
             _logger.Debug($"Validation result: {result.ValidCount}/{result.TotalCount} passed ({result.PassRate:F1}%)");
 
             try
