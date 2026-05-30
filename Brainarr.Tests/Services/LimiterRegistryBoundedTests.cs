@@ -52,12 +52,19 @@ namespace Brainarr.Tests.Services
 
             // Adding one more must trigger clear-all eviction without throwing.
             var act = () =>
-                LimiterRegistry.RegisterThrottle($"openai:model-overflow", TimeSpan.FromSeconds(300), 2);
+                LimiterRegistry.RegisterThrottle("openai:model-overflow", TimeSpan.FromSeconds(300), 2);
             act.Should().NotThrow("overflow eviction must be transparent to callers");
 
-            // After eviction the overflow entry should exist (it was added after the clear).
+            // Strong assertion (reliable now the collection is serialized via DisableParallelization,
+            // so no foreign collection mutates _throttleUntil mid-test): the clear-all fires THEN the
+            // new entry is inserted, so the just-added entry survives.
             LimiterRegistry.HasThrottleFor("openai:model-overflow")
-                .Should().BeTrue("the entry inserted after eviction must be present");
+                .Should().BeTrue("the entry inserted after the clear-all eviction must be present");
+
+            // Defense-in-depth: the bound itself must hold regardless of which entries survive.
+            LimiterRegistry.ThrottleEntryCountForTesting
+                .Should().BeLessThanOrEqualTo(LimiterRegistry.DictCapForTesting,
+                    "the bounded dictionary must never exceed its cap");
         }
 
         // -----------------------------------------------------------------------
