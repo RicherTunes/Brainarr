@@ -17,6 +17,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     Configuration.BrainarrConstants.MaxRecommendations)
                 .WithMessage($"MaxRecommendations must be between {Configuration.BrainarrConstants.MinRecommendations} and {Configuration.BrainarrConstants.MaxRecommendations}");
 
+            // Confidence floor: now a user-visible advanced field, so reject out-of-range input with a
+            // clear message instead of silently clamping it in SafetyGateService at runtime.
+            RuleFor(s => s.MinConfidence)
+                .InclusiveBetween(0.0, 1.0)
+                .WithMessage("Minimum Confidence must be between 0.0 and 1.0");
+
             // AI request timeout bounds
             RuleFor(s => s.AIRequestTimeoutSeconds)
                 .InclusiveBetween(
