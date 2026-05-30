@@ -152,7 +152,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             };
         }
 
-        private string NormalizeArtistName(string artistName)
+        // internal for direct normalization unit tests (InternalsVisibleTo "Brainarr.Tests").
+        internal string NormalizeArtistName(string artistName)
         {
             if (string.IsNullOrWhiteSpace(artistName)) return string.Empty;
 
@@ -167,19 +168,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             // Normalize whitespace
             normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
 
-            // Handle common abbreviations and variations
+            // Normalize "featuring" abbreviations to a canonical word so "X ft Y" / "X feat Y" dedup
+            // against "X featuring Y". Word boundaries are load-bearing: a plain substring Replace
+            // turned "Daft Punk" -> "dafeaturing punk" and "Lifton" -> "lifeaturingon", corrupting any
+            // name containing "ft"/"feat" and distorting the fuzzy-similarity match (#68).
+            // NOTE: the [^\w\s] pass above already replaced "&", "+" and "w/" with spaces, so the
+            // previous "&"->"and" / "+"->"and" / "w/"->"with" entries were dead at this point (their
+            // symbol forms no longer exist) and were removed.
             var abbreviations = new Dictionary<string, string>
             {
                 ["ft"] = "featuring",
                 ["feat"] = "featuring",
-                ["w/"] = "with",
-                ["&"] = "and",
-                ["+"] = "and"
             };
 
             foreach (var abbrev in abbreviations)
             {
-                normalized = normalized.Replace(abbrev.Key, abbrev.Value);
+                normalized = Regex.Replace(normalized, $@"\b{Regex.Escape(abbrev.Key)}\b", abbrev.Value);
             }
 
             return normalized;
