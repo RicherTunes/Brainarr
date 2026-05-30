@@ -324,8 +324,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
-            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult())
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => FetchRecommendationsAsync(settings));
+            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult()).
+            // The bridge timeout is derived from the configured per-request budget so it never
+            // aborts a slow-but-valid run before the provider's own timeout elapses.
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                () => FetchRecommendationsAsync(settings),
+                ResolveSyncFetchTimeoutMs(settings));
+        }
+
+        /// <summary>
+        /// Resolves the timeout for the synchronous Fetch() bridge. A local provider's effective
+        /// per-request budget can reach LocalProviderDefaultTimeout (360s) even when
+        /// AIRequestTimeoutSeconds is left at its 30s default, and a user may raise it up to
+        /// MaxAITimeout (600s). The orchestration also issues follow-up (top-up) calls and
+        /// MusicBrainz enrichment on top of the initial request. The backstop is therefore sized
+        /// off the largest single-call budget, doubled to cover a top-up follow-up, plus a flat
+        /// enrichment headroom — so it only ever fires on a genuine hang, never on a slow-but-valid
+        /// run — and is floored at the legacy default so it can never shrink below it.
+        /// </summary>
+        internal static int ResolveSyncFetchTimeoutMs(BrainarrSettings settings)
+        {
+            var perRequestSeconds = Math.Max(
+                settings?.AIRequestTimeoutSeconds ?? BrainarrConstants.DefaultAITimeout,
+                BrainarrConstants.LocalProviderDefaultTimeout);
+
+            const int orchestrationHeadroomSeconds = 120; // top-up + MusicBrainz enrichment
+            var backstopMs = ((perRequestSeconds * 2) + orchestrationHeadroomSeconds) * 1000;
+
+            return Math.Max(BrainarrConstants.DefaultAsyncTimeoutMs, backstopMs);
         }
 
         // ====== PROVIDER MANAGEMENT ======
