@@ -67,21 +67,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     continue;
                 }
 
-                // Sanitize, then validate. Preserve enrichment fields (MBIDs, Year).
-                var sanitizedRec = new Recommendation
+                // Sanitize via a record `with`-copy so every field we DON'T explicitly transform is
+                // carried over automatically. A field-by-field `new Recommendation { … }` silently
+                // reset every unlisted member to its default — it preserved Year/ConfidenceProvided but
+                // DROPPED ReleaseYear, Source, Provider, MusicBrainzId and SpotifyId (provenance/identity
+                // fields). Critically, ConfidenceProvided auto-carries here (this runs BEFORE the safety
+                // gate; resetting it to the default `true` would re-introduce the fabricated-confidence
+                // floor cliff the flag exists to prevent). Prefer `with` over field-by-field rebuilds.
+                var sanitizedRec = rec with
                 {
                     Artist = SanitizeString(rec.Artist),
                     Album = SanitizeString(rec.Album),
                     Genre = SanitizeString(rec.Genre),
                     Confidence = Math.Max(0.0, Math.Min(1.0, rec.Confidence)),
-                    // Preserve confidence provenance: this rebuild runs BEFORE the safety gate, so
-                    // dropping the flag here would reset it to the default (true) and silently
-                    // re-introduce the fabricated-confidence floor cliff the flag exists to prevent.
-                    ConfidenceProvided = rec.ConfidenceProvided,
                     Reason = SanitizeString(rec.Reason),
                     ArtistMusicBrainzId = string.IsNullOrWhiteSpace(rec.ArtistMusicBrainzId) ? null : rec.ArtistMusicBrainzId,
                     AlbumMusicBrainzId = string.IsNullOrWhiteSpace(rec.AlbumMusicBrainzId) ? null : rec.AlbumMusicBrainzId,
-                    Year = rec.Year
                 };
 
                 if (IsBasicallyValid(sanitizedRec))

@@ -47,5 +47,34 @@ namespace Brainarr.Tests.Services.Core
             result.Should().ContainSingle();
             result[0].ConfidenceProvided.Should().BeTrue();
         }
+
+        [Fact]
+        public void Sanitize_PreservesAllNonTransformedFields_ViaWithCopy()
+        {
+            // #64: the field-by-field rebuild silently DROPPED ReleaseYear/Source/Provider/
+            // MusicBrainzId/SpotifyId (reset to default). The `with`-copy must carry them through.
+            var sanitizer = new RecommendationSanitizer(LogManager.GetCurrentClassLogger());
+            var input = new List<Recommendation>
+            {
+                new Recommendation
+                {
+                    Artist = "Artist", Album = "Album", Confidence = 0.8,
+                    Year = 1999, ReleaseYear = 2001, Source = "src", Provider = "openai",
+                    MusicBrainzId = "mbid-rg", ArtistMusicBrainzId = "mbid-artist",
+                    AlbumMusicBrainzId = "mbid-album", SpotifyId = "spotify-1"
+                }
+            };
+
+            var r = sanitizer.SanitizeRecommendations(input).Single();
+
+            r.Year.Should().Be(1999);
+            r.ReleaseYear.Should().Be(2001);
+            r.Source.Should().Be("src");
+            r.Provider.Should().Be("openai");
+            r.MusicBrainzId.Should().Be("mbid-rg");
+            r.ArtistMusicBrainzId.Should().Be("mbid-artist");
+            r.AlbumMusicBrainzId.Should().Be("mbid-album");
+            r.SpotifyId.Should().Be("spotify-1");
+        }
     }
 }
