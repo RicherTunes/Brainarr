@@ -64,8 +64,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
                     resolvableCount++;
 
-                    // Check LRU cache first
-                    var key = MakeKey(rec.Artist, rec.Album);
+                    // Check LRU cache first. Build the key from the SAME HtmlDecoded text that
+                    // ResolveMbidAsync uses for the query/match (#66, heuristic-s residual of #60):
+                    // otherwise "Simon & Garfunkel" and a model-emitted "Simon &amp; Garfunkel" — the
+                    // identical entity — key differently, so the duplicate misses the cache and fires a
+                    // redundant MusicBrainz query (and a decoded entry would be stored under a raw key).
+                    var key = MakeKey(
+                        System.Net.WebUtility.HtmlDecode(rec.Artist),
+                        System.Net.WebUtility.HtmlDecode(rec.Album));
                     Recommendation cached = null;
                     lock (_lruLock)
                     {

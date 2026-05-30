@@ -116,6 +116,31 @@ namespace Brainarr.Tests.Services.Enrichment
         }
 
         [Fact]
+        public async Task EnrichWithMbidsAsync_CacheKey_CollapsesAcrossEntityEncoding()
+        {
+            // Regression (#66, heuristic-s residual of #60): the LRU cache key must be built from the
+            // SAME HtmlDecoded text the query/match use — otherwise "Simon & Garfunkel" and the
+            // entity-encoded "Simon &amp; Garfunkel" (which resolve to the IDENTICAL MusicBrainz entity)
+            // key differently, so the second is a cache MISS and fires a redundant network query.
+            var mbJson = "{\n  \"release-groups\": [\n    {\n      \"id\": \"rg-sg\",\n      \"score\": 100,\n      \"title\": \"Bookends\",\n      \"artist-credit\": [{\"artist\": {\"name\": \"Simon & Garfunkel\", \"id\": \"artist-sg\"}}],\n      \"first-release-date\": \"1968-04-03\"\n    }\n  ]\n}";
+            var handler = new StubHandler(mbJson);
+            var resolver = new MusicBrainzResolver(TestLogger.CreateNullLogger(), new HttpClient(handler));
+
+            var input = new List<Recommendation>
+            {
+                new Recommendation { Artist = "Simon & Garfunkel", Album = "Bookends", Confidence = 0.9 },
+                new Recommendation { Artist = "Simon &amp; Garfunkel", Album = "Bookends", Confidence = 0.8 },
+            };
+
+            var result = await resolver.EnrichWithMbidsAsync(input, CancellationToken.None);
+
+            result.Should().HaveCount(2);
+            result[0].AlbumMusicBrainzId.Should().Be("rg-sg");
+            result[1].AlbumMusicBrainzId.Should().Be("rg-sg", "the entity-encoded duplicate must resolve to the same entity");
+            handler.Calls.Should().Be(1, "both encodings normalize to one cache key → a single MusicBrainz query");
+        }
+
+        [Fact]
         public async Task EnrichWithMbidsAsync_PreservesOriginalRecommendation_WhenLookupFails()
         {
             // Arrange
