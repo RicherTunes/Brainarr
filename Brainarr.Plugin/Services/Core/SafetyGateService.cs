@@ -27,6 +27,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var passNow = new List<Recommendation>();
             var toQueue = new List<Recommendation>();
+            var belowFloorCount = 0;   // model EXPLICITLY scored below the floor (provenance-aware)
+            var missingMbidCount = 0;  // passed confidence but gated for missing required MBID(s)
             for (int i = 0; i < enriched.Count; i++)
             {
                 if (ct.IsCancellationRequested) break;
@@ -55,7 +57,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 // above the parser's fabricated default. Such items bypass the confidence gate (the
                 // MBID gate below still applies independently).
                 var confOk = !r.ConfidenceProvided || r.Confidence >= minConf;
-                if (confOk && (!requireMbids || hasMbids)) passNow.Add(r); else toQueue.Add(r);
+                var mbidOk = !requireMbids || hasMbids;
+                if (confOk && mbidOk)
+                {
+                    passNow.Add(r);
+                }
+                else
+                {
+                    toQueue.Add(r);
+                    // Attribute the drop: confidence floor is the primary reason when it fails; an
+                    // item that cleared the floor but lacks required MBIDs is an MBID-gate drop.
+                    if (!confOk) belowFloorCount++; else missingMbidCount++;
+                }
+            }
+
+            // Observability: per-run, reason-segregated gate summary so an under-target run can be
+            // attributed to the confidence floor (vs dedup/timeout/MBID). belowFloorCount is
+            // provenance-aware — score-less items bypass the floor and are never counted here.
+            if (belowFloorCount > 0)
+            {
+                // Per-run, race-free accumulation (see GateMetricsContext) so the orchestrator can
+                // attribute an under-target run to the confidence floor. NOT a process-wide counter.
+                GateMetricsContext.AddConfidenceFloorDrops(belowFloorCount);
+            }
+            if (belowFloorCount > 0 || missingMbidCount > 0)
+            {
+                var disposition = queueBorderline ? $"{toQueue.Count} queued for review" : $"{toQueue.Count} dropped";
+                logger?.Info($"Safety gate: {passNow.Count} passed, {belowFloorCount} below Minimum Confidence {minConf:F2}, {missingMbidCount} missing required MBID(s) ({disposition}).");
             }
 
             if (toQueue.Count > 0 && queueBorderline)
