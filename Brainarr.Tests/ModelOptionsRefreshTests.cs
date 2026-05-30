@@ -97,6 +97,8 @@ namespace Brainarr.Tests
         [InlineData(AIProvider.DeepSeek, "DeepSeek_Chat")]
         [InlineData(AIProvider.Gemini, "Gemini_25_Flash")]
         [InlineData(AIProvider.Groq, "Llama33_70B_Versatile")]
+        [InlineData(AIProvider.ZaiGlm, "GLM_5_1")]
+        [InlineData(AIProvider.ZaiCoding, "GLM_5_1")]
         public void StaticProviders_Should_Return_Canonical_Model_Options(AIProvider provider, string expectedValue)
         {
             var providerFactory = new Mock<IProviderFactory>();
