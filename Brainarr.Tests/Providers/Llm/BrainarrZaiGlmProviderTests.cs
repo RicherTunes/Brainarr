@@ -146,6 +146,62 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_SendsTemperature()
+        {
+            // CONTRACT GUARD (opposite of ZaiCoding): the OpenAI-format PaaS endpoint accepts
+            // temperature, so it MUST be sent. Do NOT remove it by analogy to the sibling
+            // BrainarrZaiCodingProvider — that one omits temperature only because Z.AI's
+            // Anthropic-format Coding endpoint rejects it with [1210]. The two providers have
+            // deliberately opposite temperature contracts.
+            var provider = new BrainarrZaiGlmProvider(_http.Object, _logger, "k", "GLM_4_5_Air");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", Temperature = 0.5f });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("temperature", "the OpenAI-format Z.AI PaaS endpoint accepts/uses temperature");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_UsesRequestMaxTokens_WhenProvided()
+        {
+            // The pipeline's timeout-aware output-token budget flows in via request.MaxTokens
+            // (GetOutputTokenBudget → TimeoutContext → adapter). The provider must honor it, not
+            // hardcode a cap.
+            var provider = new BrainarrZaiGlmProvider(_http.Object, _logger, "k", "GLM_4_5_Air");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", MaxTokens = 6000 });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"max_tokens\":6000");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_DefaultsMaxTokens_WhenUnset()
+        {
+            var provider = new BrainarrZaiGlmProvider(_http.Object, _logger, "k", "GLM_4_5_Air");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"{}\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"max_tokens\":2000", "falls back to the proven-safe default when unset");
+        }
+
+        [Fact]
         public async Task CompleteAsync_WithSystemPrompt_EmitsBothMessages()
         {
             var provider = new BrainarrZaiGlmProvider(_http.Object, _logger, "k", "GLM_4_5_Air");
