@@ -77,6 +77,21 @@ namespace Brainarr.Tests.Services.Support
             ex.Should().BeNull();
         }
 
+        // #78: the dedup key must collapse leading/trailing and internal whitespace runs so a stray
+        // double-space (common in scraped/model output) keys the SAME as the single-spaced form —
+        // same consistency rationale as the #62 entity decode. Covers artist, album, and the
+        // entity+whitespace combination (an entity decode that introduces/normalizes spacing).
+        [Theory]
+        [InlineData("The  Beatles", "The Beatles")]
+        [InlineData("  The Beatles  ", "The Beatles")]
+        [InlineData("Simon &amp;  Garfunkel", "Simon & Garfunkel")]
+        [InlineData("The\tBeatles", "The Beatles")]
+        public void GetKey_CollapsesWhitespace_SoSpacingVariantsMatch(string messy, string clean)
+        {
+            RecommendationHistory.GetKey(messy, "Some  Album").Should().Be(RecommendationHistory.GetKey(clean, "Some Album"));
+            RecommendationHistory.GetKey(messy, null).Should().Be(RecommendationHistory.GetKey(clean, null));
+        }
+
         [Fact]
         public void RecordSuggestions_KeepsRecentItem_AfterPruneWiring()
         {
