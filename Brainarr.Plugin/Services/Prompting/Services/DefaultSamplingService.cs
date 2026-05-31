@@ -200,7 +200,106 @@ public sealed class DefaultSamplingService : ISamplingService
             }
         }
 
+        // Style-seeded ("genre-first") dedup fallback: the user selected styles their library has
+        // ZERO coverage of, so the strict+relaxed match lists came back empty and the prompt would
+        // print "0 groups" — the model gets no "avoid these duplicates" signal. Surface the closest
+        // library artists (adjacent styles, then the library's dominant artists, then any artist) as a
+        // pure dedup audit. These carry NO matched styles and score 0 so they are NEVER registered as
+        // seed-style matches: the genre-first decision gate (sum of selected-style coverage == 0,
+        // computed identically by the renderer and RecommendationPipeline) is preserved.
+        //
+        // GATE on the genre-first condition (zero selected-style coverage) — NOT merely on an empty
+        // match list. A library-aligned selection whose styles DO have coverage can still yield zero
+        // matches (e.g. a below-threshold relaxed match, or artists missing style tags); that is a
+        // sparse library-aligned case, not genre-first, and must keep its empty list (the prompt stays
+        // grounded in collaborators). Only the true zero-coverage case gets the dedup audit.
+        if (IsStyleSeededZeroCoverage(selection) && matches.Count == 0 && artists.Count > 0)
+        {
+            var fallbackArtists = SelectDedupFallbackArtists(artists, context, selection);
+            foreach (var artist in fallbackArtists)
+            {
+                matches.Add(new ArtistMatch(artist, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0.0));
+            }
+
+            if (matches.Count > 0)
+            {
+                _logger.Debug(
+                    "Style-seeded dedup fallback engaged for artists: zero seed-style coverage, surfaced {Count} library artists as a dedup audit (selected=[{Selected}])",
+                    matches.Count,
+                    string.Join(", ", selection.SelectedSlugs));
+            }
+        }
+
         return matches;
+    }
+
+    private List<Artist> SelectDedupFallbackArtists(
+        IReadOnlyList<Artist> artists,
+        LibraryStyleContext context,
+        StylePlanContext selection)
+    {
+        var lookup = artists.ToDictionary(a => a.Id);
+
+        // 1) Adjacent styles: the library lacks the seed styles, but it may have a sibling/parent the
+        //    catalog considers similar. Those artists are the most relevant dedup candidates.
+        var adjacentSlugs = CollectAdjacentSlugs(selection);
+        if (adjacentSlugs.Count > 0 && context.StyleIndex != null)
+        {
+            var ids = context.StyleIndex.GetArtistsForStyles(adjacentSlugs);
+            var resolved = ResolveArtists(ids, lookup);
+            if (resolved.Count > 0)
+            {
+                return resolved;
+            }
+        }
+
+        // 2) The library's dominant styles (its actual character) — still useful as a dedup list even
+        //    when unrelated to the seed styles.
+        if (context.DominantStyles.Count > 0 && context.StyleIndex != null)
+        {
+            var ids = context.StyleIndex.GetArtistsForStyles(context.DominantStyles);
+            var resolved = ResolveArtists(ids, lookup);
+            if (resolved.Count > 0)
+            {
+                return resolved;
+            }
+        }
+
+        // 3) Last resort: the whole library is the dedup pool (SampleArtists caps it to the target).
+        return artists.ToList();
+    }
+
+    private List<string> CollectAdjacentSlugs(StylePlanContext selection)
+    {
+        var adjacent = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var seed in selection.SelectedSlugs)
+        {
+            foreach (var similar in _styleCatalog.GetSimilarSlugs(seed))
+            {
+                if (string.IsNullOrWhiteSpace(similar.Slug) || selection.SelectedSlugs.Contains(similar.Slug))
+                {
+                    continue;
+                }
+
+                adjacent.Add(similar.Slug);
+            }
+        }
+
+        return adjacent.ToList();
+    }
+
+    private static List<Artist> ResolveArtists(IReadOnlyList<int> ids, Dictionary<int, Artist> lookup)
+    {
+        var resolved = new List<Artist>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (lookup.TryGetValue(id, out var artist))
+            {
+                resolved.Add(artist);
+            }
+        }
+
+        return resolved;
     }
 
     private List<AlbumMatch> BuildAlbumMatchList(
@@ -312,7 +411,91 @@ public sealed class DefaultSamplingService : ISamplingService
             }
         }
 
+        // Style-seeded dedup fallback (album side) — mirrors the artist fallback above. See its comment
+        // for the genre-first-gate-preservation rationale. Score 0, no matched styles → dedup audit only.
+        if (IsStyleSeededZeroCoverage(selection) && matches.Count == 0 && albums.Count > 0)
+        {
+            var fallbackAlbums = SelectDedupFallbackAlbums(albums, context, selection);
+            foreach (var album in fallbackAlbums)
+            {
+                matches.Add(new AlbumMatch(album, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0.0));
+            }
+
+            if (matches.Count > 0)
+            {
+                _logger.Debug(
+                    "Style-seeded dedup fallback engaged for albums: zero seed-style coverage, surfaced {Count} library albums as a dedup audit (selected=[{Selected}])",
+                    matches.Count,
+                    string.Join(", ", selection.SelectedSlugs));
+            }
+        }
+
         return matches;
+    }
+
+    private List<Album> SelectDedupFallbackAlbums(
+        IReadOnlyList<Album> albums,
+        LibraryStyleContext context,
+        StylePlanContext selection)
+    {
+        var lookup = albums.ToDictionary(a => a.Id);
+
+        var adjacentSlugs = CollectAdjacentSlugs(selection);
+        if (adjacentSlugs.Count > 0 && context.StyleIndex != null)
+        {
+            var ids = context.StyleIndex.GetAlbumsForStyles(adjacentSlugs);
+            var resolved = ResolveAlbums(ids, lookup);
+            if (resolved.Count > 0)
+            {
+                return resolved;
+            }
+        }
+
+        if (context.DominantStyles.Count > 0 && context.StyleIndex != null)
+        {
+            var ids = context.StyleIndex.GetAlbumsForStyles(context.DominantStyles);
+            var resolved = ResolveAlbums(ids, lookup);
+            if (resolved.Count > 0)
+            {
+                return resolved;
+            }
+        }
+
+        return albums.ToList();
+    }
+
+    private static List<Album> ResolveAlbums(IReadOnlyList<int> ids, Dictionary<int, Album> lookup)
+    {
+        var resolved = new List<Album>(ids.Count);
+        foreach (var id in ids)
+        {
+            if (lookup.TryGetValue(id, out var album))
+            {
+                resolved.Add(album);
+            }
+        }
+
+        return resolved;
+    }
+
+    /// <summary>
+    /// Genre-first ("style-seeded") detector — TRUE when the user selected styles whose summed library
+    /// coverage is zero. This is the SAME signal <c>LibraryPromptRenderer</c> and
+    /// <c>RecommendationPipeline.IsStyleSeededDiscovery</c> compute (sum of
+    /// <c>StyleContext.Coverage[selectedSlug]</c> == 0); gating the dedup fallback on it keeps the
+    /// sampler, the prompt, and the post-filter in lockstep and prevents the fallback from firing on a
+    /// merely-sparse library-aligned selection.
+    /// </summary>
+    private static bool IsStyleSeededZeroCoverage(StylePlanContext selection)
+    {
+        if (selection == null || !selection.HasStyles)
+        {
+            return false;
+        }
+
+        var selectedCoverage = selection.SelectedSlugs.Sum(slug =>
+            selection.Coverage.TryGetValue(slug, out var c) ? c : 0);
+        return selectedCoverage == 0;
     }
 
     private bool TryMatchStyles(HashSet<string> itemSlugs, StylePlanContext selection, out HashSet<string> matched, out double score)
