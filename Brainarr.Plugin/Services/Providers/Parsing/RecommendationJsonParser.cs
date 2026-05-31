@@ -20,6 +20,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             var results = new List<Recommendation>();
             if (string.IsNullOrWhiteSpace(json)) return results;
 
+            // Captured (not logged immediately): the primary parse may throw on a truncated/fenced
+            // payload that salvage recovers below. The log LEVEL is decided at the end from the outcome.
+            Exception parseFailure = null;
+
             try
             {
                 // Use relaxed parsing since provider text may include HTML/script literals as data
@@ -98,7 +102,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             }
             catch (Exception ex)
             {
-                logger?.Warn(ex, "Failed to parse recommendations JSON");
+                // Defer: do NOT warn here. Truncated/fenced payloads (routine for verbose models such
+                // as GLM) throw the primary parse but are recovered by the salvage pass below. Warning
+                // unconditionally here produced misleading WARN spam on every successful run.
+                parseFailure = ex;
                 // Fallback: attempt to extract the first JSON array from the raw text and parse that
                 try
                 {
@@ -117,7 +124,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 }
                 catch (Exception ex2)
                 {
-                    logger?.Warn(ex2, "Fallback array extraction also failed");
+                    // Secondary best-effort attempt; object salvage still runs below. Debug, not Warn.
+                    logger?.Debug(ex2, "Fallback array extraction also failed; will attempt object salvage");
                 }
             }
 
@@ -133,6 +141,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 if (results.Count > before)
                 {
                     logger?.Debug("Recovered {0} recommendation(s) by salvaging objects from a truncated/invalid JSON array", results.Count - before);
+                }
+            }
+
+            // Decide the log level for a primary-parse failure from the final outcome: a recovery
+            // (fallback or salvage) is routine and logs at Debug; only a TOTAL loss warrants WARN.
+            if (parseFailure != null)
+            {
+                if (results.Count > 0)
+                {
+                    logger?.Debug(parseFailure, "Primary recommendations-JSON parse failed but recovered {0} item(s) via fallback/salvage; not warning", results.Count);
+                }
+                else
+                {
+                    logger?.Warn(parseFailure, "Failed to parse recommendations JSON (0 recovered after fallback + salvage)");
                 }
             }
 
