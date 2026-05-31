@@ -39,6 +39,7 @@ To add a new AI provider:
 6. Update the provider documentation
 
 Example provider template:
+
 ```csharp
 public class YourProvider : IAIProvider
 {
@@ -75,6 +76,7 @@ Provider requirements:
 We treat the code as the source of truth and keep documentation aligned via automated checks. Run the docs workflow before sending any PR, even if you only touched code.
 
 ### Required docs workflow
+
 1. `pwsh ./scripts/sync-provider-matrix.ps1`
 2. `pwsh ./scripts/check-docs-consistency.ps1` (or `bash ./scripts/check-docs-consistency.sh`)
 3. `pre-commit run --all-files`
@@ -116,7 +118,7 @@ lychee --config .lychee.toml README.md docs/**/*.md wiki-content/**/*.md
   - Linux: `/var/lib/lidarr/plugins/RicherTunes/Brainarr/`
   - Windows: `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`
   - Docker: `/config/plugins/RicherTunes/Brainarr`
-- Compatibility: include “Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch” on entry pages
+- Compatibility: include "Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch" on entry pages
 
 ### Upgrading Code Fences
 
@@ -130,7 +132,7 @@ pwsh -File scripts/add-codefence-langs.ps1 -Root .
 
 ### Prerequisites
 
-- .NET 6.0 SDK or later
+- .NET 8.0 SDK
 - Visual Studio 2022 or VS Code with C# extension
 - A Lidarr instance for testing (optional but recommended)
 - At least one AI provider configured (Ollama recommended for local testing)
@@ -138,16 +140,19 @@ pwsh -File scripts/add-codefence-langs.ps1 -Root .
 ### Setting Up Your Development Environment
 
 1. Extract or clone the repository:
+
    ```bash
    cd Brainarr
    ```
 
 2. Build the project:
+
    ```bash
    dotnet build
    ```
 
 3. Run tests:
+
    ```bash
    dotnet test
    ```

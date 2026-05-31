@@ -1,3 +1,5 @@
+> ⚠️ Historical (flagged 2026-05-31): describes a past state; some details below no longer match the current code.
+
 # Brainarr Auth Scope Audit
 
 **Date**: 2026-05-23

@@ -7,7 +7,7 @@ This document outlines best practices and guidelines to ensure the GitHub Action
 The CI pipeline is now **stable and passing** across all environments:
 
 - ✅ Ubuntu, Windows, macOS (latest versions)
-- ✅ .NET 6.0.x and 8.0.x compatibility
+- ✅ .NET 8.0.x (target framework)
 - ✅ All tests passing with optimized timing
 - ✅ Security scans completing successfully
 - ✅ Zero build warnings
@@ -80,7 +80,7 @@ Before pushing changes that might affect CI:
 ```yaml
 matrix:
   os: [ubuntu-latest, windows-latest, macos-latest]
-  dotnet-version: ['6.0.x', '8.0.x']
+  dotnet-version: ['8.0.x']
 ```
 
 ### Assembly Extraction Strategy (Preferred)

@@ -1,3 +1,5 @@
+> ⚠️ Historical (flagged 2026-05-31): describes a past state; some details below no longer match the current code.
+
 # Archived Brainarr Documentation
 
 These documents are kept for historical reference. They document past planning, audits, and decisions that shaped the current implementation.

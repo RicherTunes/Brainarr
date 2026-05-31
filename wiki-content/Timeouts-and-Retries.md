@@ -13,7 +13,7 @@ This page summarizes the default timeouts and retries for Brainarr and is kept i
 
 - Test timeout: 10s (connection/model checks)
 - Retries: 3 attempts with backoff
-- Circuit breaker: opens for 1 minute on sustained failures (half-open requires 3 successes)
+- Circuit breaker: opens for 30 seconds on sustained failures (half-open requires 3 successes)
 - Hard guardrail: 120s maximum per request
 
 ## Provider call timeouts (defaults)

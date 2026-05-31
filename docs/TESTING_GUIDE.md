@@ -67,7 +67,7 @@ Tests error handling and boundary conditions.
 ### Prerequisites
 
 ```bash
-# Install .NET SDK 6.0 or higher
+# Install .NET SDK 8.0 or higher
 dotnet --version
 
 # Restore dependencies
@@ -542,7 +542,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v1
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Restore
       run: dotnet restore

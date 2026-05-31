@@ -12,11 +12,11 @@ Use this list to confirm the release is ready **before** running `./.github/scri
 
 - [ ] `pwsh ./build.ps1 --setup --test` (or `./build.sh --setup --test`) passes locally.
 - [ ] Any quarantined tests have been reviewed; new skips are documented with TODO links.
-- [ ] CI on `feat/roadmap-1.3.0` is green.
+- [ ] CI on `main` (or release branch) is green. <!-- TODO(docval): feat/roadmap-1.3.0 branch reference outdated -->
 
 ## 3. Manual Smoke (once per release line)
 
-- [ ] Lidarr nightly (≥2.14.2.4786) with Brainarr vX.Y.Z starts cleanly and the import list appears in the UI.
+- [ ] Lidarr nightly (≥3.0.0.4855 plugins branch) with Brainarr vX.Y.Z starts cleanly and the import list appears in the UI.
 - [ ] Primary provider path (local or cloud) returns a recommendation batch end-to-end.
 - [ ] Failover path triggers by intentionally breaking the primary (e.g., stop Ollama service, revoke cloud key) and recovers.
 
