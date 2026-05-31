@@ -146,11 +146,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Temporary per-model concurrency cap for cloud providers after 429. Default 2.")]
         public int? AdaptiveThrottleCloudCap { get; set; }
 
-        // ===== Music Styles (dynamic TagSelect) =====
-        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.TagSelect,
-            HelpText = "Select one or more styles (aliases supported). Leave empty to use your library profile.",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles",
-            SelectOptionsProviderAction = "styles/getoptions")]
+        // ===== Music Styles (free-text tags) =====
+        // NOTE: free-text Tag, NOT TagSelect. Lidarr's TagSelect input renders only static, numeric-keyed
+        // `selectOptions` and ignores `SelectOptionsProviderAction` entirely — so a dynamic, string-slug,
+        // action-backed multi-select (what styles need) silently shipped an EMPTY option list and rejected
+        // every typed value ("nothing sticks"). Lidarr has no generic dynamic-multi-select input, so we use
+        // free-text tags: anything typed sticks, and StyleCatalogService resolves names/aliases (and loose
+        // word order, e.g. "Rock Alternative" -> Alternative Rock) to catalog slugs server-side; unmatched
+        // entries become freeform style anchors.
+        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.Tag,
+            HelpText = "Type one or more styles and press Enter (e.g. \"Alternative Rock\", \"Lo-Fi Hip Hop\"). Aliases and loose word order are matched to the catalog; unrecognised entries are used as freeform seeds. Leave empty to use your library profile.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles")]
         public IEnumerable<string> StyleFilters { get; set; } = Array.Empty<string>();
 
         // Hidden/advanced knobs related to styles & token budgets

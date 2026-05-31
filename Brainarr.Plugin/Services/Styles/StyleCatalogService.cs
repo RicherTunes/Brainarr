@@ -472,7 +472,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
         {
             var trimmed = (value ?? string.Empty).Trim();
             if (string.IsNullOrEmpty(trimmed)) return null;
-            return _valueToSlug.TryGetValue(trimmed, out var slug) ? slug : null;
+
+            // Exact match: a slug, the canonical Name, or a registered alias (case-insensitive).
+            if (_valueToSlug.TryGetValue(trimmed, out var slug))
+            {
+                return slug;
+            }
+
+            // Token-AND fuzzy fallback (mirrors the autocomplete search): free-text entry like
+            // "Rock Alternative" — word order swapped vs the catalog "Alternative Rock" — resolves to
+            // the catalog slug ONLY when exactly one entry contains every query token in its name or
+            // aliases. Ambiguous input (a broad token matching many entries) stays unresolved and is
+            // treated as a freeform style anchor downstream, rather than guessing wrong.
+            var tokens = trimmed.ToLowerInvariant().Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length > 1)
+            {
+                string? unique = null;
+                foreach (var entry in _cache)
+                {
+                    if (entry?.Slug == null) continue;
+                    var hay = (entry.Name ?? string.Empty).ToLowerInvariant();
+                    if (entry.Aliases != null)
+                    {
+                        hay += " " + string.Join(" ", entry.Aliases.Where(a => a != null).Select(a => a.ToLowerInvariant()));
+                    }
+
+                    if (tokens.All(t => hay.Contains(t)))
+                    {
+                        if (unique != null && !string.Equals(unique, entry.Slug, StringComparison.OrdinalIgnoreCase))
+                        {
+                            return null; // ambiguous — don't guess
+                        }
+
+                        unique = entry.Slug;
+                    }
+                }
+
+                return unique;
+            }
+
+            return null;
         }
 
         private static List<StyleEntry> ParseStyles(string json)
