@@ -75,6 +75,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null,
             bool aggressiveGuarantee = false,
+            IReadOnlyList<Recommendation>? alreadyProvided = null,
             CancellationToken cancellationToken = default)
         {
             var existingKeys = shouldRecommendArtists ?
@@ -83,6 +84,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
             var rejectedNames = new List<string>();
+
+            // T1: seed the dedup baseline AND the prompt avoid-list with recommendations already
+            // delivered to the user in this run (the initial batch). Without this, the top-up prompt
+            // never tells the model what it already produced, so a saturated provider re-emits delivered
+            // artists; the strategy then counts them "new" (they are not in the LIBRARY) and they are
+            // only dropped post-hoc — wasting the iteration. Seeding existingKeys makes the strategy's
+            // own dedup recognize any that slip through; seeding rejectedNames puts them into the
+            // iteration-1 [[SYSTEM_AVOID]] marker so the model is told up front. The delivered set is
+            // bounded by MaxRecommendations and the prompt avoid-list is independently capped (Take 50).
+            if (alreadyProvided != null)
+            {
+                foreach (var rec in alreadyProvided)
+                {
+                    if (rec is null || string.IsNullOrWhiteSpace(rec.Artist)) continue;
+                    var key = shouldRecommendArtists
+                        ? NormalizeArtistKey(rec.Artist)
+                        : NormalizeAlbumKey(rec.Artist, rec.Album);
+                    existingKeys.Add(key);
+                    var nm = (!shouldRecommendArtists && !string.IsNullOrWhiteSpace(rec.Album))
+                        ? $"{rec.Artist.Trim()} - {rec.Album.Trim()}"
+                        : rec.Artist.Trim();
+                    if (!string.IsNullOrWhiteSpace(nm) && !rejectedNames.Contains(nm, StringComparer.OrdinalIgnoreCase))
+                    {
+                        rejectedNames.Add(nm);
+                    }
+                }
+            }
 
             var targetCount = settings.MaxRecommendations;
             var ip = settings.GetIterationProfile();
@@ -228,8 +256,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
                     // Log iteration results
                     var successRate = recommendations.Any() ? (double)uniqueRecs.Count / recommendations.Count : 0;
-                    _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} unique " +
-                                $"(success rate: {successRate:P1})");
+                    _logger.Info($"Iteration {iteration}: {uniqueRecs.Count}/{recommendations.Count} new " +
+                                $"(not already in library/delivered/rejected) (success rate: {successRate:P1})");
                     // Correlate tokens to success rate (compact summary)
                     if (settings.EnableDebugLogging)
                     {
