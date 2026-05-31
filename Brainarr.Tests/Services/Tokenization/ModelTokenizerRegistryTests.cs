@@ -84,7 +84,7 @@ namespace Brainarr.Tests.Services.Tokenization
             new ModelTokenizerRegistry(logger: logger).Get(key);
             new ModelTokenizerRegistry(logger: logger).Get(key);
 
-            Assert.Equal(1, target.Logs.Count);
+            Assert.Single(target.Logs); // exactly one WARN across both instances (xUnit2013)
             Assert.Contains(target.Logs, log => log.Contains(key));
         }
 
