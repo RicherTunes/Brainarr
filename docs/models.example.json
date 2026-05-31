@@ -183,6 +183,330 @@
         "max": 1,
         "backoff_ms": 100
       }
+    },
+    {
+      "name": "Z.AI GLM (PaaS)",
+      "slug": "zaiglm",
+      "endpoint": "https://api.z.ai/api/paas/v4/chat/completions",
+      "auth": {
+        "type": "bearer",
+        "env": "ZAI_API_KEY"
+      },
+      "models": [
+        {
+          "id": "glm-5.1",
+          "label": "GLM-5.1",
+          "context_tokens": 200000,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-5",
+          "label": "GLM-5",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-5-turbo",
+          "label": "GLM-5-Turbo",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7",
+          "label": "GLM-4.7",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7-flash",
+          "label": "GLM-4.7-Flash",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7-flashx",
+          "label": "GLM-4.7-FlashX",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.6",
+          "label": "GLM-4.6",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5",
+          "label": "GLM-4.5",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-air",
+          "label": "GLM-4.5-Air",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-airx",
+          "label": "GLM-4.5-AirX",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-flash",
+          "label": "GLM-4.5-Flash",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4-plus",
+          "label": "GLM-4-Plus",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4-32b-0414-128k",
+          "label": "GLM-4-32B",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": true,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        }
+      ],
+      "timeouts": {
+        "connect_ms": 5000,
+        "request_ms": 90000
+      },
+      "retries": {
+        "max": 2,
+        "backoff_ms": 200
+      }
+    },
+    {
+      "name": "Z.AI GLM (Coding Plan)",
+      "slug": "zaicoding",
+      "endpoint": "https://api.z.ai/api/anthropic/v1/messages",
+      "auth": {
+        "type": "bearer",
+        "env": "ZAI_API_KEY"
+      },
+      "models": [
+        {
+          "id": "glm-5.1",
+          "label": "GLM-5.1",
+          "context_tokens": 200000,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-5",
+          "label": "GLM-5",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-5-turbo",
+          "label": "GLM-5-Turbo",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7",
+          "label": "GLM-4.7",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7-flash",
+          "label": "GLM-4.7-Flash",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.7-flashx",
+          "label": "GLM-4.7-FlashX",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.6",
+          "label": "GLM-4.6",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5",
+          "label": "GLM-4.5",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-air",
+          "label": "GLM-4.5-Air",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-airx",
+          "label": "GLM-4.5-AirX",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4.5-flash",
+          "label": "GLM-4.5-Flash",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4-plus",
+          "label": "GLM-4-Plus",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        },
+        {
+          "id": "glm-4-32b-0414-128k",
+          "label": "GLM-4-32B",
+          "context_tokens": 131072,
+          "capabilities": {
+            "stream": true,
+            "json_mode": false,
+            "tools": true,
+            "tool_choice": "auto"
+          }
+        }
+      ],
+      "timeouts": {
+        "connect_ms": 5000,
+        "request_ms": 90000
+      },
+      "retries": {
+        "max": 2,
+        "backoff_ms": 200
+      }
     }
   ]
 }

@@ -96,11 +96,17 @@ namespace Brainarr.Tests.Services
         {
             var b = new LibraryAwarePromptBuilder(Logger);
             var minOllama = b.GetEffectiveTokenLimit(SamplingStrategy.Minimal, AIProvider.Ollama);
-            var balCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.OpenAI);
-            var compLocal = b.GetEffectiveTokenLimit(SamplingStrategy.Comprehensive, AIProvider.LMStudio);
+            var compOllama = b.GetEffectiveTokenLimit(SamplingStrategy.Comprehensive, AIProvider.Ollama);
+            // Smaller- vs larger-context cloud providers at the same strategy: the effective
+            // limit must scale with the model's context window (capacity-aware budget).
+            var balSmallCtxCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.Gemini); // 32K default
+            var balLargeCtxCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.OpenAI); // 64K default
 
             Assert.True(minOllama > 0);
-            Assert.True(compLocal > balCloud); // comprehensive(local) should exceed balanced(cloud)
+            // Strategy ordering on the same provider: comprehensive yields a larger budget than minimal.
+            Assert.True(compOllama > minOllama, $"comprehensive ({compOllama}) should exceed minimal ({minOllama}) on the same provider");
+            // Context-window awareness: a larger-context cloud model gets a larger budget at the same strategy.
+            Assert.True(balLargeCtxCloud > balSmallCtxCloud, $"larger-context cloud ({balLargeCtxCloud}) should exceed smaller-context cloud ({balSmallCtxCloud})");
         }
 
         [Fact]
