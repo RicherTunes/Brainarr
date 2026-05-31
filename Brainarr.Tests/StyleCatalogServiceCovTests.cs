@@ -208,6 +208,31 @@ namespace Brainarr.Tests
             result.Should().Contain("progressive-rock");
         }
 
+        [Theory]
+        [InlineData("Rock Alternative", "alternative-rock")]
+        [InlineData("alternative rock", "alternative-rock")]
+        public void ResolveSlug_ReorderedOrExactFreeText_ResolvesToCanonicalSlug(string typed, string expectedSlug)
+        {
+            // F4 (real fix): Music Styles is now a free-text Tag field. A user typing the words in a
+            // different order than the catalog ("Rock Alternative" vs "Alternative Rock") must still
+            // resolve to the catalog slug server-side via a unique token-AND match.
+            var service = new StyleCatalogService(_logger, null);
+
+            service.ResolveSlug(typed).Should().Be(expectedSlug);
+            service.Normalize(new[] { typed }).Should().Contain(expectedSlug);
+        }
+
+        [Fact]
+        public void ResolveSlug_AmbiguousOrUnknownFreeText_StaysUnresolved()
+        {
+            // Token-AND must not guess: unknown multi-word free text resolves to null (treated as a
+            // freeform anchor downstream), and an ambiguous broad single token doesn't false-resolve.
+            var service = new StyleCatalogService(_logger, null);
+
+            service.ResolveSlug("zzz nonexistent gibberish").Should().BeNull();
+            service.Normalize(new[] { "zzz nonexistent gibberish" }).Should().BeEmpty();
+        }
+
         [Fact]
         public void Normalize_IsCaseInsensitive()
         {
