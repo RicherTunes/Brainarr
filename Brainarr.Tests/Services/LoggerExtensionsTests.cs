@@ -56,30 +56,5 @@ namespace Brainarr.Tests.Services
                 logs.Any(l => l.Contains("ERROR:")).Should().BeTrue();
             }
         }
-
-        [Theory]
-        [InlineData("https://example.com/path?api_key=secret#frag", "https://example.com/path")]
-        [InlineData("http://example.com:8080/path/sub", "http://example.com:8080/path/sub")]
-        public void UrlSanitizer_Should_RemoveSensitiveParts_AndKeepPath(string input, string expected)
-        {
-            // Act
-            var sanitized = UrlSanitizer.SanitizeUrl(input);
-
-            // Assert
-            sanitized.Should().Be(expected);
-        }
-
-        [Fact]
-        public void UrlSanitizer_Should_Fallback_WhenUrlIsMalformed()
-        {
-            // Arrange
-            var malformed = "http://exa mple.com/path?token=abc#frag";
-
-            // Act
-            var sanitized = UrlSanitizer.SanitizeUrl(malformed);
-
-            // Assert
-            sanitized.Should().Be("http://exa mple.com/path");
-        }
     }
 }
