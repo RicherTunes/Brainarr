@@ -25,6 +25,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         internal const double ComprehensiveRatio = 1.00;
         internal const int MinimalPromptFloor = 1500;
 
+        // Top bound on the prompt budget for metered cloud providers. The prompt already
+        // scales with the model's context window via the completion/headroom reserves
+        // (see ResolvePromptBudget lines computing completionReserve/headroomTokens); this
+        // ceiling just bounds the top to control cost on metered providers (user-approved ~96K).
+        internal const int CloudPromptCeiling = 96000;
+
         internal static readonly Dictionary<AIProvider, int> DefaultContextTokens = new()
         {
             [AIProvider.Ollama] = 32768,
@@ -36,6 +42,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             [AIProvider.DeepSeek] = 48000,
             [AIProvider.Gemini] = 32000,
             [AIProvider.Groq] = 32000,
+            // 128K — conservative provider default safe for all GLM models; per-model
+            // precision (e.g. GLM-5.1's 200K) comes from the model registry when present.
+            [AIProvider.ZaiGlm] = 131072,
+            [AIProvider.ZaiCoding] = 131072,
         };
 
         public TokenBudgetResolver(Logger logger, ModelContextResolver modelContextResolver, ITokenBudgetPolicy tokenBudgetPolicy)
@@ -116,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             return provider switch
             {
                 AIProvider.Ollama or AIProvider.LMStudio => int.MaxValue,
-                _ => 20000
+                _ => CloudPromptCeiling
             };
         }
 

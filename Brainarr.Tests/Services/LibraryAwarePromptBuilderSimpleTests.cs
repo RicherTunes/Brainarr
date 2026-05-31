@@ -17,12 +17,14 @@ namespace Brainarr.Tests.Services
             var logger = Helpers.TestLogger.CreateNullLogger();
             var b = new LibraryAwarePromptBuilder(logger);
 
-            var balancedCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.OpenAI);
-            var balancedOllama = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.Ollama);
+            var balancedSmallCtxCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.Gemini); // 32K default
+            var balancedLargeCtxCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Balanced, AIProvider.OpenAI); // 64K default
             var minimalCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Minimal, AIProvider.OpenAI);
             var compCloud = b.GetEffectiveTokenLimit(SamplingStrategy.Comprehensive, AIProvider.OpenAI);
 
-            Assert.True(balancedOllama > balancedCloud);
+            // Provider context-window awareness: larger context window -> larger budget at the same strategy.
+            Assert.True(balancedLargeCtxCloud > balancedSmallCtxCloud);
+            // Strategy ordering on the same provider.
             Assert.True(compCloud > minimalCloud);
         }
 

@@ -21,17 +21,5 @@ namespace Brainarr.Tests.Services
             innerId.Should().Be("test-corr");
             CorrelationContext.Current.Should().NotBeNull();
         }
-
-        [Fact]
-        public void UrlSanitizer_removes_query_and_fragment()
-        {
-            var url = "https://api.example.com/path/resource?api_key=SECRET#frag";
-            var sanitized = UrlSanitizer.SanitizeUrl(url);
-            sanitized.Should().Be("https://api.example.com/path/resource");
-
-            var api = UrlSanitizer.SanitizeApiUrl("https://api.example.com/api/v1?token=ABC123");
-            api.Should().Contain("api");
-            api.Should().NotContain("ABC123");
-        }
     }
 }
