@@ -305,33 +305,6 @@ namespace Brainarr.Plugin.Services.Security
                 return "[invalid-url]";
             }
         }
-
-        private string SanitizeErrorMessage(string message)
-        {
-            // Remove potentially sensitive information from error messages
-            if (string.IsNullOrWhiteSpace(message))
-            {
-                return "Unknown error";
-            }
-
-            // Remove file paths
-            message = System.Text.RegularExpressions.Regex.Replace(message, @"[a-zA-Z]:[\\\/][\w\s\\\/.-]+", "[path]");
-            message = System.Text.RegularExpressions.Regex.Replace(message, @"\/[\w\s\/.-]+", "[path]");
-
-            // Remove IP addresses
-            message = System.Text.RegularExpressions.Regex.Replace(message, @"\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b", "[ip]");
-
-            // Remove URLs
-            message = System.Text.RegularExpressions.Regex.Replace(message, @"https?:\/\/[^\s]+", "[url]");
-
-            // Truncate if too long
-            if (message.Length > 200)
-            {
-                message = message.Substring(0, 197) + "...";
-            }
-
-            return message;
-        }
     }
 
     public class SecurityConfiguration
