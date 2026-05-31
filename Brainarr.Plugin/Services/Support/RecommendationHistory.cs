@@ -533,11 +533,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             // Decode HTML entities before keying so an entity-encoded "Simon &amp; Garfunkel" and the
             // raw "Simon & Garfunkel" map to the SAME dedup key (mirrors the MBID-resolver fixes #60/#66;
             // otherwise the same entity is tracked under two keys and slips re-suggestion/exclusion).
-            // Null-safe (a null artist previously threw here).
-            var a = System.Net.WebUtility.HtmlDecode(artist ?? string.Empty).ToLowerInvariant();
+            // Also collapse leading/trailing and internal whitespace runs so "The  Beatles" (a stray
+            // double space, common in scraped/model output) keys the same as "The Beatles" — same
+            // consistency rationale as the entity decode (#78). Null-safe (a null artist previously threw).
+            var a = NormalizeKeyPart(artist);
             return string.IsNullOrEmpty(album)
                 ? a
-                : $"{a}|{System.Net.WebUtility.HtmlDecode(album).ToLowerInvariant()}";
+                : $"{a}|{NormalizeKeyPart(album)}";
+        }
+
+        private static string NormalizeKeyPart(string s)
+        {
+            var decoded = System.Net.WebUtility.HtmlDecode(s ?? string.Empty).ToLowerInvariant();
+            // Split on any whitespace, drop empties, rejoin with a single space — trims ends and
+            // collapses runs without a regex (no ReDoS surface, consistent with RecommendationValidator).
+            return string.Join(" ", decoded.Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
         }
 
         private void LoadHistory()
