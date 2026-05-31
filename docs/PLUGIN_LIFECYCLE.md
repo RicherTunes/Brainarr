@@ -11,7 +11,7 @@ Lidarr Core
     ↓
 ImportListBase<T>
     ↓
-BrainarrImportList
+Brainarr
     ↓
 AI Providers & Services
 ```
@@ -24,15 +24,15 @@ When Lidarr starts, it scans the plugins directory for assemblies:
 
 ```text
 /var/lib/lidarr/plugins/RicherTunes/Brainarr/
-├── Brainarr.Plugin.dll          # Main plugin assembly
+├── Lidarr.Plugin.Brainarr.dll    # Main plugin assembly
 ├── plugin.json                   # Plugin manifest
-└── Dependencies/                 # Additional dependencies
+└── manifest.json                 # Plugin metadata
 ```
 
 **Process:**
 
 1. Lidarr scans `/plugins/` directory
-2. Loads assemblies matching pattern `*.Plugin.dll`
+2. Loads assemblies matching pattern `Lidarr.Plugin.*.dll`
 3. Reads `plugin.json` for metadata validation
 4. Registers plugin types with dependency injection container
 
@@ -41,11 +41,12 @@ When Lidarr starts, it scans the plugins directory for assemblies:
 Lidarr uses reflection to discover plugin classes:
 
 ```csharp
-[ImportListDefinition(
-    "Brainarr",
-    typeof(BrainarrSettings),
-    ImportListType.Music)]
-public class BrainarrImportList : ImportListBase<BrainarrSettings>
+public class Brainarr : ImportListBase<BrainarrSettings>, IDisposable
+{
+    public override string Name => "Brainarr AI Music Discovery";
+    public override ImportListType ListType => ImportListType.Program;
+    // ...
+}
 ```
 
 **Registration Steps:**
@@ -60,14 +61,14 @@ public class BrainarrImportList : ImportListBase<BrainarrSettings>
 Brainarr's constructor receives Lidarr services via DI:
 
 ```csharp
-public BrainarrImportList(
-    IHttpClient httpClient,           // HTTP operations
-    IImportListStatusService statusService,  // Status tracking
-    IConfigService configService,     // Configuration
-    IParsingService parsingService,   // Metadata parsing
-    IArtistService artistService,     // Artist database
-    IAlbumService albumService,       // Album database
-    Logger logger)                    // Logging
+public Brainarr(
+    IHttpClient httpClient,
+    IImportListStatusService importListStatusService,
+    IConfigService configService,
+    IParsingService parsingService,
+    IArtistService artistService,
+    IAlbumService albumService,
+    Logger logger)
 ```
 
 **Service Lifecycle:**

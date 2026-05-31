@@ -4,8 +4,9 @@ This is a small, dev‑only HTML page that helps you exercise Brainarr’s provi
 
 - File: `examples/ui/testconnection_details.html`
 - Purpose:
-  - Call `testconnection/details` and render `hint` + `docs` (Learn more link)
-  - Call `sanitycheck/commands` to get copy‑paste curl commands for quick out‑of‑band checks
+  - Call `testconnection` to test provider connectivity
+  - Call model detection actions like `getOllamaModels`, `getLMStudioModels`
+  - <!-- TODO(docval): unverified — HTML file references `testconnection/details` and `sanitycheck/commands` endpoints that don’t exist in BrainarrOrchestrator.HandleAction -->
 
 Usage
 - Start Lidarr with the Brainarr plugin loaded.

@@ -1,6 +1,6 @@
 # Brainarr AI Provider Guide
 
-Brainarr supports nine AI providers across local, cloud, and gateway modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
+Brainarr supports eleven AI providers across local, cloud, subscription, and CLI modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
 
 - **Provider status, verification notes, and default models** are generated from `docs/providers.yaml` into [README ▸ Provider status](../README.md#provider-status) and `docs/PROVIDER_MATRIX.md`.
 - **Deep dives and setup walkthroughs** live in the wiki: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
@@ -28,8 +28,12 @@ Brainarr uses UI-friendly labels that map to actual API model IDs. Select models
 | **DeepSeek** | DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_Chat` |
 | **Perplexity** | Sonar_Pro, Sonar_Reasoning_Pro, Sonar_Reasoning, Sonar | `Sonar_Pro` |
 | **OpenRouter** | Auto, ClaudeSonnet4, GPT41_Mini, Gemini25_Flash, Llama33_70B, DeepSeekV3 | `Auto` |
+| **Claude Code** | ClaudeSonnet46, ClaudeOpus47, ClaudeHaiku45 | `ClaudeSonnet46` |
+| **OpenAI Codex** | GPT5, GPT5_Mini, GPT41_Mini | `GPT5_Mini` |
 
 **Advanced:** Use the **Manual Model ID** field in Advanced Settings to specify an exact API model ID (e.g., `gpt-4.1-mini`, `claude-sonnet-4-20250514`) when you need a model not in the dropdown.
+
+> **Note:** For the complete and up-to-date provider status matrix including verification notes and any additional providers, see [README ▸ Provider compatibility](../README.md#provider-compatibility).
 
 ## Latest models (November 2025)
 
