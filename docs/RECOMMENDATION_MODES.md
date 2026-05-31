@@ -4,7 +4,7 @@ Recommendation modes describe how Brainarr balances artist versus album sampling
 
 Key pointers:
 
-- The enum values (`SpecificAlbums`, `Artists`, etc.) and defaults are documented in `Brainarr.Plugin/Configuration/RecommendationMode.cs`.
+- The enum values (`SpecificAlbums`, `ArtistsOnly`, `Artists`, `Mixed`) and defaults are documented in `Brainarr.Plugin/Configuration/Enums.cs`.
 - Behavioural differences (discography imports, token budgets, sampling shape) are covered in the wiki alongside other advanced tuning knobs.
 - Release notes summarise changes when new modes or defaults ship (see `CHANGELOG.md`).
 

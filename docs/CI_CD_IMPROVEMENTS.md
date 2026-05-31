@@ -80,9 +80,9 @@ Critical version alignments for Lidarr plugins:
 | Component | Version | Notes |
 |-----------|---------|-------|
 | Target Framework | net8.0 | Must match Lidarr host |
-| Microsoft.Extensions.* | 8.0.x | Required by modern NLog |
+| Microsoft.Extensions.* | 7.0.x / 8.0.x | Mixed versions; some packages use 7.0.x, others 8.0.x |
 | FluentValidation | 9.5.4 | Matches Lidarr's version |
-| NLog | 5.4.0 | Compatible with Lidarr |
+| NLog | 6.0.3 | Compatible with Lidarr |
 
 ## Why Other Lidarr Plugins Should Adopt This
 

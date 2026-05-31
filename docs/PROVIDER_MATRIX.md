@@ -1,6 +1,7 @@
-# Brainarr Provider Matrix (v1.3.1)
+# Brainarr Provider Matrix (v1.6.1)
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
+<!-- TODO(docval): providers.yaml is incomplete vs actual AIProvider enum in Brainarr.Plugin/Configuration/Enums.cs - missing ClaudeCodeCli, ZaiGlm, ZaiCoding -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
