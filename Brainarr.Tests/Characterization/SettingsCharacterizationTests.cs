@@ -78,11 +78,13 @@ namespace Brainarr.Tests.Characterization
         [InlineData(AIProvider.Groq)]
         [InlineData(AIProvider.Perplexity)]
         [InlineData(AIProvider.OpenRouter)]
-        public void ConfigurationUrl_CloudProviders_ReturnsNAMessage(AIProvider provider)
+        public void ConfigurationUrl_CloudProviders_ShowRealEndpoint(AIProvider provider)
         {
+            // F5b: cloud providers now show their real endpoint for reference (was "N/A").
             var settings = new BrainarrSettings { Provider = provider };
-            settings.ConfigurationUrl.Should().Contain("N/A",
-                $"cloud provider {provider} should show N/A for ConfigurationUrl");
+            settings.ConfigurationUrl.Should().StartWith("https://",
+                $"cloud provider {provider} should show its real endpoint for ConfigurationUrl");
+            settings.ConfigurationUrl.Should().NotContain("N/A");
         }
 
         // ─── ModelSelection: each provider returns a valid model ──────────────
