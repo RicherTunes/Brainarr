@@ -199,7 +199,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     libraryProfile,
                     deficit,
                     validationSummary,
-                    cancellationToken).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
+                    cancellationToken,
+                    // T1: exclude the already-delivered set from the top-up prompt + dedup.
+                    alreadyAccepted: importItems,
+                    // T2: MBID-enrich top-up recs (artist mode) with the same resolver as the initial batch.
+                    artistResolver: _artistResolver).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
                 if (topUp.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
