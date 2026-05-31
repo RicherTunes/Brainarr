@@ -11,6 +11,15 @@ namespace Brainarr.Tests.Services.Tokenization
 {
     public class ModelTokenizerRegistryTests
     {
+        public ModelTokenizerRegistryTests()
+        {
+            // The tokenizer-fallback warn gate is process-wide static (F1 fix). Reset it before each
+            // test so warn/metric-count assertions are deterministic regardless of suite ordering.
+            // The fallback keys used here ("openai:gpt-test", "f1procwide:*", empty/"<default>") are
+            // exclusive to this file, so no cross-collection test can race the gate during these.
+            ModelTokenizerRegistry.ResetFallbackWarnStateForTests();
+        }
+
         [Fact]
         [Trait("Category", "Unit")]
         [Trait("Category", "Tokenization")]
@@ -49,6 +58,34 @@ namespace Brainarr.Tests.Services.Tokenization
             Assert.Equal(2, metrics.Records.Count);
             Assert.Contains(metrics.Records, r => r.Name == MetricsNames.TokenizerFallback && r.Tags["model"] == "openai:gpt-test" && r.Tags["reason"] == "default-fallback");
             Assert.Contains(metrics.Records, r => r.Tags["model"] == "<default>" && r.Tags["reason"] == "empty-model-key");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "Tokenization")]
+        public void FallbackWarn_FiresOnce_AcrossRegistryInstances()
+        {
+            // Real-usage finding (F1): the tokenizer-fallback WARN ("no tokenizer registered for
+            // zaicoding:glm-4.5-air") re-fired on every run. Lidarr re-instantiates BrainarrImportList
+            // — and thus a fresh DI ServiceProvider + a fresh ModelTokenizerRegistry — per operation,
+            // so an instance-scoped WarnOnce gate reset every run. The gate must be process-wide
+            // (WarnOnce's documented private-static usage) so the WARN fires once and subsequent
+            // fallbacks (this run or a later one) drop to Debug.
+            var target = new MemoryTarget { Layout = "${level}|${message}" };
+            var config = new LoggingConfiguration();
+            config.AddRule(LogLevel.Warn, LogLevel.Warn, target, "tokenizer-procwide");
+            using var factory = new LogFactory(config);
+            var logger = factory.GetLogger("tokenizer-procwide");
+
+            const string key = "f1procwide:glm-4.5-air"; // unique to this test — no cross-test collision
+
+            // Two separate registries (simulating two per-run instantiations) both fall back for the
+            // same model key. The WARN must fire exactly ONCE across both instances, not once per instance.
+            new ModelTokenizerRegistry(logger: logger).Get(key);
+            new ModelTokenizerRegistry(logger: logger).Get(key);
+
+            Assert.Single(target.Logs); // exactly one WARN across both instances (xUnit2013)
+            Assert.Contains(target.Logs, log => log.Contains(key));
         }
 
         [Fact]
