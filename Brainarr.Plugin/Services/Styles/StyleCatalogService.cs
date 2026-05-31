@@ -254,6 +254,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
                     if (al.Contains(lowerQuery)) return 200 - (al.Length - lowerQuery.Length);
                 }
             }
+
+            // Token-AND (order-independent) fallback for multi-word queries: every whitespace token of
+            // the query must appear somewhere in the name (or, lower-ranked, the name+aliases). This is
+            // what lets "Rock Alternative" find "Alternative Rock" — the whole-string checks above are
+            // token-order-sensitive and would otherwise return nothing. Ranked BELOW all direct matches
+            // so precise typing still wins; only triggers for >1 token (single tokens are fully covered
+            // above, and AND-ing one token would just duplicate the Contains check).
+            var tokens = lowerQuery.Split((char[])null, StringSplitOptions.RemoveEmptyEntries);
+            if (tokens.Length > 1)
+            {
+                if (tokens.All(t => name.Contains(t))) return 100;
+
+                var aliasBlob = s.Aliases == null
+                    ? string.Empty
+                    : string.Join(" ", s.Aliases.Where(a => a != null).Select(a => a.ToLowerInvariant()));
+                var haystack = name + " " + aliasBlob;
+                if (tokens.All(t => haystack.Contains(t))) return 60;
+            }
+
             return 0;
         }
 

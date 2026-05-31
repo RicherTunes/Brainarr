@@ -153,6 +153,34 @@ namespace Brainarr.Tests
         }
 
         [Fact]
+        public void Search_WithReorderedTokens_ReturnsStyle()
+        {
+            // F4 (real-usage): typing "Rock Alternative" in the Music Styles TagSelect returned NO
+            // options because Score only did whole-string StartsWith/Contains — "rock alternative" is
+            // not a substring of "alternative rock". Multi-word queries must match order-independently
+            // (every token present), so the user can actually find/select the style.
+            var service = new StyleCatalogService(_logger, null);
+
+            var result = service.Search("Rock Alternative");
+
+            result.Should().Contain(s => s.Slug == "alternative-rock",
+                "a reordered multi-word query must still find Alternative Rock");
+        }
+
+        [Fact]
+        public void Search_WithReorderedTokens_DoesNotOverMatchMissingToken()
+        {
+            // Token-AND, not token-OR: an entry missing one of the query tokens must NOT match. Plain
+            // "Rock" lacks "alternative", so the query "Rock Alternative" must not return it.
+            var service = new StyleCatalogService(_logger, null);
+
+            var result = service.Search("Rock Alternative");
+
+            result.Should().NotContain(s => s.Slug == "rock",
+                "plain Rock is missing the 'alternative' token and must be excluded");
+        }
+
+        [Fact]
         public void Search_WithLimit_ReturnsLimitedResults()
         {
             // Arrange
