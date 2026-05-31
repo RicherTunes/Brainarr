@@ -8,16 +8,17 @@
 The primary interface that all AI providers must implement to integrate with Brainarr.
 
 ```csharp
-public interface ILibraryAnalyzer
+public interface IAIProvider
 {
-    LibraryProfile AnalyzeLibrary();
-    string BuildPrompt(LibraryProfile profile, int maxRecommendations, DiscoveryMode discoveryMode);
-    List<Recommendation> FilterExistingRecommendations(List<Recommendation> recommendations, bool artistMode);
-    List<ImportListItemInfo> FilterDuplicates(List<ImportListItemInfo> recommendations);
+    Task<List<Recommendation>> GetRecommendationsAsync(string prompt);
+    Task<bool> TestConnectionAsync();
+    string ProviderName { get; }
+    void UpdateModel(string modelName);
+    string? GetLastUserMessage();
+    string? GetLearnMoreUrl();
 }
 ```
 
-#### Methods
 #### Methods
 
 ##### GetRecommendationsAsync
@@ -210,22 +211,23 @@ Filters the post-enrichment import items, removing duplicate artist/album combin
 
 Represents a music recommendation with metadata.
 
-```csharp
-public class Recommendation
+```text
+public record Recommendation
 {
-    public string Artist { get; set; }
-    public string Album { get; set; }
-    public string Genre { get; set; }
-    public double Confidence { get; set; }
-    public string Reason { get; set; }
-    public int? Year { get; set; }                   // Preferred: Release year of the album
-    public int? ReleaseYear { get; set; }            // Alternative property name for Year
-    public string Source { get; set; }               // Source provider identifier
-    public string Provider { get; set; }             // Provider that made the recommendation
-    public string MusicBrainzId { get; set; }        // MusicBrainz ID for the recommendation
-    public string ArtistMusicBrainzId { get; set; }  // Artist MusicBrainz ID
-    public string AlbumMusicBrainzId { get; set; }   // Album MusicBrainz ID
-    public string SpotifyId { get; set; }            // Spotify ID for the album
+    public string Artist { get; init; }
+    public string Album { get; init; }
+    public string? Genre { get; init; }
+    public double Confidence { get; init; }
+    public bool ConfidenceProvided { get; init; }
+    public string? Reason { get; init; }
+    public int? Year { get; init; }                   // Preferred: Release year of the album
+    public int? ReleaseYear { get; init; }            // Alternative property name for Year
+    public string? Source { get; init; }              // Source provider identifier
+    public string? Provider { get; init; }            // Provider that made the recommendation
+    public string? MusicBrainzId { get; init; }       // MusicBrainz ID for the recommendation
+    public string? ArtistMusicBrainzId { get; init; } // Artist MusicBrainz ID
+    public string? AlbumMusicBrainzId { get; init; } // Album MusicBrainz ID
+    public string? SpotifyId { get; init; }          // Spotify ID for the album
 }
 ```
 
@@ -458,18 +460,23 @@ public class BrainarrSettings
 ### Enumerations
 
 #### AIProvider
-```csharp
+```text
 public enum AIProvider
 {
-    Ollama,
-    LMStudio,
-    OpenAI,
-    Anthropic,
-    Gemini,
-    DeepSeek,
-    Groq,
-    OpenRouter,
-    Perplexity
+    Ollama = 0,
+    LMStudio = 1,
+    Perplexity = 2,
+    OpenAI = 3,
+    Anthropic = 4,
+    OpenRouter = 5,
+    DeepSeek = 6,
+    Gemini = 7,
+    Groq = 8,
+    ClaudeCodeSubscription = 9,
+    OpenAICodexSubscription = 10,
+    ClaudeCodeCli = 11,
+    ZaiGlm = 12,
+    ZaiCoding = 13
 }
 ```
 
@@ -709,6 +716,7 @@ Certain UI operations are handled via provider actions without changing existing
   - Examples: Gemini model list, OpenAI/Anthropic/OpenRouter model list, local Ollama/LM Studio endpoints.
 
 Dev UI example
+
 - A simple HTML page demonstrating both actions lives at `examples/ui/testconnection_details.html`.
 - See `docs/PROVIDER_GUIDE.md` for usage notes.
 

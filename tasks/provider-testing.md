@@ -23,7 +23,7 @@ Use this checklist to verify Brainarr provider integrations before marking them 
 
 ## Google Gemini (Cloud)
 
-- API key created at https://aistudio.google.com/apikey
+- API key created at <https://aistudio.google.com/apikey>
 - Free tier rate limits understood (15 RPM, 1.5K RPD)
 - Default model `Gemini_25_Flash` ▸ `gemini-2.5-flash` selected (or Pro if desired)
 - Test run produces recommendations consistently
@@ -31,14 +31,14 @@ Use this checklist to verify Brainarr provider integrations before marking them 
 
 ## Perplexity (Cloud)
 
-- API key created at https://perplexity.ai/settings/api
+- API key created at <https://perplexity.ai/settings/api>
 - Default model `Sonar_Pro` ▸ `sonar-pro`
 - Test run produces web‑enhanced results
 - If using Pro subscription, note $5/month API credit availability in docs
 
 ## Recording Results
 
-- Update docs/PROVIDER_SUPPORT_MATRIX.md with “Tested” and Last Verified date
+- Update docs/PROVIDER_MATRIX.md with “Tested” and Last Verified date
 - Update docs/PROVIDER_GUIDE.md “Last Verified” for the provider section
 - Update README Provider Status snippet
 - Add a note in CHANGELOG and release notes for the version

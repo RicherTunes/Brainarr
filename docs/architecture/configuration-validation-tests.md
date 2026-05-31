@@ -17,7 +17,7 @@ Last updated: 2025-09-25 (production validation service introduced)
 
 ## Root Causes
 
-- **Type shadowing risk**: mitigated by introducing `ConfigurationValidationService` within `NzbDrone.Core.ImportLists.Brainarr.Services.ConfigurationValidation` and deleting the old helper.
+- **Type shadowing risk**: mitigated by introducing `ConfigurationValidationService` within the `NzbDrone.Core.ImportLists.Brainarr.Services.ConfigurationValidation` namespace and deleting the old helper.
 - **Duplication / drift**: Helper re-implemented validation rules (URL checks, API key shapes) leading to divergence. Production validators now cover those paths.
 - **Overextended test scope**: The prior single class mixed settings, provider configuration, and connection tests, making failures hard to localize.
 
@@ -31,7 +31,7 @@ Last updated: 2025-09-25 (production validation service introduced)
 
 ## Deliverables
 
-- New production service: `Services.ConfigurationValidation.ConfigurationValidationService` + `ConfigurationValidationSummary`.
+- New production service: `ConfigurationValidationService` + `ConfigurationValidationSummary` in namespace `NzbDrone.Core.ImportLists.Brainarr.Services.ConfigurationValidation`.
 - New test fixtures: `BrainarrSettingsValidatorTestsV2`, `ProviderConfigurationValidatorTests`, `ConfigurationValidationServiceTests`.
 - Roadmap item **T0** updated; docs reference this plan (`tasks/brainarr-tech-roadmap.md`).
 

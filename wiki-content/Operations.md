@@ -38,7 +38,7 @@
 
 ## Dashboards & alerts
 
-- Import `dashboards/grafana-brainarr-observability.json` as a starting panel set (p95 latency, error rate, 429 ratio).
+- Import `docs/assets/grafana-brainarr-observability.json` as a starting panel set (p95 latency, error rate, 429 ratio).
 - Suggested PromQL (from `dashboards/README.md`):
   - `provider_latency_seconds_p95{provider="openai"}` for tails.
   - `increase(provider_requests_total{status="error"}[5m])` for spikes.
