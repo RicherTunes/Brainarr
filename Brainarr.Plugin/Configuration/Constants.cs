@@ -145,6 +145,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
+        public const string PerplexityChatCompletionsUrl = "https://api.perplexity.ai/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
         public const string GroqChatCompletionsUrl = "https://api.groq.com/openai/v1/chat/completions";
         public const string DeepSeekChatCompletionsUrl = "https://api.deepseek.com/chat/completions";

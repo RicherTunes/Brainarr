@@ -75,14 +75,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private string _lmStudioModel;
 
         [FieldDefinition(1, Label = "Configuration URL", Type = FieldType.Textbox,
-            HelpText = "Only used for local providers (Ollama/LM Studio). For cloud/API-key providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq) this shows 'N/A' and is ignored.",
+            HelpText = "For local providers (Ollama/LM Studio) this is the editable server URL. For cloud/subscription providers it shows the fixed API endpoint for reference — requests are authenticated by your API Key, so edits here are ignored. (Z.AI Coding, for example, shows its real Anthropic-format endpoint.)",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#configuration-url")]
         public string ConfigurationUrl
         {
             get => Provider switch
             {
+                // Local providers: the editable server URL (default when unset).
                 AIProvider.Ollama => string.IsNullOrEmpty(_ollamaUrl) ? BrainarrConstants.DefaultOllamaUrl : _ollamaUrl,
                 AIProvider.LMStudio => string.IsNullOrEmpty(_lmStudioUrl) ? BrainarrConstants.DefaultLMStudioUrl : _lmStudioUrl,
+                // Cloud/subscription providers: the fixed endpoint, shown for reference (not editable) so
+                // switching provider surfaces the real destination instead of an opaque "N/A". The setter
+                // below no-ops for these, and the runtime endpoint is owned by each provider, not this field.
+                AIProvider.Perplexity => BrainarrConstants.PerplexityChatCompletionsUrl,
+                AIProvider.OpenAI => BrainarrConstants.OpenAIChatCompletionsUrl,
+                AIProvider.Anthropic => BrainarrConstants.AnthropicMessagesUrl,
+                AIProvider.OpenRouter => BrainarrConstants.OpenRouterChatCompletionsUrl,
+                AIProvider.DeepSeek => BrainarrConstants.DeepSeekChatCompletionsUrl,
+                AIProvider.Gemini => BrainarrConstants.GeminiModelsBaseUrl,
+                AIProvider.Groq => BrainarrConstants.GroqChatCompletionsUrl,
+                AIProvider.ZaiGlm => BrainarrConstants.ZaiGlmChatCompletionsUrl,
+                AIProvider.ZaiCoding => BrainarrConstants.ZaiCodingMessagesUrl,
+                AIProvider.ClaudeCodeSubscription => BrainarrConstants.AnthropicMessagesUrl,
+                AIProvider.OpenAICodexSubscription => BrainarrConstants.OpenAIChatCompletionsUrl,
+                AIProvider.ClaudeCodeCli => "Local CLI (claude binary) — no HTTP endpoint",
                 _ => "N/A - API Key based provider"
             };
             set
@@ -93,7 +109,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         }
 
         [FieldDefinition(2, Label = "Model Selection", Type = FieldType.Select, SelectOptionsProviderAction = "getModelOptions",
-            HelpText = "Detected models are loaded once when this form opens. To refresh after switching Provider or Configuration URL: Save the settings and reopen this page, or edit the Configuration URL (e.g., add/remove a trailing slash) to trigger an inline refresh. Lidarr's UI does not currently watch the Provider field for changes.", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
+            HelpText = "Models load when this form opens. Lidarr's settings UI does not refetch this list when only the Provider dropdown changes, so after switching Provider: for cloud/subscription providers, entering or updating your API Key refreshes the list to that provider's models; otherwise Save the settings and reopen this page. (If the list looks stale for a newly-selected provider, that's why — Save & reopen.)", HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#model-selection")]
         public string ModelSelection
         {
             get
