@@ -1,5 +1,7 @@
 # TechDebt Teardown Plan
 
+> ⚠️ Historical (flagged 2026-05-31): describes a past state; some details below no longer match the current code.
+
 > ✅ **Status (Wave-22 / 2026-05-25):** The entire `Brainarr.Plugin/TechDebt/`
 > directory was deleted in commit `7e7a722`. This document is retained for
 > historical context — describes the analysis that informed the deletion.

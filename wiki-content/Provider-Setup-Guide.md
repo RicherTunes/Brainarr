@@ -4,7 +4,7 @@
 
 # ⚙️ Provider Setup Guide
 
-Complete configuration guide for all 9 supported AI providers.
+Complete configuration guide for all 14 supported AI providers.
 > **Model IDs are case-sensitive.** Use lowercase, hyphenated IDs (e.g., `gpt-4o-mini`, `claude-3-5-sonnet-20240620`). When routing via OpenRouter, copy the full upstream slug from the Provider Matrix.
 
 ## 🎯 **Provider Selection Strategy**
