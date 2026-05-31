@@ -16,7 +16,7 @@ public sealed class DefaultContextPolicy : IContextPolicy
             return Math.Min(60, Math.Max(30, totalArtists / 2));
         }
 
-        return Math.Min(90, Math.Max(32, tokenBudget / 260));
+        return Math.Min(250, Math.Max(32, tokenBudget / 260));
     }
 
     public int DetermineTargetAlbumCount(int totalAlbums, int tokenBudget)
@@ -31,6 +31,6 @@ public sealed class DefaultContextPolicy : IContextPolicy
             return Math.Min(160, Math.Max(60, totalAlbums / 2));
         }
 
-        return Math.Min(220, Math.Max(70, tokenBudget / 120));
+        return Math.Min(600, Math.Max(70, tokenBudget / 120));
     }
 }

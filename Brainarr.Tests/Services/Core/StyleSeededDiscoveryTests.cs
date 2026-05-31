@@ -93,6 +93,79 @@ namespace Brainarr.Tests.Services.Core
             RecommendationPipeline.IsStyleSeededDiscovery(null, settings, ProfileWithCoverage(("rock", 10))).Should().BeFalse();
         }
 
+        // ---- Improvement B invariant guard ----------------------------------------------------
+        // Enriching the dedup sample (improvement B) must NOT alter the genre-first DECISION gate.
+        // This exercises BOTH layers with the SAME catalog + slug-keyed coverage signal:
+        //   1. DefaultSamplingService now produces a NON-EMPTY dedup audit for the zero-coverage case.
+        //   2. RecommendationPipeline.IsStyleSeededDiscovery STILL returns true (gate preserved).
+
+        [Fact]
+        public void StyleSeeded_DedupFallback_PopulatesSample_AndLeavesGateTrue()
+        {
+            // "lo-fi" → lofi-hip-hop; the library has only the adjacent "hip-hop". Genre-first gate fires.
+            var catalog = Catalog();
+            var settings = new BrainarrSettings { StyleFilters = new[] { "lo-fi" }, MaxSelectedStyles = 10 };
+
+            // Slug-keyed coverage with ZERO lofi-hip-hop → the exact renderer/pipeline signal.
+            var styleContext = new LibraryStyleContext();
+            styleContext.SetCoverage(new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+            {
+                ["hip-hop"] = 3
+            });
+            styleContext.SetDominantStyles(new[] { "hip-hop" });
+            styleContext.ArtistStyles[1] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hip-hop" };
+            styleContext.ArtistStyles[2] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hip-hop" };
+            styleContext.ArtistStyles[3] = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "hip-hop" };
+            styleContext.SetStyleIndex(new LibraryStyleIndex(
+                new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["hip-hop"] = new List<int> { 1, 2, 3 }
+                },
+                new Dictionary<string, IReadOnlyList<int>>(StringComparer.OrdinalIgnoreCase)));
+
+            var profile = new LibraryProfile { StyleContext = styleContext };
+
+            // Gate BEFORE sampling: genre-first.
+            RecommendationPipeline.IsStyleSeededDiscovery(catalog, settings, profile).Should().BeTrue(
+                "precondition: zero exact coverage of the seed style is genre-first discovery");
+
+            // Build the real style selection (resolves "lo-fi" → lofi-hip-hop) and sample.
+            var selectionService = new DefaultStyleSelectionService(Logger, catalog);
+            var selection = selectionService.Build(profile, settings, styleContext,
+                new DefaultCompressionPolicy(), CancellationToken.None);
+
+            var samplingService = new DefaultSamplingService(Logger, catalog, new DefaultContextPolicy());
+            var artists = Enumerable.Range(1, 3)
+                .Select(id =>
+                {
+                    var a = new NzbDrone.Core.Music.Artist { Id = id, Added = DateTime.UtcNow.AddDays(-id) };
+                    a.Metadata.Value.Name = $"Hip Hop Artist {id}";
+                    return a;
+                })
+                .ToList();
+
+            var sample = samplingService.Sample(
+                artists,
+                Array.Empty<NzbDrone.Core.Music.Album>(),
+                styleContext,
+                selection,
+                settings,
+                tokenBudget: 8000,
+                seed: 7,
+                CancellationToken.None);
+
+            // Improvement B: the dedup audit is now populated (was empty → "0 groups").
+            sample.ArtistCount.Should().BeGreaterThan(0,
+                "the genre-first dedup audit must surface adjacent-style library artists");
+
+            // CRITICAL: the gate is UNCHANGED after enrichment — same catalog, same coverage signal.
+            RecommendationPipeline.IsStyleSeededDiscovery(catalog, settings, profile).Should().BeTrue(
+                "enriching the dedup sample must NOT change the genre-first decision gate");
+            // The selection's slug-keyed coverage the renderer sums must still be 0 for the seed slug.
+            selection.SelectedSlugs.Sum(s => selection.Coverage.TryGetValue(s, out var c) ? c : 0)
+                .Should().Be(0, "renderer's styleSeeded signal must remain selectedCoverage==0");
+        }
+
         // ---- B2: freestyle passthrough --------------------------------------------------------
 
         [Fact]

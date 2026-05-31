@@ -124,7 +124,13 @@ public class LibraryPromptRenderer : IPromptRenderer
         }
 
         var artistLines = BuildArtistGroups(plan);
-        builder.AppendLine(Heading($"\U0001f3b6 LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):", $"LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):"));
+        // Genre-first discovery: the section below is purely a dedup list (the recommendations come
+        // from the seed styles, not the library), so make the "avoid duplicates" intent explicit in
+        // the header. Keep the stable "LIBRARY ARTISTS & KEY ALBUMS" substring for determinism tests.
+        var librarySectionLabel = styleSeeded
+            ? $"LIBRARY ARTISTS & KEY ALBUMS — EXISTING LIBRARY (avoid these duplicates) ({artistLines.Count} groups shown):"
+            : $"LIBRARY ARTISTS & KEY ALBUMS ({artistLines.Count} groups shown):";
+        builder.AppendLine(Heading($"\U0001f3b6 {librarySectionLabel}", librarySectionLabel));
         foreach (var line in artistLines)
         {
             builder.AppendLine(line);

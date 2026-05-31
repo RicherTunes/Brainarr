@@ -6,6 +6,7 @@ using NzbDrone.Core.Parser.Model;
 
 // Explicitly reference Services namespace types to avoid ambiguity with Services.Validation
 using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -20,6 +21,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             LibraryProfile libraryProfile,
             int needed,
             NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation,
-            CancellationToken cancellationToken);
+            CancellationToken cancellationToken,
+            // T1: recommendations already delivered this run (avoid re-suggesting them in top-up).
+            IReadOnlyList<ImportListItemInfo>? alreadyAccepted = null,
+            // T2: resolver used to MBID-enrich top-up recs before the require-MBID filter (artist mode).
+            IArtistMbidResolver? artistResolver = null);
     }
 }
