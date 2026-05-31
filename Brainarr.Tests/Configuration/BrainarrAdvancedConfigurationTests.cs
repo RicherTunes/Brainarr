@@ -75,9 +75,9 @@ namespace Brainarr.Tests.Configuration
             {
                 new { Provider = AIProvider.Ollama, ExpectedUrl = BrainarrConstants.DefaultOllamaUrl, ExpectedModel = BrainarrConstants.DefaultOllamaModel },
                 new { Provider = AIProvider.LMStudio, ExpectedUrl = BrainarrConstants.DefaultLMStudioUrl, ExpectedModel = BrainarrConstants.DefaultLMStudioModel },
-                new { Provider = AIProvider.OpenAI, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultOpenAIModel },
-                new { Provider = AIProvider.Anthropic, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultAnthropicModel },
-                new { Provider = AIProvider.Gemini, ExpectedUrl = "N/A - API Key based provider", ExpectedModel = BrainarrConstants.DefaultGeminiModel }
+                new { Provider = AIProvider.OpenAI, ExpectedUrl = BrainarrConstants.OpenAIChatCompletionsUrl, ExpectedModel = BrainarrConstants.DefaultOpenAIModel },
+                new { Provider = AIProvider.Anthropic, ExpectedUrl = BrainarrConstants.AnthropicMessagesUrl, ExpectedModel = BrainarrConstants.DefaultAnthropicModel },
+                new { Provider = AIProvider.Gemini, ExpectedUrl = BrainarrConstants.GeminiModelsBaseUrl, ExpectedModel = BrainarrConstants.DefaultGeminiModel }
             };
 
             foreach (var testCase in testCases)
@@ -345,12 +345,12 @@ namespace Brainarr.Tests.Configuration
             settings.Provider = AIProvider.LMStudio;
             Assert.Contains("1234", settings.ConfigurationUrl);  // Default LM Studio port
 
-            // Cloud providers should indicate API key usage
+            // Cloud providers now show their real endpoint for reference (F5b; was "N/A").
             settings.Provider = AIProvider.OpenAI;
-            Assert.Equal("N/A - API Key based provider", settings.ConfigurationUrl);
+            Assert.Equal(BrainarrConstants.OpenAIChatCompletionsUrl, settings.ConfigurationUrl);
 
             settings.Provider = AIProvider.Anthropic;
-            Assert.Equal("N/A - API Key based provider", settings.ConfigurationUrl);
+            Assert.Equal(BrainarrConstants.AnthropicMessagesUrl, settings.ConfigurationUrl);
         }
 
         [Fact]

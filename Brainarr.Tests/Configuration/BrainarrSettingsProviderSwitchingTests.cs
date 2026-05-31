@@ -14,6 +14,39 @@ namespace Brainarr.Tests.Configuration
     [Trait("Category", "Unit")]
     public class BrainarrSettingsProviderSwitchingTests
     {
+        #region Configuration URL display (F5b)
+
+        [Theory]
+        [InlineData(AIProvider.ZaiCoding, "https://api.z.ai/api/anthropic/v1/messages")]
+        [InlineData(AIProvider.ZaiGlm, "https://api.z.ai/api/paas/v4/chat/completions")]
+        [InlineData(AIProvider.OpenAI, "https://api.openai.com/v1/chat/completions")]
+        [InlineData(AIProvider.Anthropic, "https://api.anthropic.com/v1/messages")]
+        [InlineData(AIProvider.OpenRouter, "https://openrouter.ai/api/v1/chat/completions")]
+        [InlineData(AIProvider.Perplexity, "https://api.perplexity.ai/chat/completions")]
+        [InlineData(AIProvider.OpenAICodexSubscription, "https://api.openai.com/v1/chat/completions")]
+        public void ConfigurationUrl_CloudProvider_ShowsRealEndpoint_NotNA(AIProvider provider, string expectedEndpoint)
+        {
+            // F5b: switching to a cloud/subscription provider used to show "N/A - API Key based provider";
+            // it now surfaces the real endpoint for reference (e.g. Z.AI Coding's Anthropic-format URL).
+            var settings = new BrainarrSettings { Provider = provider };
+
+            settings.ConfigurationUrl.Should().Be(expectedEndpoint);
+            settings.ConfigurationUrl.Should().NotContain("N/A");
+        }
+
+        [Fact]
+        public void ConfigurationUrl_LocalProvider_RemainsEditableServerUrl()
+        {
+            // Local providers keep the editable URL behavior (the cloud display change must not regress it).
+            var settings = new BrainarrSettings { Provider = AIProvider.Ollama };
+            settings.ConfigurationUrl.Should().Be(BrainarrConstants.DefaultOllamaUrl);
+
+            settings.ConfigurationUrl = "http://my-ollama:11434";
+            settings.ConfigurationUrl.Should().Be("http://my-ollama:11434");
+        }
+
+        #endregion
+
         #region State Preservation Tests
 
         [Fact]
@@ -498,13 +531,15 @@ namespace Brainarr.Tests.Configuration
         [InlineData(AIProvider.DeepSeek)]
         [InlineData(AIProvider.Gemini)]
         [InlineData(AIProvider.Groq)]
-        public void ConfigurationUrl_CloudProviders_ReturnsNotApplicable(AIProvider cloudProvider)
+        public void ConfigurationUrl_CloudProviders_ShowsRealEndpoint(AIProvider cloudProvider)
         {
-            // Arrange
+            // F5b: cloud providers now surface their real endpoint for reference instead of the old
+            // opaque "N/A - API Key based provider". (Per-provider exact values are pinned by
+            // ConfigurationUrl_CloudProvider_ShowsRealEndpoint_NotNA above.)
             var settings = new BrainarrSettings { Provider = cloudProvider };
 
-            // Act & Assert
-            settings.ConfigurationUrl.Should().Be("N/A - API Key based provider");
+            settings.ConfigurationUrl.Should().StartWith("https://");
+            settings.ConfigurationUrl.Should().NotContain("N/A");
         }
 
         [Fact]
