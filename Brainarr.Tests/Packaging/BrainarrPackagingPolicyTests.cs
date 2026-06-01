@@ -51,11 +51,11 @@ namespace Brainarr.Tests.Packaging
             "Lidarr.Plugin.Common.dll"
         };
 
-        [PackagingFact]
+        [SkippableFact]
         [Trait("Category", "Packaging")]
         public void Package_Should_Contain_Required_Files()
         {
-            var zipPath = GetPackagePathOrThrow();
+            var zipPath = GetPackagePathOrSkip();
             var entries = ReadZipEntries(zipPath);
 
             entries.Should().Contain(RequiredFiles);
@@ -69,11 +69,11 @@ namespace Brainarr.Tests.Packaging
         /// the sidecar was correctly omitted by the packaging policy but the merge
         /// didn't actually merge anything.
         /// </summary>
-        [PackagingFact]
+        [SkippableFact]
         [Trait("Category", "Packaging")]
         public void Plugin_Dll_Should_Be_Merged_Size()
         {
-            var zipPath = GetPackagePathOrThrow();
+            var zipPath = GetPackagePathOrSkip();
             using var archive = ZipFile.OpenRead(zipPath);
 
             var entry = archive.Entries.FirstOrDefault(e =>
@@ -87,11 +87,11 @@ namespace Brainarr.Tests.Packaging
                 "'Could not load file or assembly Lidarr.Plugin.Abstractions/Common'");
         }
 
-        [PackagingFact]
+        [SkippableFact]
         [Trait("Category", "Packaging")]
         public void Package_Should_Not_Contain_Forbidden_Assemblies()
         {
-            var zipPath = GetPackagePathOrThrow();
+            var zipPath = GetPackagePathOrSkip();
             var entries = ReadZipEntries(zipPath);
 
             entries.Should().NotContain(ForbiddenAssemblies);
@@ -114,11 +114,11 @@ namespace Brainarr.Tests.Packaging
         ///
         /// The plugin must use the host's FluentValidation assembly for type identity to match.
         /// </summary>
-        [PackagingFact]
+        [SkippableFact]
         [Trait("Category", "Packaging")]
         public void Package_Must_Not_Ship_FluentValidation()
         {
-            var zipPath = GetPackagePathOrThrow();
+            var zipPath = GetPackagePathOrSkip();
             var entries = ReadZipEntries(zipPath);
 
             entries.Should().NotContain(
@@ -128,7 +128,21 @@ namespace Brainarr.Tests.Packaging
                 "when ValidationResult resolves from different assembly load contexts");
         }
 
-        private static string GetPackagePathOrThrow()
+        // Returns the package zip path, or SKIPS the test (via SkippableFact) when no package
+        // is present. Packaging tests only make sense once a package has been built — the
+        // dedicated packaging workflow (.github/workflows/plugin-package.yml) builds the zip,
+        // sets PLUGIN_PACKAGE_PATH, and validates the contents both here and via standalone
+        // unzip steps. Broad test runs (e.g. the Nightly workflow, which builds with
+        // PluginPackagingDisable=true and never produces a zip) would otherwise throw
+        // "No plugin package found" for all four packaging tests. Skipping there loses no
+        // coverage: packaging is independently gated by plugin-package.yml.
+        //
+        // One case still hard-fails: when an explicit package-path env var (PLUGIN_PACKAGE_PATH
+        // or BRAINARR_PACKAGE_PATH) is set but points at a non-existent file. That means a
+        // workflow promised a package and the build silently failed to produce it — a genuine
+        // error that must not be masked by a skip. (In plugin-package.yml the zip is also
+        // validated by separate unzip steps, so this is belt-and-suspenders.)
+        private static string GetPackagePathOrSkip()
         {
             var zipPath = PackagingTestPaths.TryFindPackagePath();
             if (zipPath != null)
@@ -136,12 +150,23 @@ namespace Brainarr.Tests.Packaging
                 return zipPath;
             }
 
-            if (PackagingTestPaths.IsStrictMode())
+            var explicitPath =
+                Environment.GetEnvironmentVariable("PLUGIN_PACKAGE_PATH") ??
+                Environment.GetEnvironmentVariable("BRAINARR_PACKAGE_PATH");
+
+            if (!string.IsNullOrWhiteSpace(explicitPath))
             {
-                throw new InvalidOperationException("No plugin package found. Set PLUGIN_PACKAGE_PATH or run `./build.ps1 -Package`.");
+                throw new InvalidOperationException(
+                    $"Package path '{explicitPath}' was set via env var but no file exists there. " +
+                    "The packaging build did not produce the expected zip. Run `./build.ps1 -Package`.");
             }
 
-            throw new InvalidOperationException("PackagingFact should have skipped when package is missing.");
+            Skip.If(true,
+                "No plugin package found. Packaging is gated by the plugin-package workflow; " +
+                "build a package (./build.ps1 -Package) or set PLUGIN_PACKAGE_PATH to run these tests locally.");
+
+            // Unreachable: Skip.If(true, ...) always throws SkipException.
+            throw new InvalidOperationException("Skip.If(true) should have skipped the test.");
         }
 
         private static HashSet<string> ReadZipEntries(string zipPath)
