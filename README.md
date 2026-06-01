@@ -227,7 +227,7 @@ For day-to-day operations, start with the [upgrade notes](./docs/upgrade-notes-1
 7. On Windows, verify the folder now lives at `C:\ProgramData\Lidarr\plugins\RicherTunes\Brainarr`.
 8. On Linux, verify the folder now lives at `/var/lib/lidarr/plugins/RicherTunes/Brainarr`.
 9. On macOS, verify the folder now lives at `~/Library/Application Support/Lidarr/plugins/RicherTunes/Brainarr`.
-10. Confirm the folder contains `plugin.json`, `manifest.json`, and `Brainarr.Plugin.dll`.
+10. Confirm the folder contains `plugin.json`, `manifest.json`, and `Lidarr.Plugin.Brainarr.dll`.
 11. Restart Lidarr so it loads the updated plugin binaries.
 12. Open Lidarr and visit `Settings → Plugins` to confirm Brainarr is listed as enabled.
 13. Navigate to `Settings → Import Lists` and click `+` to add a new list.
