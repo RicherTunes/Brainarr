@@ -2,6 +2,12 @@
   "version": 2,
   "dependencies": {
     "net8.0": {
+      "FluentValidation": {
+        "type": "Direct",
+        "requested": "[9.5.4, )",
+        "resolved": "9.5.4",
+        "contentHash": "dnAz4PUtSSa+8EGWDUmEZujOa9rvzxln4BgokZZfO2Gbcj0612TMISU4vkvL60qIy5DI/sDF9Oy1iMXr7sJW3A=="
+      },
       "ILRepack.Lib.MSBuild.Task": {
         "type": "Direct",
         "requested": "[2.0.44.2, )",
@@ -45,6 +51,12 @@
         "requested": "[13.0.4, )",
         "resolved": "13.0.4",
         "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
+      },
+      "NLog": {
+        "type": "Direct",
+        "requested": "[6.1.3, )",
+        "resolved": "6.1.3",
+        "contentHash": "w4JFIUN3cjQobFOc6wuXtHTyMNaWfdAxOhMvCR0vHBNpl2kKSjNYYxzx1KsTtePufQeokFMEx9UbWTAqlICKjA=="
       },
       "System.Security.Cryptography.ProtectedData": {
         "type": "Direct",
@@ -307,7 +319,7 @@
         "type": "Project",
         "dependencies": {
           "CliWrap": "[3.10.1, )",
-          "Lidarr.Plugin.Abstractions": "[1.7.1, )",
+          "Lidarr.Plugin.Abstractions": "[1.18.0-dev, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
