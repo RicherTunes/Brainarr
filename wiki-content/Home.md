@@ -50,9 +50,6 @@ You can install Brainarr directly from Lidarr without downloading a ZIP:
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
 | OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
-| Claude Code CLI | CLI | ⚠️ Experimental | Shells out to `claude` binary; no HTTP endpoint |
-| Z.AI GLM | Cloud | ⚠️ Experimental | OpenAI-compatible PaaS endpoint (GLM-5.x / 4.x families) |
-| Z.AI Coding | Cloud | ⚠️ Experimental | Anthropic-compatible Coding-Plan endpoint (same API key as Z.AI GLM) |
 <!-- PROVIDER_MATRIX_END -->
 
 If you need to expand a topic, update the repo docs first, then add a short pointer here.
