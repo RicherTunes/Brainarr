@@ -9,7 +9,7 @@ on:
   workflow_run:
     workflows:
       - "CI"
-      - "Nightly Tests"
+      - "Nightly"
       - "Test and Coverage"
       - "Sanity Build"
     types:
