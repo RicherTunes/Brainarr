@@ -1,13 +1,13 @@
 # Brainarr AI Provider Guide
 
-Brainarr supports eleven AI providers across local, cloud, subscription, and CLI modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
+Brainarr supports fourteen AI providers across local, cloud, subscription, and CLI modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
 
 - **Provider status, verification notes, and default models** are generated from `docs/providers.yaml` into [README ▸ Provider status](../README.md#provider-status) and `docs/PROVIDER_MATRIX.md`.
 - **Deep dives and setup walkthroughs** live in the wiki: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
 - **Troubleshooting** per provider is centralised in `docs/troubleshooting.md` and the wiki **Observability & Metrics** page.
 
 > Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
+> See the [README compatibility notice](../README.md) for the Lidarr version requirement before enabling Brainarr.
 
 ## Offline mode
 
@@ -21,14 +21,17 @@ Brainarr uses UI-friendly labels that map to actual API model IDs. Select models
 | --- | --- | --- |
 | **Ollama** | Auto-detected from your local instance | `qwen2.5:latest` |
 | **LM Studio** | Auto-detected from your local instance | `local-model` |
-| **OpenAI** | GPT41, GPT41_Mini, GPT41_Nano, GPT4o, GPT4o_Mini, O4_Mini | `GPT41_Mini` |
-| **Anthropic** | ClaudeSonnet4, Claude37_Sonnet, Claude35_Haiku, Claude3_Opus | `ClaudeSonnet4` |
-| **Google Gemini** | Gemini_25_Pro, Gemini_25_Flash, Gemini_25_Flash_Lite, Gemini_20_Flash, Gemini_15_Flash, Gemini_15_Flash_8B, Gemini_15_Pro | `Gemini_25_Flash` |
-| **Groq** | Llama33_70B_Versatile, Llama33_70B_SpecDec, DeepSeek_R1_Distill_L70B, Llama31_8B_Instant | `Llama33_70B_Versatile` |
-| **DeepSeek** | DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_Chat` |
-| **Perplexity** | Sonar_Pro, Sonar_Reasoning_Pro, Sonar_Reasoning, Sonar | `Sonar_Pro` |
-| **OpenRouter** | Auto, ClaudeSonnet4, GPT41_Mini, Gemini25_Flash, Llama33_70B, DeepSeekV3 | `Auto` |
+| **OpenAI** | GPT5, GPT5_Mini, GPT5_Nano, GPT41, GPT41_Mini, GPT41_Nano, GPT4o, GPT4o_Mini, O3_Pro, O4_Mini | `GPT5_Mini` |
+| **Anthropic** | ClaudeOpus47, ClaudeSonnet46, ClaudeHaiku45, ClaudeSonnet4, Claude37_Sonnet | `ClaudeSonnet46` |
+| **Google Gemini** | Gemini_3_1_Pro, Gemini_3_Flash, Gemini_3_1_Flash_Lite, Gemini_25_Pro, Gemini_25_Flash, Gemini_20_Flash | `Gemini_3_Flash` |
+| **Groq** | Llama33_70B_Versatile, Llama33_70B_SpecDec, OpenAi_Gpt_Oss_120B, Groq_Compound, Qwen3_32B, DeepSeek_R1_Distill_L70B, Llama31_8B_Instant | `Llama33_70B_Versatile` |
+| **DeepSeek** | DeepSeek_V4_Pro, DeepSeek_V4_Flash, DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_V4_Flash` |
+| **Perplexity** | Sonar_Pro, Sonar_Reasoning_Pro, Sonar_Reasoning, Sonar_Deep_Research, Sonar | `Sonar_Pro` |
+| **OpenRouter** | Auto, ClaudeSonnet46, ClaudeOpus47, GPT5, GPT5_Mini, Gemini3_Pro, Gemini3_Flash, Llama4_Scout, DeepSeekV4 | `Auto` |
+| **Z.AI GLM** | GLM_5_1, GLM_5, GLM_5_Turbo, GLM_4_7, GLM_4_6, GLM_4_5, GLM_4_5_Air, GLM_4_32B, and more | `GLM_4_5_Air` |
+| **Z.AI Coding** | GLM_5_1, GLM_5, GLM_5_Turbo, GLM_4_7, GLM_4_6, GLM_4_5, GLM_4_5_Air, GLM_4_Plus, GLM_4_32B | `GLM_5_1` |
 | **Claude Code** | ClaudeSonnet46, ClaudeOpus47, ClaudeHaiku45 | `ClaudeSonnet46` |
+| **Claude Code CLI** | Uses `claude` binary model selection | Auto-detected |
 | **OpenAI Codex** | GPT5, GPT5_Mini, GPT41_Mini | `GPT5_Mini` |
 
 **Advanced:** Use the **Manual Model ID** field in Advanced Settings to specify an exact API model ID (e.g., `gpt-4.1-mini`, `claude-sonnet-4-20250514`) when you need a model not in the dropdown.
@@ -79,9 +82,10 @@ Estimated monthly cost for typical Brainarr usage (~50 recommendation requests/m
 |------|---------------------------|-----|
 | 100% privacy / offline | **Ollama** or **LM Studio** | Zero-cost, no data leaves your network, great for pilots. |
 | Lowest cloud spend | **DeepSeek** | Budget-friendly with strong quality; pair with free Gemini for overflow. |
-| "It just works" managed cloud | **Gemini** (`Gemini_25_Flash`) | Generous free tier, excellent context window, easy onboarding. |
-| Highest quality | **Anthropic** (`ClaudeSonnet4`) or via **OpenRouter** | Premium reasoning. Budget a fallback such as GPT41_Mini. |
+| "It just works" managed cloud | **Gemini** (`Gemini_3_Flash`) | Generous free tier, excellent context window, easy onboarding. |
+| Highest quality | **Anthropic** (`ClaudeSonnet46`) or via **OpenRouter** | Premium reasoning. Budget a fallback such as GPT5_Mini. |
 | Fastest responses | **Groq** (`Llama33_70B_Versatile`) | Ultra-low latency for interactive playlists. |
+| Z.AI ecosystem | **Z.AI GLM** (`GLM_4_5_Air`) or **Z.AI Coding** (`GLM_5_1`) | OpenAI- or Anthropic-compatible endpoint at api.z.ai. |
 
 Use the flowchart above or follow the wiki guides for detailed setup walkthroughs.
 
@@ -90,11 +94,46 @@ Use the flowchart above or follow the wiki guides for detailed setup walkthrough
 These chains balance cost, stability, and performance. Configure them in Brainarr's provider settings using the UI labels shown in the matrix.
 
 1. **Privacy First:** Ollama → LM Studio (ensure both run locally).
-2. **Cost Effective:** DeepSeek (`DeepSeek_Chat`) → Gemini (`Gemini_25_Flash`) → OpenAI (`GPT41_Mini`) for overflow.
-3. **Quality First:** Anthropic (`ClaudeSonnet4`) → OpenAI (`GPT41_Mini`) → DeepSeek (`DeepSeek_Chat`).
-4. **Exploration:** OpenRouter (`Auto`) → Gemini (`Gemini_25_Flash`) → Groq (`Llama33_70B_Versatile`) for fast retries.
+2. **Cost Effective:** DeepSeek (`DeepSeek_V4_Flash`) → Gemini (`Gemini_3_Flash`) → OpenAI (`GPT5_Mini`) for overflow.
+3. **Quality First:** Anthropic (`ClaudeSonnet46`) → OpenAI (`GPT5_Mini`) → DeepSeek (`DeepSeek_V4_Flash`).
+4. **Exploration:** OpenRouter (`Auto`) → Gemini (`Gemini_3_Flash`) → Groq (`Llama33_70B_Versatile`) for fast retries.
+5. **Z.AI ecosystem:** Z.AI Coding (`GLM_5_1`) → Z.AI GLM (`GLM_4_5_Air`) as PaaS fallback.
 
 Test your fallback chain using the **Test** button after configuring each provider.
+
+## Z.AI GLM
+
+Z.AI GLM uses the OpenAI-compatible `chat/completions` endpoint at `api.z.ai`. It supports the GLM-5.x and GLM-4.x model families. Key points:
+
+- **Endpoint**: `https://api.z.ai/api/paas/v4/chat/completions` (PaaS, pay-per-token).
+- **Default model**: `GLM_4_5_Air` (balanced cost/quality at 106B params).
+- **Temperature**: Sent (standard OpenAI format).
+- **Same API key** as Z.AI Coding — only the endpoint and wire format differ.
+- A Coding-Plan token used against the PaaS endpoint returns a quota-exceeded error with a hint to switch to the Coding provider.
+
+> **Tip:** GLM-5.x reasoning models are slower (~45–60s/request). Raise **AI Request Timeout** to 60–90s or pick the faster GLM-4.5-Air (~10s) for interactive use.
+
+## Z.AI Coding Plan
+
+Z.AI Coding uses the Anthropic-compatible `messages` endpoint at `api.z.ai/api/anthropic`. It is billed under Z.AI's Coding Plan subscription (separate from PaaS credits).
+
+- **Endpoint**: `https://api.z.ai/api/anthropic/v1/messages`.
+- **Default model**: `GLM_5_1` (flagship, 200K context).
+- **⚠️ Never enable `temperature`.** The Coding endpoint rejects any request carrying `temperature` with `[1210][Invalid API parameter]`. Brainarr omits it automatically — do not add it back.
+- **Keep `max_tokens` at the default (2000).** Higher values cause GLM to pad output and overrun the request timeout, losing the entire response. Truncated responses at 2000 are recovered by Brainarr's JSON salvage parser.
+- Uses a raw `HttpClient` (not Lidarr's HTTP stack) because the Coding-Plan filter requires a specific User-Agent.
+- **First request after a Lidarr restart may time out** (TLS cold-start + model warm-up). It self-heals on the next sync.
+
+> **Tip:** For reasoning models (GLM-5.x), raise **AI Request Timeout** to 60–90s. Budget ~10s for GLM-4.5-Air.
+
+## Claude Code CLI
+
+Claude Code CLI is an alternate Claude path that shells out to the `claude` binary rather than calling the Anthropic REST API directly. It coexists with the subscription provider (same underlying OAuth, different integration shape).
+
+- **How it works**: Brainarr invokes `claude` on your system and lets the CLI handle authentication, transport, and response parsing.
+- **Prerequisites**: Install the Claude Code CLI (`npm install -g @anthropic-ai/claude-code`) and authenticate with `claude login`.
+- **When to pick it**: Use this when you want the CLI to manage auth refresh, streaming, and retries instead of the plugin. For the REST API path (no CLI dependency), use **Claude Code (Subscription)** instead.
+- **No API key required** — the `claude` binary reads credentials from `~/.claude/.credentials.json` automatically.
 
 ## How to update provider data
 

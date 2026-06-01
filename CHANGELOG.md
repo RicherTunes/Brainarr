@@ -225,6 +225,29 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - **`max_tokens` scales to the target count** instead of a flat 2000 (`GetOutputTokenBudget`), but is bounded by what the model can generate within the per-request timeout — overshooting just cancels the call mid-stream (nothing to salvage). So a larger list completes in one request when you grant the time, and short timeouts still floor at the proven-safe 2000. (This is the *output/completion* cap — unrelated to the model's much larger input context window.)
 - **Run summary reports target attainment** (`items/target` + %) distinctly from the provider-health success rate (now labeled `providerSuccess`), plus an under-target explainer naming the likely cause (timeout / dedup / gating) — ending the "100% success but 17/50 delivered" confusion.
 
+## [1.6.1] - 2026-05-29
+
+### Fixed
+
+- Invariant casing in genre-overview matching (Turkish-I locale bug).
+- Memory caps for `ValidationMetrics` history and `ArtistMbidResolver` MBID cache (`BoundedConcurrentDictionary`).
+- Retry-After header parsing now uses Common's `LlmErrorMapper.ParseRetryAfterHeader`.
+- Hardened recommendation pipeline against untrusted LLM data.
+
+### Changed
+
+- Performance: single thread-pool hop for `ReviewQueueService.Enqueue` batch.
+- CI: repoint Common reusable workflow refs to `@workflows/v1`.
+- `ext/Lidarr.Plugin.Common` submodule bumped to `594a73b`.
+
+### Removed
+
+- Dead code: `ServiceResult<T>`, `NLogWrapper`, `DateUtil` utility class.
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.6.0...v1.6.1)
+
+## [1.6.0] - 2026-05-28
+
 ### Added
 
 - `TestValidationBuilder` adopted in `ConfigurationValidator.Validate` (`Brainarr.Plugin/Services/Core/ConfigurationValidator.cs`). Per-provider credential/URL field requirements now gate the behavioral connection probe. **User-visible outcome**: when an API key is empty for a cloud provider, the user sees `OpenAI API key is required. Get yours at https://platform.openai.com/api-keys.` instead of the generic `Unable to connect to AI provider` that the connection probe would have emitted on the failed provider construction. Maps every entry in `AIProviderFactory.CheckProviderAvailability` to its corresponding settings field with a hint pointing at where to obtain the credential. `ClaudeCodeCli` stays N/A (binary auto-detected from PATH). Closes the parity-matrix `TestValidationBuilder MISSING` axis.
@@ -275,6 +298,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Dependencies (2026-05-29)
 
 - `ext/Lidarr.Plugin.Common` re-pinned to `24b43c1` — picks up the PathTraversalGuard trailing-separator fix (#552), packaging-gates canonical-abstractions opt-in (#549), and the local-ci .NET 8 runtime guardrail (#548). `ext-common-sha.txt` + submodule gitlink advanced together (594a73b → 24b43c1). Plugin builds clean against the bump; ZaiCoding E2E re-validated (27 recs, 100%).
+
+[Full diff](https://github.com/RicherTunes/Brainarr/compare/v1.5.6...v1.6.0)
 
 ## [1.5.6] - 2026-05-24
 
@@ -552,7 +577,14 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Last tagged release prior to the registry and planner/renderer overhauls.
 
-[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.3.2...main
+[Unreleased]: https://github.com/RicherTunes/Brainarr/compare/v1.6.1...main
+[1.6.1]: https://github.com/RicherTunes/Brainarr/compare/v1.6.0...v1.6.1
+[1.6.0]: https://github.com/RicherTunes/Brainarr/compare/v1.5.6...v1.6.0
+[1.5.6]: https://github.com/RicherTunes/Brainarr/compare/v1.5.5...v1.5.6
+[1.5.5]: https://github.com/RicherTunes/Brainarr/compare/v1.5.4...v1.5.5
+[1.5.4]: https://github.com/RicherTunes/Brainarr/compare/v1.5.3...v1.5.4
+[1.5.3]: https://github.com/RicherTunes/Brainarr/compare/v1.4.0...v1.5.3
+[1.4.0]: https://github.com/RicherTunes/Brainarr/compare/v1.3.2...v1.4.0
 [1.3.2]: https://github.com/RicherTunes/Brainarr/compare/v1.3.1...v1.3.2
 [1.3.1]: https://github.com/RicherTunes/Brainarr/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/RicherTunes/Brainarr/compare/v1.2.7...v1.3.0
