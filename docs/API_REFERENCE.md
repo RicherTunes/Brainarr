@@ -154,6 +154,8 @@ Gets metrics for all provider usage.
 
 Analyzes the user's music library to generate context for AI recommendations.
 
+<!-- TODO(docval): as of 2026-06-01 the real ILibraryAnalyzer (Brainarr.Plugin/Services/Core/ILibraryAnalyzer.cs) exposes AnalyzeLibrary(), GetAllArtists(), GetAllAlbums() — NOT BuildPrompt/FilterExistingRecommendations/FilterDuplicates. FilterExistingRecommendations and FilterDuplicates belong to IDuplicateFilterService (Services/Core/IDuplicateFilterService.cs); the method docs below should be re-homed accordingly. -->
+
 ```csharp
 public interface ILibraryAnalyzer
 {
