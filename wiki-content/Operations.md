@@ -8,7 +8,7 @@
 
 ## Day 0 – Confirm prerequisites
 
-- Lidarr nightly ≥ 2.14.2.4786 (README compatibility notice).
+- Lidarr nightly ≥ 3.0.0.4855 (README compatibility notice).
 - Brainarr built via `./setup.ps1` / `./setup.sh`; provider matrix regenerated if `docs/providers.yaml` changed.
 - Follow the README quick start and [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md) before proceeding.
 

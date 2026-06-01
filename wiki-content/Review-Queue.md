@@ -5,7 +5,7 @@
 # Review Queue
 
 > Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
 The Review Queue is Brainarr’s safety net for borderline results. Keep the heavy guidance in sync by updating `docs/troubleshooting.md` first—this page highlights only the key workflow.
 
