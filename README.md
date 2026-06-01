@@ -14,7 +14,7 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 
 ### Core
 
-- **14 AI providers** — 2 local (Ollama, LM Studio), 9 cloud (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter, Z.AI GLM, Z.AI Coding), 3 subscription (Claude Code, Claude Code CLI, OpenAI Codex).
+- **11 AI providers** — 2 local (Ollama, LM Studio), 7 cloud (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter), 2 subscription (Claude Code, OpenAI Codex).
 - **Deterministic planning** — fingerprint your library, select representative styles, sample artists/albums, render prompts in a reproducible pipeline.
 - **Dual recommendation modes** — specific albums or artist-only discovery.
 - **Iterative refinement (top-up)** — backfill sparse results automatically until the target count is met.
@@ -335,7 +335,22 @@ Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidar
 
 ## Provider compatibility
 
-See [docs/PROVIDER_MATRIX.md](./docs/PROVIDER_MATRIX.md) for the full provider-compatibility table with types, statuses, and notes.
+<!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
+<!-- PROVIDER_MATRIX_START -->
+| Provider | Type | Status | Notes |
+| --- | --- | --- | --- |
+| LM Studio | Local | ✅ Verified in v1.3.1 | Best local reliability in 1.3.x |
+| Gemini | Cloud | ✅ Verified in v1.3.1 | JSON-friendly responses |
+| Perplexity | Cloud | ✅ Verified in v1.3.1 | Web-aware fallback |
+| Ollama | Local | ✅ Verified in v1.3.1 | Run Brainarr entirely offline |
+| OpenAI | Cloud | ⚠️ Experimental | JSON schema support; verify rate limits |
+| Anthropic | Cloud | ⚠️ Experimental |  |
+| Groq | Cloud | ⚠️ Experimental | Low-latency batches |
+| DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
+| OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
+| OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
+<!-- PROVIDER_MATRIX_END -->
 
 ### Tested local models
 
@@ -352,15 +367,13 @@ For per-provider model lists, defaults, and subscription setup, see [docs/PROVID
 | --- | --- | --- |
 | **Ollama** | `qwen2.5:latest` | Auto-detected from local instance |
 | **LM Studio** | `local-model` | Auto-detected from local instance |
-| **OpenAI** | `GPT5_Mini` | GPT-5 series available |
-| **Anthropic** | `ClaudeSonnet46` | Claude Sonnet 4.6 |
-| **Gemini** | `Gemini_3_Flash` | Gemini 3 Flash |
+| **OpenAI** | `GPT41_Mini` | GPT-4.1 series available |
+| **Anthropic** | `ClaudeSonnet4` | Claude 4 Sonnet |
+| **Gemini** | `Gemini_25_Flash` | Gemini 2.5 Flash |
 | **Groq** | `Llama33_70B_Versatile` | Low-latency inference |
-| **DeepSeek** | `DeepSeek_V4_Flash` | V4 Flash series |
+| **DeepSeek** | `DeepSeek_Chat` | Budget-friendly |
 | **Perplexity** | `Sonar_Pro` | Web-augmented |
 | **OpenRouter** | `Auto` | Gateway to many models |
-| **Z.AI GLM** | `GLM_4_5_Air` | OpenAI-compatible PaaS |
-| **Z.AI Coding** | `GLM_5_1` | Anthropic-compatible Coding Plan |
 
 ## Upgrade Notes: 1.3.0
 
