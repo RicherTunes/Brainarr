@@ -30,21 +30,28 @@ updates:
           - "Moq"
           - "xunit*"
     # Host-boundary packages: types cross plugin<->host boundary via NzbDrone APIs.
-    # Bumping major versions causes type-identity conflicts at runtime.
+    # The Lidarr plugins host ships Microsoft.Extensions.* 8.0.x, FluentValidation 9.x,
+    # and NLog 5.x. A merged plugin carrying a newer-MAJOR copy of any of these fails to
+    # load (type-identity / assembly-load conflicts) — Docker E2E + co-existence smoke fail.
     # Only bump when the Lidarr host itself upgrades first.
+    #
+    # Block ALL host-coupled major bumps so dependabot stops re-proposing host-incompatible
+    # upgrades. The wildcard `Microsoft.Extensions.*` major-block catches the whole family
+    # (DependencyInjection[.Abstractions], Logging[.Abstractions], Http, Options, Primitives,
+    # Caching.Abstractions, Caching.Memory) — including any future M.E.* package — so a bump
+    # like "Microsoft.Extensions.Caching.Memory 8.0.1 -> 10.0.8" can't slip through again.
     ignore:
+      - dependency-name: "Microsoft.Extensions.*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "FluentValidation"
+        update-types: ["version-update:semver-major"]
       - dependency-name: "NLog"
-        versions: [">=6.0.0"]
+        update-types: ["version-update:semver-major"]
+      # Belt-and-suspenders pins narrower than the major-block above:
       - dependency-name: "FluentValidation"
         versions: [">9.5.4"]  # Must match Lidarr host exactly (pr-plugins-3.1.2.4913 ships 9.5.4)
-      - dependency-name: "Microsoft.Extensions.DependencyInjection"
-        versions: [">=9.0.0"]
-      - dependency-name: "Microsoft.Extensions.DependencyInjection.Abstractions"
-        versions: [">=9.0.0"]
-      - dependency-name: "Microsoft.Extensions.Logging.Abstractions"
-        versions: [">=9.0.0"]
       - dependency-name: "System.Text.Json"
-        versions: [">=9.0.0"]
+        versions: [">=9.0.0"]  # Host-provided; merged plugin must not carry a newer copy.
       - dependency-name: "Newtonsoft.Json"
         versions: [">13.0.3"]  # Must match Lidarr's version
       - dependency-name: "FluentAssertions"
