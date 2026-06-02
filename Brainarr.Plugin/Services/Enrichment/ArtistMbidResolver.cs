@@ -25,6 +25,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
         private const string BaseUrl = "https://musicbrainz.org/ws/2";
         private readonly HttpClient _httpClient;
         private readonly Logger _logger;
+        private readonly NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter _rateLimiter;
         private ISearchForNewArtist _artistSearch; // optional
         // Bounded so a long-running, singleton resolver can't accumulate one entry per distinct
         // artist name forever (the old Dictionary had a TTL checked on read but never evicted).
@@ -35,10 +36,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             new BoundedConcurrentDictionary<string, (string id, DateTime at)>(CacheCapacity, StringComparer.OrdinalIgnoreCase);
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(12);
 
-        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null)
+        public ArtistMbidResolver(Logger logger, HttpClient httpClient = null, NzbDrone.Core.ImportLists.Brainarr.Services.IRateLimiter rateLimiter = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _httpClient = httpClient ?? NzbDrone.Core.ImportLists.Brainarr.Services.Http.SecureHttpClientFactory.Create("musicbrainz");
+            // Mirror MusicBrainzResolver: the artist fallback query hits the same MusicBrainz host
+            // (1 req/sec hard rule), so it must share the "musicbrainz" rate-limiter bucket.
+            // Constructed-by-default but injectable for tests.
+            if (rateLimiter != null)
+            {
+                _rateLimiter = rateLimiter;
+            }
+            else
+            {
+                _rateLimiter = new NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiter(logger);
+                NzbDrone.Core.ImportLists.Brainarr.Services.RateLimiterConfiguration.ConfigureDefaults(_rateLimiter);
+            }
             _artistSearch = null;
             // Headers are configured in SecureHttpClientFactory
         }
@@ -90,8 +103,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                     result.Add(rec);
                 }
 
-                // Be nice to MusicBrainz
-                await Task.Delay(200, ct);
+                // Throttling handled centrally via RateLimiter("musicbrainz") — the token bucket
+                // is now the single source of MusicBrainz pacing (parity with MusicBrainzResolver).
             }
 
             _logger.Info($"Artist MBID resolution complete: resolved {resolvedCount}/{resolvableCount} artists (returned {result.Count})");
@@ -141,8 +154,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 }
             }
 
-            // 3) Fallback: direct MusicBrainz query
-            using var resp = await _httpClient.GetAsync(url, ct);
+            // 3) Fallback: direct MusicBrainz query, routed through the shared "musicbrainz"
+            // rate-limiter bucket (1 req/sec) so it never trips MusicBrainz's hard cap (which
+            // returns 503 and was being treated as a permanent "no MBID"). Parity with
+            // MusicBrainzResolver.ResolveMbidAsync.
+            using var resp = await _rateLimiter.ExecuteAsync("musicbrainz", async (token) => await _httpClient.GetAsync(url, token), ct);
             if (!resp.IsSuccessStatusCode)
             {
                 _logger.Debug($"MusicBrainz artist query failed: {resp.StatusCode} for {rec.Artist}");
