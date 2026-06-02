@@ -86,9 +86,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
             _startTime = DateTime.UtcNow;
         }
 
+        // Threshold above which a provider response is logged as a slow-response WARN.
+        // The previous 10s threshold predated reasoning-class models (GLM/o1-style), which
+        // routinely take 15-70s by design, so it fired on ~100% of calls and buried genuinely
+        // actionable warnings in noise. 90s flags responses genuinely approaching the default
+        // ~120s provider timeout while treating normal reasoning-model latency as expected.
+        // Note: the per-call duration is still recorded as a metric (see RecordResponse below)
+        // regardless of whether this WARN fires, so no data is lost by raising the threshold.
+        internal const double SlowResponseWarnThresholdSeconds = 90;
+
+        /// <summary>
+        /// Pure, deterministic predicate: returns true when a provider response is slow enough
+        /// to warrant a WARN (i.e. strictly greater than <see cref="SlowResponseWarnThresholdSeconds"/>).
+        /// </summary>
+        internal static bool IsSlowResponse(TimeSpan duration) => duration.TotalSeconds > SlowResponseWarnThresholdSeconds;
+
         /// <summary>
         /// Records the response time for an AI provider request with automatic performance warnings.
-        /// Logs warnings for responses taking longer than 10 seconds.
+        /// Logs a WARN only for responses slower than <see cref="SlowResponseWarnThresholdSeconds"/> (90s).
+        /// The threshold was raised from the original 10s because reasoning-class models (GLM/o1-style)
+        /// normally take 15-70s, which made the old WARN fire on ~100% of calls; 90s instead flags
+        /// responses genuinely approaching the default ~120s provider timeout. The duration is always
+        /// recorded as a metric regardless of whether the WARN fires.
         /// </summary>
         /// <param name="provider">Name of the AI provider</param>
         /// <param name="duration">Actual response time measured</param>
@@ -97,7 +116,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Performance
             var metrics = _providerMetrics.GetOrAdd(provider, _ => new ProviderMetrics());
             metrics.RecordResponse(duration);
 
-            if (duration.TotalSeconds > 10)
+            if (IsSlowResponse(duration))
             {
                 _logger.Warn($"Provider {provider} took {duration.TotalSeconds:F1}s to respond");
             }
