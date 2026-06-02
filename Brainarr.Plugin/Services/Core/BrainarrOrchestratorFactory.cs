@@ -165,6 +165,11 @@ internal static class BrainarrOrchestratorFactory
         // WS4.2: Use CommonBreakerRegistry which delegates to Common's AdvancedCircuitBreaker
         services.TryAddSingleton<IBreakerRegistry, CommonBreakerRegistry>();
 
+        // NOTE: the optional IStyleCatalogService is intentionally NOT injected here, which makes the
+        // pipeline's post-validation style filter inert in production. This is a known, deliberate
+        // state pending a product decision on match strictness — see the long comment at the
+        // "Style filtering" gate in RecommendationPipeline.ProcessAsync. Do not add the catalog
+        // argument without also addressing the strict-slug over-drop documented there.
         services.TryAddSingleton<IRecommendationPipeline>(sp =>
             new RecommendationPipeline(
                 sp.GetRequiredService<Logger>(),
