@@ -1137,6 +1137,8 @@ namespace Brainarr.Tests.Services.Core
             var styleCatalog = new Mock<IStyleCatalogService>();
             styleCatalog.Setup(s => s.Normalize(It.IsAny<IEnumerable<string>>()))
                 .Returns<IEnumerable<string>>(slugs => new HashSet<string>(slugs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase));
+            styleCatalog.Setup(s => s.ResolveSlug(It.IsAny<string>()))
+                .Returns<string>(v => string.IsNullOrWhiteSpace(v) ? null : v.Trim());
             styleCatalog.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), true))
                 .Returns(true); // Relaxed mode matches
             styleCatalog.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), false))
@@ -1241,6 +1243,11 @@ namespace Brainarr.Tests.Services.Core
             var mock = new Mock<IStyleCatalogService>();
             mock.Setup(s => s.Normalize(It.IsAny<IEnumerable<string>>()))
                 .Returns<IEnumerable<string>>(slugs => new HashSet<string>(slugs ?? Array.Empty<string>(), StringComparer.OrdinalIgnoreCase));
+            // Identity resolution: every term/genre is treated as a resolvable slug, so the pipeline's
+            // keep-when-ambiguous (Normalize→empty) and unresolvable-selected-term (ResolveSlug→null)
+            // leniency branches don't trip — these tests exercise the match/drop decision itself.
+            mock.Setup(s => s.ResolveSlug(It.IsAny<string>()))
+                .Returns<string>(v => string.IsNullOrWhiteSpace(v) ? null : v.Trim());
             mock.Setup(s => s.IsMatch(It.IsAny<ICollection<string>>(), It.IsAny<ISet<string>>(), It.IsAny<bool>()))
                 .Returns<ICollection<string>, ISet<string>, bool>((genres, selected, relax) =>
                 {

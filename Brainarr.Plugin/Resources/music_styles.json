@@ -30,7 +30,7 @@
   { "name": "Boom Bap", "slug": "boom-bap", "aliases": [], "parents": ["hip-hop"] },
   { "name": "Trap", "slug": "trap", "aliases": [], "parents": ["hip-hop"] },
   { "name": "Lo-Fi Hip Hop", "slug": "lofi-hip-hop", "aliases": ["Lo-fi", "LoFi"], "parents": ["hip-hop"] },
-  { "name": "Electronica", "slug": "electronica", "aliases": ["Electronic"], "parents": [] },
+  { "name": "Electronica", "slug": "electronica", "aliases": ["Electronic", "EDM", "Electronic Dance Music", "Dance"], "parents": [] },
   { "name": "House", "slug": "house", "aliases": [], "parents": ["electronica"] },
   { "name": "Deep House", "slug": "deep-house", "aliases": [], "parents": ["house"] },
   { "name": "Tech House", "slug": "tech-house", "aliases": [], "parents": ["house", "techno"] },

@@ -83,7 +83,9 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<IDuplicationPrevention>(sp => new DuplicationPreventionService(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IPlannerVersionProvider, DefaultPlannerVersionProvider>();
         services.TryAddSingleton<IRecommendationCacheKeyBuilder, RecommendationCacheKeyBuilder>();
-        services.TryAddSingleton<ILibraryContextBuilder>(sp => new LibraryContextBuilder(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<ILibraryContextBuilder>(sp => new LibraryContextBuilder(
+            sp.GetRequiredService<Logger>(),
+            sp.GetRequiredService<IStyleCatalogService>()));
         services.TryAddSingleton<ILibraryProfileService>(sp => new LibraryProfileService(
             sp.GetRequiredService<ILibraryContextBuilder>(),
             sp.GetRequiredService<Logger>(),
@@ -165,11 +167,11 @@ internal static class BrainarrOrchestratorFactory
         // WS4.2: Use CommonBreakerRegistry which delegates to Common's AdvancedCircuitBreaker
         services.TryAddSingleton<IBreakerRegistry, CommonBreakerRegistry>();
 
-        // NOTE: the optional IStyleCatalogService is intentionally NOT injected here, which makes the
-        // pipeline's post-validation style filter inert in production. This is a known, deliberate
-        // state pending a product decision on match strictness — see the long comment at the
-        // "Style filtering" gate in RecommendationPipeline.ProcessAsync. Do not add the catalog
-        // argument without also addressing the strict-slug over-drop documented there.
+        // The post-validation style filter is LIVE: inject the DI-registered IStyleCatalogService so
+        // the pipeline can enforce the user's Music Styles. The enforcement is over-drop-safe by
+        // construction (hierarchy-aware matching + keep-when-ambiguous + genre-first/freeform skips —
+        // see RecommendationPipeline.ProcessAsync). StyleContext now flows into the pipeline profile
+        // via LibraryContextBuilder (above), so the genre-first gate reflects real library coverage.
         services.TryAddSingleton<IRecommendationPipeline>(sp =>
             new RecommendationPipeline(
                 sp.GetRequiredService<Logger>(),
@@ -182,7 +184,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IArtistMbidResolver>(),
                 sp.GetRequiredService<IDuplicationPrevention>(),
                 sp.GetRequiredService<IPerformanceMetrics>(),
-                sp.GetRequiredService<RecommendationHistory>()));
+                sp.GetRequiredService<RecommendationHistory>(),
+                sp.GetRequiredService<IStyleCatalogService>()));
 
         services.TryAddSingleton<IRecommendationCoordinator>(sp =>
             new RecommendationCoordinator(

@@ -4,6 +4,8 @@ using System.Linq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.Music;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -11,10 +13,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     public class LibraryContextBuilder : ILibraryContextBuilder
     {
         private readonly Logger _logger;
+        private readonly StyleContextBuilder _styleContextBuilder;
 
-        public LibraryContextBuilder(Logger logger)
+        public LibraryContextBuilder(Logger logger, IStyleCatalogService styleCatalog = null)
         {
             _logger = logger;
+            // Build the SAME slug-keyed StyleContext the prompt side uses (LibraryAnalyzer →
+            // StyleContextBuilder) so the pipeline's post-validation style filter genre-first gate
+            // (IsStyleSeededDiscovery) reflects real library coverage instead of always-empty. Reusing
+            // StyleContextBuilder keeps a single source of truth — no divergent second implementation.
+            // Optional for backwards compatibility: when no catalog is supplied (older callers/tests),
+            // StyleContext stays empty and the filter degrades to genre-first (skip), exactly as before.
+            _styleContextBuilder = styleCatalog != null
+                ? new StyleContextBuilder(styleCatalog, new LibraryAnalyzerOptions(), logger)
+                : null;
         }
 
         public LibraryProfile BuildProfile(IArtistService artistService, IAlbumService albumService)
@@ -43,6 +55,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     genreCounts[BrainarrConstants.FallbackGenres[i]] = 20 - (i * 3);
                 }
 
+                // Populate slug-keyed style coverage from real artist/album genre metadata so the
+                // pipeline's post-validation style filter can engage (its genre-first gate keys off
+                // StyleContext.StyleCoverage). When no catalog is wired the default empty context is
+                // used (filter degrades to genre-first/skip). Failures are swallowed in StyleContextBuilder.
+                var styleContext = _styleContextBuilder?.Build(artists, albums) ?? new LibraryStyleContext();
+
                 return new LibraryProfile
                 {
                     TotalArtists = artists.Count,
@@ -53,7 +71,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         .OrderByDescending(a => a.Added)
                         .Take(10)
                         .Select(a => a.Name)
-                        .ToList()
+                        .ToList(),
+                    StyleContext = styleContext
                 };
             }
             catch (Exception ex)
