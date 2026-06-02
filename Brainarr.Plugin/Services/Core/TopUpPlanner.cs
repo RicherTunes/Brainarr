@@ -12,6 +12,7 @@ using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
@@ -35,7 +36,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             LibraryProfile libraryProfile,
             int needed,
             NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation,
-            CancellationToken cancellationToken)
+            CancellationToken cancellationToken,
+            IReadOnlyList<ImportListItemInfo>? alreadyAccepted = null,
+            IArtistMbidResolver? artistResolver = null)
         {
             var importItems = new List<ImportListItemInfo>();
             if (provider == null)
@@ -58,7 +61,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 try { _logger.Info($"[Brainarr Debug] Top-Up Effective timeout: {effectiveTimeout}s"); }
                 catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up timeout"); }
             }
-            using var _timeoutScope = TimeoutContext.Push(effectiveTimeout);
 
             var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder, new ProviderInvoker());
 
@@ -67,6 +69,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 getter: () => settings.MaxRecommendations,
                 setter: v => settings.MaxRecommendations = v,
                 newValue: Math.Max(1, needed));
+
+            // Push timeout + output-token budget AFTER scoping MaxRecommendations to the deficit so the
+            // token budget scales to the smaller top-up request rather than the full target.
+            using var _timeoutScope = TimeoutContext.Push(effectiveTimeout, settings.GetOutputTokenBudget());
 
             try
             {
@@ -81,6 +87,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
                 catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up planner state"); }
 
+                // T1: the recommendations already delivered to the user in this run (the initial batch).
+                // Threaded into the strategy so the top-up prompt's [[SYSTEM_AVOID]] + dedup baseline
+                // exclude them — otherwise the provider re-emits delivered artists and the iteration is
+                // wasted (they are dropped post-hoc). Bounded by MaxRecommendations.
+                var priorRecs = (alreadyAccepted ?? Array.Empty<ImportListItemInfo>())
+                    .Where(i => i != null && !string.IsNullOrWhiteSpace(i.Artist))
+                    .Select(i => new Recommendation { Artist = i.Artist, Album = i.Album ?? string.Empty })
+                    .ToList();
+
                 var topUpRecs = await strategy.GetIterativeRecommendationsAsync(
                     provider,
                     libraryProfile,
@@ -92,15 +107,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     initialValidation?.FilteredRecommendations,
                     // For top-up, prefer aggressive guarantee to actually fill deficits
                     aggressiveGuarantee: true,
+                    alreadyProvided: priorRecs,
                     cancellationToken: cancellationToken);
 
                 if (topUpRecs != null && topUpRecs.Count > 0)
                 {
                     var suggested = topUpRecs.Count;
-                    // Enforce MBID requirement in artist-mode for top-ups as well
+                    var noMbidDropped = 0;
+                    var enrichmentDropped = 0;
+                    // Enforce MBID requirement in artist-mode for top-ups as well.
                     if (shouldRecommendArtists && settings.RequireMbids)
                     {
+                        // T2: top-up recs arrive straight from the provider WITHOUT MBIDs and are never
+                        // enrichment-resolved elsewhere on the top-up path (the initial-batch enrichment
+                        // at RecommendationPipeline runs BEFORE top-up). Resolve them here first, reusing
+                        // the SAME resolver as the initial batch (injected, not a parallel impl), so a
+                        // resolvable artist survives the require-MBID filter instead of being dropped
+                        // wholesale — the gap that made top-up contribute 0 under RequireMbids. The
+                        // resolver carries its own rate-limit/LRU cache; the input is bounded by the
+                        // deficit, so this cannot loop or grow unbounded.
+                        if (artistResolver != null)
+                        {
+                            topUpRecs = await artistResolver.EnrichArtistsAsync(topUpRecs, cancellationToken).ConfigureAwait(false);
+                        }
+                        var beforeMbidFilter = topUpRecs.Count;
+                        // Enrichment itself can drop a rec (e.g. a blank artist name), so account for that
+                        // separately to keep the summary identity exact (suggested == sum of all drops + returned).
+                        enrichmentDropped = suggested - beforeMbidFilter;
                         topUpRecs = topUpRecs.Where(r => !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)).ToList();
+                        // Genuinely-unresolvable artists still drop (real gate, not a bug) — but the drop
+                        // is now ATTRIBUTED in the summary below instead of silently lost.
+                        noMbidDropped = beforeMbidFilter - topUpRecs.Count;
                     }
 
                     importItems.AddRange(topUpRecs
@@ -132,15 +169,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     var postSession = importItems.Count;
                     var sessionDropped = preSession - postSession;
 
+                    var preLibrary = importItems.Count;
                     importItems = _duplicateFilter.FilterDuplicates(importItems) ?? new List<ImportListItemInfo>();
+                    var libraryDropped = preLibrary - importItems.Count;
                     var after = importItems.Count;
                     try
                     {
-                        var msg = $"Top-Up Planner summary: provider suggested={suggested}, history-duplicates removed={historyDropped}, session-duplicates removed={sessionDropped}, returned={after}";
+                        // Accounting reconciles exactly: suggested = enrichment-dropped + no-MBID + history + session + library + returned.
+                        var msg = $"Top-Up Planner summary: provider suggested={suggested}, enrichment-dropped={enrichmentDropped}, no-MBID removed={noMbidDropped}, history-duplicates removed={historyDropped}, session-duplicates removed={sessionDropped}, library-duplicates removed={libraryDropped}, returned={after}";
                         if (settings.EnableDebugLogging) _logger.Info(msg); else _logger.Debug(msg);
                     }
                     catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up planner summary"); }
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                // The RUN was cancelled — propagate so the cancellation-aware orchestrator path maps
+                // it to a cancelled fetch. Without this guard the broad catch below re-swallows the
+                // OperationCanceledException that IterativeRecommendationStrategy now re-throws,
+                // returning a partial list as if the run succeeded (the intermediate re-swallow an
+                // adversarial review flagged). A provider's OWN request timeout (run token NOT
+                // cancelled) still falls through to the broad catch as a recoverable failure.
+                throw;
             }
             catch (Exception ex)
             {

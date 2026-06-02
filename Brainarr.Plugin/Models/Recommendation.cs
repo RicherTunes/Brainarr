@@ -30,6 +30,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Models
         public double Confidence { get; init; }
 
         /// <summary>
+        /// True when <see cref="Confidence"/> came from the model, false when the parser fabricated a
+        /// default because the model omitted a score. Defaults to true so recommendations built outside
+        /// the parsers (tests, internal flows) behave as before. The confidence floor
+        /// (<c>SafetyGateService</c>) only drops items the model EXPLICITLY scored below it — an item
+        /// with no score wasn't "scored below," so a fabricated default must not silently filter it out
+        /// when the user raises the floor above that default.
+        /// </summary>
+        public bool ConfidenceProvided { get; init; } = true;
+
+        /// <summary>
         /// Reason for the recommendation (optional).
         /// </summary>
         public string? Reason { get; init; }

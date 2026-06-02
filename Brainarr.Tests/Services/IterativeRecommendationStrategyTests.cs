@@ -73,6 +73,93 @@ namespace Brainarr.Tests.Services
 
         [Fact]
         [Trait("Category", "IterativeStrategy")]
+        public async Task GetIterativeRecommendationsAsync_WhenRunCancelled_PropagatesOperationCanceled()
+        {
+            // Resilience: a cancelled RUN token must propagate out of the top-up loop (so the
+            // cancellation-aware orchestrator path maps it to a cancelled fetch), NOT be swallowed
+            // by the per-iteration catch and returned as a partial list claiming success.
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new OperationCanceledException());
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
+                .ThrowsAsync(new OperationCanceledException());
+
+            Func<Task> act = async () => await _strategy.GetIterativeRecommendationsAsync(
+                _mockProvider.Object,
+                _profile,
+                _existingArtists,
+                _existingAlbums,
+                _settings,
+                shouldRecommendArtists: false,
+                cancellationToken: cts.Token);
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(act);
+        }
+
+        [Fact]
+        [Trait("Category", "IterativeStrategy")]
+        public async Task GetIterativeRecommendationsAsync_ProviderTimeoutWithLiveToken_DoesNotPropagateAsCancel()
+        {
+            // A provider's OWN request timeout surfaces as OperationCanceled/TaskCanceled while the
+            // run token is NOT cancelled. That must be treated as a recoverable per-iteration failure
+            // (break + return what we have), NOT propagated as a run cancellation.
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+                .ThrowsAsync(new OperationCanceledException());
+            _mockProvider.Setup(x => x.GetRecommendationsAsync(It.IsAny<string>()))
+                .ThrowsAsync(new OperationCanceledException());
+
+            // CancellationToken.None (default) → IsCancellationRequested == false → no propagation.
+            var result = await _strategy.GetIterativeRecommendationsAsync(
+                _mockProvider.Object,
+                _profile,
+                _existingArtists,
+                _existingAlbums,
+                _settings,
+                shouldRecommendArtists: false);
+
+            Assert.NotNull(result);
+            Assert.Empty(result);
+        }
+
+        [SkippableFact]
+        [Trait("Category", "IterativeStrategy")]
+        public void Cooldown_UsesNoUntokenedTaskDelay()
+        {
+            // #re-audit-4 (resilience): the local-provider cool-down was `await Task.Delay(cooldownMs)`
+            // with no token, so a cancelled run blocked for the full cooldown before OCE propagated
+            // through the per-iteration guard. A behavioral test for that exact branch is timing-fragile
+            // (must hit the zero/low-streak stop AND cancel mid-cooldown; if zeroStop>1 the next provider
+            // call throws OCE first → false pass), so pin the BUG CLASS statically: every Task.Delay on
+            // this hot fetch-path file must pass a CancellationToken. The cancellation CONTRACT itself is
+            // covered behaviorally by the two tests above.
+            var src = LocatePluginSource("Services/IterativeRecommendationStrategy.cs");
+            Skip.If(src is null, "plugin source not locatable from test base dir (packaged run)");
+            var text = System.IO.File.ReadAllText(src!);
+            foreach (System.Text.RegularExpressions.Match m in
+                     System.Text.RegularExpressions.Regex.Matches(text, @"Task\.Delay\(([^)]*)\)"))
+            {
+                Assert.True(m.Groups[1].Value.Contains(","),
+                    $"every Task.Delay on the fetch path must pass a CancellationToken — found un-tokened: {m.Value}");
+            }
+        }
+
+        private static string? LocatePluginSource(string relative)
+        {
+            var dir = new System.IO.DirectoryInfo(AppContext.BaseDirectory);
+            while (dir is not null)
+            {
+                var candidate = System.IO.Path.Combine(dir.FullName, "Brainarr.Plugin",
+                    relative.Replace('/', System.IO.Path.DirectorySeparatorChar));
+                if (System.IO.File.Exists(candidate)) return candidate;
+                dir = dir.Parent;
+            }
+            return null;
+        }
+
+        [Fact]
+        [Trait("Category", "IterativeStrategy")]
         public async Task SingleIterationSuccess_ReturnsEnoughUniqueRecommendations()
         {
             // Arrange

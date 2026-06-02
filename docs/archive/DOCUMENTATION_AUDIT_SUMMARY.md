@@ -1,3 +1,5 @@
+> ⚠️ Historical (flagged 2026-05-31): describes a past state; some details below no longer match the current code.
+
 # Documentation Audit & Enhancement Summary
 **Audit Date**: 2025-08-19
 **Auditor**: Senior Technical Documentation Specialist

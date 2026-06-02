@@ -270,6 +270,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             request.Method = HttpMethod.Post;
             request.SetContent(JsonConvert.SerializeObject(body));
 
+            // SECURITY (HIGH): Gemini carries the API key in the URL query (?key=...). The host
+            // IHttpClient throws an HttpException on non-2xx whose Message embeds the full request
+            // URL — and that exception would be chained as InnerException of the mapped
+            // LlmProviderException and rendered UNREDACTED by NLog's exception renderer, leaking the
+            // key into logs on every failed request. Suppressing the host throw routes all non-2xx
+            // responses through the status-code branches in CompleteAsync/CheckHealthAsync, which map
+            // with inner:null (no URL-bearing exception is ever constructed). Do NOT remove this.
+            request.SuppressHttpError = true;
+
             var seconds = useTestTimeout
                 ? BrainarrConstants.TestConnectionTimeout
                 : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);

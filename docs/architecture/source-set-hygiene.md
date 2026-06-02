@@ -1,4 +1,4 @@
-# Source-Set Hygiene Assessment (Brainarr v1.3.1)
+# Source-Set Hygiene Assessment (Brainarr v1.6.1)
 
 Last updated: 2025-09-25
 
@@ -15,7 +15,7 @@ Last updated: 2025-09-25
 | Code | Description | Current Rationale | Proposed Action |
 |------|-------------|-------------------|-----------------|
 | CS0618 | Use of obsolete members | Lidarr APIs occasionally mark members obsolete before replacements land in stable builds. | Keep (documented); add TODO to remove once Lidarr provides replacements. |
-| CS0168 | Variable declared but never used | Catch blocks with logging stubs. | Replace with discard `_` or log exception; plan cleanup and remove suppression. |
+| CS0168 | Variable declared but never used | Catch blocks with logging stubs. <!-- TODO(docval): unverified - CS0168 not found in actual NoWarn list as of 2026-05-31 --> | Replace with discard `_` or log exception; plan cleanup and remove suppression. |
 | CS1998 | Async method lacks `await` | Compatibility shims for async signatures returning cached data. | Audit methods; convert to synchronous or add `await Task.CompletedTask`; target removal. |
 | CS8618 | Non-nullable field uninitialized | DTOs populated by deserializers. | Convert to nullable or add constructors; feasible to remove with targeted refactor. |
 | CS8625 | Null literal to non-nullable | JSON converters using null sentinel. | Investigate per call site; may be resolved alongside CS8618 clean-up. |
@@ -35,7 +35,7 @@ Last updated: 2025-09-25
 | Code | Description | Current Rationale | Proposed Action |
 |------|-------------|-------------------|-----------------|
 | CS0618 | Obsolete members | Tests exercising downgrade paths. | Keep for now; add TODO for removal once obsolete APIs gone. |
-| CS1998 | Async method lacks `await` | Helper methods using async signature for data-driven tests. | Update helpers; plan removal. |
+| CS1998 | Async method lacks `await` | Helper methods using async signature for data-driven tests. <!-- TODO(docval): unverified - CS1998 not found in actual tests NoWarn list as of 2026-05-31 --> | Update helpers; plan removal. |
 | MSB3277 | Assembly version conflict | Test project references plugin output + Lidarr assemblies. | Investigate if we can load via `HintPath`; keep temporarily. |
 
 ## Recommended Cleanup Sequence
@@ -70,4 +70,4 @@ Last updated: 2025-09-25
 
 ## Next Checkpoint
 
-Revisit after quick-win tasks to reassess remaining suppressions and decide whether we can enforce `WarningsAsErrors` for Release builds in Brainarr v1.3.0.
+Revisit after quick-win tasks to reassess remaining suppressions and decide whether we can enforce `WarningsAsErrors` for Release builds in Brainarr v1.6.1.

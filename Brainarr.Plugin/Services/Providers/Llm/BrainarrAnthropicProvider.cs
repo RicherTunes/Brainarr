@@ -195,7 +195,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ["model"] = modelRaw,
                 ["messages"] = new[] { new { role = "user", content = request.Prompt } },
                 ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["temperature"] = (double?)request.Temperature ?? 0.8,
+                // Anthropic's temperature range is [0, 1] (unlike OpenAI's [0, 2]); clamp so an
+                // out-of-range value never 400s the request (defensive — current callers send 0.8).
+                ["temperature"] = System.Math.Clamp((double?)request.Temperature ?? 0.8, 0.0, 1.0),
             };
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {
@@ -265,7 +267,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 ["model"] = modelRaw,
                 ["messages"] = new[] { new { role = "user", content = request.Prompt } },
                 ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["temperature"] = (double?)request.Temperature ?? 0.8,
+                // Anthropic's temperature range is [0, 1] (unlike OpenAI's [0, 2]); clamp so an
+                // out-of-range value never 400s the request (defensive — current callers send 0.8).
+                ["temperature"] = System.Math.Clamp((double?)request.Temperature ?? 0.8, 0.0, 1.0),
                 ["stream"] = true,
             };
             if (!string.IsNullOrEmpty(request.SystemPrompt))

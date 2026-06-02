@@ -299,9 +299,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
         private async Task<HttpResponse> SendAsync(string token, object body, bool useTestTimeout, CancellationToken cancellationToken)
         {
+            // Subscription credentials are Claude Pro/Max OAuth access tokens (claudeAiOauth.accessToken
+            // from `claude login`), NOT sk-ant- API keys. Anthropic authenticates the OAuth family via
+            // `Authorization: Bearer` + the `anthropic-beta: oauth-...` opt-in flag — sending an OAuth
+            // token as `x-api-key` (the original day-one scheme) is rejected with HTTP 401 for every
+            // subscriber. The sibling BrainarrZaiCodingProvider uses the same Bearer/Claude-Code scheme
+            // (live-confirmed). NOTE: the dated anthropic-beta value can rotate server-side; if a real
+            // subscriber sees a 400/401 citing an oauth-beta error, capture the body and bump it. A
+            // `claude-cli` User-Agent is deliberately NOT set here — Lidarr's ManagedHttpDispatcher
+            // throws on any non-Lidarr UA, so if Bearer+beta prove insufficient this provider must move
+            // to a raw HttpClient like ZaiCoding (queued follow-up).
             var request = new HttpRequestBuilder(BrainarrConstants.AnthropicMessagesUrl)
-                .SetHeader("x-api-key", token)
+                .SetHeader("Authorization", $"Bearer {token}")
                 .SetHeader("anthropic-version", AnthropicVersion)
+                .SetHeader("anthropic-beta", "oauth-2025-04-20")
                 .SetHeader("Content-Type", "application/json")
                 .Build();
 

@@ -77,7 +77,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log run header"); }
 
             var allowArtistOnly = settings.RecommendationMode == RecommendationMode.Artists;
-            var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions).ConfigureAwait(false);
+            var validationSummary = await ValidateAsync(recommendations, allowArtistOnly, settings.EnableDebugLogging, settings.LogPerItemDecisions, settings.CustomFilterPatterns, settings.EnableStrictValidation).ConfigureAwait(false);
             try
             {
                 var msg = $"Validation produced {validationSummary.ValidCount}/{validationSummary.TotalCount} candidates (pre-dedup). Duplicates will be removed next.";
@@ -102,26 +102,38 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var slugs = _styleCatalog.Normalize(settings.StyleFilters);
                 if (slugs.Count > 0)
                 {
-                    var relax = settings.RelaxStyleMatching;
-                    validated = validated
-                        .Where(r =>
-                        {
-                            // Build genre list from recommendation's genre (may have multiple comma-separated)
-                            var genres = new List<string>();
-                            if (!string.IsNullOrWhiteSpace(r.Genre))
-                            {
-                                genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                    .Select(g => g.Trim())
-                                    .Where(g => !string.IsNullOrWhiteSpace(g)));
-                            }
-                            return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
-                        })
-                        .ToList();
-
-                    var styleFiltered = preStyleFilter - validated.Count;
-                    if (styleFiltered > 0)
+                    // Style-seeded ("genre-first") discovery: the user asked for styles their library
+                    // doesn't contain (e.g. "lo-fi" over a rock library). The prompt already enforces
+                    // style membership; the LLM's free-text genre labels are approximate (lo-fi vs
+                    // chillhop vs downtempo) and would be wrongly dropped here, gutting the whole point.
+                    // So skip the hard drop in that case and trust the prompt.
+                    if (IsStyleSeededDiscovery(_styleCatalog, settings, libraryProfile))
                     {
-                        _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                        _logger.Info("Style-seeded discovery (library lacks the selected styles): skipping post-validation style filter; style membership is enforced at the prompt level.");
+                    }
+                    else
+                    {
+                        var relax = settings.RelaxStyleMatching;
+                        validated = validated
+                            .Where(r =>
+                            {
+                                // Build genre list from recommendation's genre (may have multiple comma-separated)
+                                var genres = new List<string>();
+                                if (!string.IsNullOrWhiteSpace(r.Genre))
+                                {
+                                    genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                                        .Select(g => g.Trim())
+                                        .Where(g => !string.IsNullOrWhiteSpace(g)));
+                                }
+                                return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
+                            })
+                            .ToList();
+
+                        var styleFiltered = preStyleFilter - validated.Count;
+                        if (styleFiltered > 0)
+                        {
+                            _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
+                        }
                     }
                 }
             }
@@ -187,7 +199,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     libraryProfile,
                     deficit,
                     validationSummary,
-                    cancellationToken).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
+                    cancellationToken,
+                    // T1: exclude the already-delivered set from the top-up prompt + dedup.
+                    alreadyAccepted: importItems,
+                    // T2: MBID-enrich top-up recs (artist mode) with the same resolver as the initial batch.
+                    artistResolver: _artistResolver).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
                 if (topUp.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
@@ -226,10 +242,70 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             return importItems;
         }
 
-        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true)
+        /// <summary>
+        /// Style-seeded ("genre-first") discovery is when the user selected styles their library does
+        /// NOT contain — the recommendations should come from those styles outright, with the library
+        /// used only for dedup.
+        ///
+        /// CRITICAL: this MUST be computed from the exact same signal the prompt renderer uses to
+        /// decide genre-first mode (<c>LibraryPromptRenderer</c>: sum of <c>StyleContext.StyleCoverage</c>
+        /// over the selected slugs == 0). An earlier version compared against <c>LibraryProfile.TopGenres</c>
+        /// with parent-relaxed matching, which could DISAGREE with the renderer — e.g. selecting a
+        /// parent style ("rock") over a library that only has a child genre ("art rock"): the renderer
+        /// sees coverage["rock"]==0 → genre-first prompt, but parent-relaxed IsMatch matched → the filter
+        /// ran and gutted the genre-first results. Reading the same slug-keyed coverage keeps the prompt
+        /// mode and the post-filter in lockstep. Pure for testability.
+        /// </summary>
+        internal static bool IsStyleSeededDiscovery(IStyleCatalogService catalog, BrainarrSettings settings, LibraryProfile profile)
+        {
+            if (catalog == null || settings?.StyleFilters == null || !settings.StyleFilters.Any())
+            {
+                return false;
+            }
+
+            var slugs = catalog.Normalize(settings.StyleFilters);
+            if (slugs.Count == 0)
+            {
+                // Pure freestyle (no catalog slugs): the outer filter guard already skips on empty
+                // Normalize, so this value is only the prompt-consistency signal — freestyle is always
+                // genre-first by nature.
+                return true;
+            }
+
+            var coverage = profile?.StyleContext?.StyleCoverage;
+            if (coverage == null || coverage.Count == 0)
+            {
+                // No library style index at all → genre-first (matches renderer's coverage==0).
+                return true;
+            }
+
+            var selectedCoverage = slugs.Sum(s => coverage.TryGetValue(s, out var c) ? c : 0);
+            return selectedCoverage == 0;
+        }
+
+        /// <summary>
+        /// Resolves the validator for this run. <c>CustomFilterPatterns</c> / <c>EnableStrictValidation</c>
+        /// are per-import-list-definition settings, but the injected <see cref="_validator"/> is a
+        /// process-wide singleton constructed without them. When the user configures either, build a
+        /// per-run <see cref="RecommendationValidator"/> carrying those settings; otherwise reuse the
+        /// injected default (zero behavior change for the common case, and a mock validator stays in
+        /// effect under test). Patterns are matched as lowercased substrings (no regex), so there is no
+        /// ReDoS/injection surface, and blank entries are dropped in the validator ctor.
+        /// </summary>
+        internal IRecommendationValidator ResolveValidator(string customPatterns, bool strictMode)
+        {
+            if (string.IsNullOrWhiteSpace(customPatterns) && !strictMode)
+            {
+                return _validator;
+            }
+
+            return new NzbDrone.Core.ImportLists.Brainarr.Services.RecommendationValidator(_logger, customPatterns, strictMode);
+        }
+
+        private Task<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult> ValidateAsync(List<Recommendation> recommendations, bool allowArtistOnly, bool debug = false, bool logPerItem = true, string customPatterns = null, bool strictMode = false)
         {
             _logger.Debug($"Validating {recommendations.Count} recommendations");
-            var result = _validator.ValidateBatch(recommendations, allowArtistOnly);
+            var result = ResolveValidator(customPatterns, strictMode).ValidateBatch(recommendations, allowArtistOnly);
             _logger.Debug($"Validation result: {result.ValidCount}/{result.TotalCount} passed ({result.PassRate:F1}%)");
 
             try

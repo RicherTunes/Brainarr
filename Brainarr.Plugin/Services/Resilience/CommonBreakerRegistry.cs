@@ -1,5 +1,5 @@
 using System;
-using System.Collections.Concurrent;
+using Lidarr.Plugin.Common.Collections;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
@@ -13,7 +13,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
     /// </summary>
     public sealed class CommonBreakerRegistry : IBreakerRegistry
     {
-        private readonly ConcurrentDictionary<ModelKey, ICircuitBreaker> _breakers = new();
+        // Hard cap (backstop) so this process-lifetime registry can't grow unbounded — mirrors
+        // LimiterRegistry, which bounds the identical ModelKey space at the same cap. Keyed by
+        // provider+model (low cardinality in practice: the few combos a user configures), so eviction
+        // never fires in normal use; this just upholds the "every long-lived collection is bounded"
+        // invariant. BoundedConcurrentDictionary.GetOrAdd enforces the cap (evicts oldest) on insert.
+        private const int BreakerCap = 5120;
+        private readonly BoundedConcurrentDictionary<ModelKey, ICircuitBreaker> _breakers = new(BreakerCap);
 
         public ICircuitBreaker Get(ModelKey key, Logger logger, CircuitBreakerOptions? options = null)
         {

@@ -8,7 +8,7 @@
 
 ## Day 0 – Confirm prerequisites
 
-- Lidarr nightly ≥ 2.14.2.4786 (README compatibility notice).
+- Lidarr nightly ≥ 3.0.0.4855 (README compatibility notice).
 - Brainarr built via `./setup.ps1` / `./setup.sh`; provider matrix regenerated if `docs/providers.yaml` changed.
 - Follow the README quick start and [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md) before proceeding.
 
@@ -38,7 +38,7 @@
 
 ## Dashboards & alerts
 
-- Import `dashboards/grafana-brainarr-observability.json` as a starting panel set (p95 latency, error rate, 429 ratio).
+- Import `docs/assets/grafana-brainarr-observability.json` as a starting panel set (p95 latency, error rate, 429 ratio).
 - Suggested PromQL (from `dashboards/README.md`):
   - `provider_latency_seconds_p95{provider="openai"}` for tails.
   - `increase(provider_requests_total{status="error"}[5m])` for spikes.

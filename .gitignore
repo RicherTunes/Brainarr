@@ -420,3 +420,13 @@ TestResults/
 # Git worktrees created for local builds/tests should never be committed.
 # (A stale `.worktrees/main` snapshot was checked in once — keep it out forever.)
 .worktrees/
+
+# Test build output (must never be committed)
+Brainarr.Plugin/bin-tests/
+Brainarr.Plugin/bin/
+
+# Extracted plugin-output dir (host assemblies + merged plugin DLL). Build
+# artifacts, not source — the E2E fixture (BrainarrLidarrContainerFixture)
+# only reads it as a last-resort fallback after Brainarr.Plugin/bin/{,Release,Debug};
+# scripts/e2e.ps1 builds into bin/, so the committed copy was redundant (#79).
+_plugins/

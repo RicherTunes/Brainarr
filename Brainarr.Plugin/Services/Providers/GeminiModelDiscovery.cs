@@ -57,6 +57,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers
                     .Build();
                 request.Method = HttpMethod.Get;
                 request.RequestTimeout = TimeSpan.FromSeconds(BrainarrConstants.ModelDetectionTimeout);
+                // SECURITY (HIGH): the API key rides in the URL query. Suppress the host throw so a
+                // non-2xx (invalid/unactivated key — a common first-run state when populating the model
+                // dropdown) returns a response handled by the status-code branch below, rather than
+                // throwing an HttpException whose URL-bearing message NLog renders UNREDACTED into the
+                // log via the catch at the bottom. Same leak class fixed in BrainarrGeminiProvider.
+                request.SuppressHttpError = true;
 
                 var response = await ResiliencePolicy.WithHttpResilienceAsync(
                     templateRequest: request,

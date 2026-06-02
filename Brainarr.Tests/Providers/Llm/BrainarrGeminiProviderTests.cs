@@ -40,6 +40,48 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_PinsEndpointKeyInQuery_AndSuppressesHttpError()
+        {
+            // Contract guard (COV1 + G1, provider-matrix #5): pin Gemini's distinct auth shape
+            // (key in ?key= query, NOT a header) + endpoint on the actually-exercised CompleteAsync
+            // path, and assert SuppressHttpError=true so the host never throws a URL-bearing
+            // HttpException that would leak the key into logs.
+            var provider = new BrainarrGeminiProvider(_http.Object, _logger, "AIza-test", "gemini-1.5-flash");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":\"[]\"}]}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Url.ToString().Should().Be(
+                "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=AIza-test");
+            // Key is in the query, never an Authorization/x-api-key header for Gemini.
+            captured.Headers.GetSingleValue("Authorization").Should().BeNull();
+            captured.Headers.GetSingleValue("x-api-key").Should().BeNull();
+            captured.SuppressHttpError.Should().BeTrue("the key is in the URL; a host HttpException would leak it into logs");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_AuthError_DoesNotChainUrlBearingException()
+        {
+            // G1 regression: on a non-2xx response the mapped exception must NOT carry an inner
+            // exception whose rendered text embeds the ?key=... URL. The provider maps with
+            // inner:null on the status-code branch; this asserts the key cannot reach a log sink.
+            var provider = new BrainarrGeminiProvider(_http.Object, _logger, "AIza-secret-key", "gemini-1.5-flash");
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Error(HttpStatusCode.Unauthorized));
+
+            Func<Task> act = async () => await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+            var ex = await act.Should().ThrowAsync<AuthenticationException>();
+
+            ex.Which.InnerException.Should().BeNull("no host HttpException (which embeds the ?key= URL) may be chained");
+            ex.Which.ToString().Should().NotContain("AIza-secret-key");
+        }
+
+        [Fact]
         public void Constructor_NullHttpClient_Throws()
         {
             Action act = () => new BrainarrGeminiProvider(null!, _logger, "AIza-test");

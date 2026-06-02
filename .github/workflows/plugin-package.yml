@@ -108,7 +108,8 @@ jobs:
       shell: bash
       run: |
         # Packaging policy (see ext/Lidarr.Plugin.Common/build/PluginPackaging.targets):
-        # MUST SHIP: merged Lidarr.Plugin.Brainarr.dll, plugin.json, manifest.json, .lidarr.plugin
+        # MUST SHIP: merged Lidarr.Plugin.Brainarr.dll, plugin.json, manifest.json
+        # (.lidarr.plugin removed — legacy pre-3.0 discovery file the host no longer reads)
         # MERGED/INTERNALIZED: Lidarr.Plugin.Common + Lidarr.Plugin.Abstractions (via ILRepack)
         # MUST NOT SHIP: FluentValidation, NLog, System.Text.Json, Microsoft.Extensions.*.Abstractions,
         #                Lidarr.*.dll, NzbDrone.*.dll (all host-provided / cross-boundary type-identity)
@@ -131,7 +132,6 @@ jobs:
         cp "$DLL" package/
         cp plugin.json package/
         cp manifest.json package/
-        if [ -f .lidarr.plugin ]; then cp .lidarr.plugin package/; fi
 
         # Filename MUST contain "net8.0.zip" so Lidarr's PluginService picks it up
         # when users install via https://github.com/RicherTunes/Brainarr → @latest pre-release.
@@ -150,8 +150,7 @@ jobs:
         for f in \
           "Lidarr.Plugin.Brainarr.dll" \
           "plugin.json" \
-          "manifest.json" \
-          ".lidarr.plugin"; do
+          "manifest.json"; do
           if ! grep -Fxq "$f" ziplist.txt; then
             echo "Missing expected file in ZIP: $f" >&2
             exit 1

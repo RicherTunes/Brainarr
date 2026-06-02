@@ -5,7 +5,7 @@
 This guide covers deploying Brainarr to various environments including manual installation, Docker, and automated CI/CD pipelines.
 
 > Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). Ensure your Lidarr meets this before deploying the plugin.
+> Requires Lidarr plugins branch image `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913` or later (.NET 8). Ensure your Lidarr meets this before deploying the plugin.
 
 ## Table of Contents
 
@@ -283,7 +283,7 @@ jobs:
     - name: Setup .NET
       uses: actions/setup-dotnet@v3
       with:
-        dotnet-version: '6.0.x'
+        dotnet-version: '8.0.x'
 
     - name: Restore dependencies
       run: dotnet restore
@@ -342,7 +342,7 @@ stages:
   - deploy
 
 variables:
-  DOTNET_VERSION: "6.0"
+  DOTNET_VERSION: "8.0"
 
 before_script:
   - apt-get update -y
@@ -390,7 +390,7 @@ pipeline {
     agent any
 
     environment {
-        DOTNET_VERSION = '6.0'
+        DOTNET_VERSION = '8.0'
         PLUGIN_VERSION = sh(returnStdout: true, script: "cat plugin.json | jq -r .version").trim()
     }
 
@@ -471,13 +471,13 @@ pipeline {
 cp -r /var/lib/lidarr/plugins/RicherTunes/Brainarr /backup/Brainarr-$(date +%Y%m%d)
 ```
 
-2. **Stop Lidarr Service**
+1. **Stop Lidarr Service**
 
 ```bash
 systemctl stop lidarr
 ```
 
-3. **Deploy New Version**
+1. **Deploy New Version**
 
 ```bash
 rm -rf /var/lib/lidarr/plugins/RicherTunes/Brainarr/*
@@ -485,13 +485,13 @@ unzip Brainarr-v1.0.0.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
 chown -R lidarr:lidarr /var/lib/lidarr/plugins/RicherTunes/Brainarr
 ```
 
-4. **Start Lidarr Service**
+1. **Start Lidarr Service**
 
 ```bash
 systemctl start lidarr
 ```
 
-5. **Verify Deployment**
+1. **Verify Deployment**
 
 ```bash
 # Check plugin loaded

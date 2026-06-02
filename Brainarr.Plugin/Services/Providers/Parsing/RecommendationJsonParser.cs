@@ -20,6 +20,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             var results = new List<Recommendation>();
             if (string.IsNullOrWhiteSpace(json)) return results;
 
+            // Captured (not logged immediately): the primary parse may throw on a truncated/fenced
+            // payload that salvage recovers below. The log LEVEL is decided at the end from the outcome.
+            Exception parseFailure = null;
+
             try
             {
                 // Use relaxed parsing since provider text may include HTML/script literals as data
@@ -98,7 +102,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             }
             catch (Exception ex)
             {
-                logger?.Warn(ex, "Failed to parse recommendations JSON");
+                // Defer: do NOT warn here. Truncated/fenced payloads (routine for verbose models such
+                // as GLM) throw the primary parse but are recovered by the salvage pass below. Warning
+                // unconditionally here produced misleading WARN spam on every successful run.
+                parseFailure = ex;
                 // Fallback: attempt to extract the first JSON array from the raw text and parse that
                 try
                 {
@@ -117,7 +124,37 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 }
                 catch (Exception ex2)
                 {
-                    logger?.Warn(ex2, "Fallback array extraction also failed");
+                    // Secondary best-effort attempt; object salvage still runs below. Debug, not Warn.
+                    logger?.Debug(ex2, "Fallback array extraction also failed; will attempt object salvage");
+                }
+            }
+
+            // Last-resort salvage for TRUNCATED responses: when a provider hits its max_tokens cap
+            // mid-array the JSON has no closing ']' (and TryExtractJsonArrayFromText finds no terminator),
+            // so both attempts above recover nothing even though dozens of complete objects precede the
+            // cut. This is routine for verbose models (e.g. Z.AI Coding / GLM, which pads ```json output).
+            // Scan for balanced top-level {...} objects and parse each, discarding only the partial tail.
+            if (results.Count == 0)
+            {
+                var before = results.Count;
+                SalvageObjectsFromText(json, results);
+                if (results.Count > before)
+                {
+                    logger?.Debug("Recovered {0} recommendation(s) by salvaging objects from a truncated/invalid JSON array", results.Count - before);
+                }
+            }
+
+            // Decide the log level for a primary-parse failure from the final outcome: a recovery
+            // (fallback or salvage) is routine and logs at Debug; only a TOTAL loss warrants WARN.
+            if (parseFailure != null)
+            {
+                if (results.Count > 0)
+                {
+                    logger?.Debug(parseFailure, "Primary recommendations-JSON parse failed but recovered {0} item(s) via fallback/salvage; not warning", results.Count);
+                }
+                else
+                {
+                    logger?.Warn(parseFailure, "Failed to parse recommendations JSON (0 recovered after fallback + salvage)");
                 }
             }
 
@@ -138,8 +175,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                 string reason = TryGetString(item, "reason") ?? TryGetString(item, "r");
 
                 int? year = TryGetInt(item, "year");
-                double conf = TryGetDouble(item, "confidence") ?? 0.85;
-                if (double.IsNaN(conf) || double.IsInfinity(conf)) conf = 0.85;
+                // Track whether the model actually supplied a (finite) confidence. When it didn't, we
+                // still set a display default but mark ConfidenceProvided=false so the confidence floor
+                // doesn't silently drop the item when the user raises the floor above that default.
+                var rawConf = TryGetDouble(item, "confidence");
+                var confProvided = rawConf.HasValue && double.IsFinite(rawConf.Value);
+                double conf = rawConf ?? 0.85;
+                if (double.IsNaN(conf) || double.IsInfinity(conf)) { conf = 0.85; confProvided = false; }
                 if (conf < 0.0) conf = 0.0; // lower bound only; do not clamp upper to preserve provider semantics
 
                 results.Add(new Recommendation
@@ -149,12 +191,101 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                     Genre = string.IsNullOrWhiteSpace(genre) ? null : genre.Trim(),
                     Reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
                     Year = year,
-                    Confidence = conf
+                    Confidence = conf,
+                    ConfidenceProvided = confProvided
                 });
             }
             catch
             {
                 // Skip malformed item
+            }
+        }
+
+        /// <summary>
+        /// Recovers complete JSON objects from text that is not valid JSON as a whole — typically a
+        /// recommendation array truncated at the provider's max_tokens cap (no closing brace/bracket).
+        /// Walks the text tracking a container stack (<c>{</c> / <c>[</c>) while respecting string
+        /// literals and escapes, and extracts every balanced object whose <em>immediately enclosing
+        /// container is an array</em> — i.e. the array elements. Doing it by container type rather than
+        /// absolute brace depth means it works whether the model emits a bare root array
+        /// (<c>[{...},{...}]</c>) or an object-wrapped one (<c>{"recommendations":[{...},{...}]}</c>)
+        /// that truncates before the wrapper closes (GLM emits both shapes interchangeably). Nested
+        /// sub-objects (e.g. a per-item <c>"meta":{...}</c>) are not extracted separately because their
+        /// enclosing container is an object, not an array; they ride along inside their parent element.
+        /// The final partial element (whose closing brace never arrives) is left unextracted.
+        /// </summary>
+        private static void SalvageObjectsFromText(string text, List<Recommendation> results)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+
+            var containers = new Stack<char>();
+            int braceDepth = 0;
+            int objStart = -1;
+            int objDepth = -1;
+            bool inString = false;
+            bool escape = false;
+
+            for (int i = 0; i < text.Length; i++)
+            {
+                char c = text[i];
+
+                if (inString)
+                {
+                    if (escape) { escape = false; }
+                    else if (c == '\\') { escape = true; }
+                    else if (c == '"') { inString = false; }
+                    continue;
+                }
+
+                switch (c)
+                {
+                    case '"':
+                        inString = true;
+                        break;
+                    case '[':
+                        containers.Push('[');
+                        break;
+                    case ']':
+                        if (containers.Count > 0 && containers.Peek() == '[') containers.Pop();
+                        break;
+                    case '{':
+                        // Only the elements of an array are candidate recommendations; an object whose
+                        // enclosing container is itself an object (or the document root) is a wrapper or
+                        // a nested field, not an element.
+                        if (objStart < 0 && containers.Count > 0 && containers.Peek() == '[')
+                        {
+                            objStart = i;
+                            objDepth = braceDepth;
+                        }
+                        containers.Push('{');
+                        braceDepth++;
+                        break;
+                    case '}':
+                        if (containers.Count > 0 && containers.Peek() == '{')
+                        {
+                            containers.Pop();
+                            braceDepth--;
+                        }
+                        if (objStart >= 0 && braceDepth == objDepth)
+                        {
+                            var objText = text.Substring(objStart, i - objStart + 1);
+                            objStart = -1;
+                            objDepth = -1;
+                            try
+                            {
+                                using var objDoc = SecureJsonSerializer.ParseDocumentRelaxed(objText);
+                                if (objDoc.RootElement.ValueKind == JsonValueKind.Object)
+                                {
+                                    TryAddRecommendation(objDoc.RootElement, results);
+                                }
+                            }
+                            catch
+                            {
+                                // Skip an individual object that still won't parse.
+                            }
+                        }
+                        break;
+                }
             }
         }
 

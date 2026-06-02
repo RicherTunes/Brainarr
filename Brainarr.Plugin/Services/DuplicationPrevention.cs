@@ -62,7 +62,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly ConcurrentDictionary<string, Lazy<Task<object>>> _inflightOperations;
         private readonly ConcurrentDictionary<string, DateTime> _lastFetchTimes;
-        private readonly HashSet<string> _historicalRecommendations;
+        // Cross-session in-memory dedup set: key -> last-seen UTC. The timestamp exists ONLY to evict
+        // the oldest entries when the set exceeds MaxHistoryEntries — without a bound this HashSet grew
+        // forever on the process-lifetime singleton (one entry per unique recommended artist|album,
+        // never evicted: ClearHistory has no production caller), a slow heap leak over a weeks-long
+        // Lidarr process. The on-disk RecommendationHistory backstops long-term dedup, so evicting the
+        // oldest in-memory keys past the cap is safe. Guarded by _historyLock.
+        private readonly Dictionary<string, DateTime> _historicalRecommendations;
+        private const int DefaultMaxHistoryEntries = 50_000;
+        private readonly int _maxHistoryEntries;
         private readonly object _historyLock = new object();
         private readonly TimeSpan _minFetchInterval = TimeSpan.FromSeconds(5);
         private DateTime _lastCleanup = DateTime.MinValue;
@@ -71,11 +79,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private bool _disposed;
 
         public DuplicationPreventionService(Logger logger)
+            : this(logger, DefaultMaxHistoryEntries)
+        {
+        }
+
+        // Test seam: lets a test drive eviction with a small cap instead of 50k items.
+        internal DuplicationPreventionService(Logger logger, int maxHistoryEntries)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+            _maxHistoryEntries = maxHistoryEntries > 0 ? maxHistoryEntries : DefaultMaxHistoryEntries;
             _inflightOperations = new ConcurrentDictionary<string, Lazy<Task<object>>>(StringComparer.OrdinalIgnoreCase);
             _lastFetchTimes = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase);
-            _historicalRecommendations = new HashSet<string>();
+            _historicalRecommendations = new Dictionary<string, DateTime>(StringComparer.Ordinal);
         }
 
         /// <summary>
@@ -188,10 +203,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             // Track these recommendations in history
             lock (_historyLock)
             {
+                var now = DateTime.UtcNow;
                 foreach (var rec in deduplicated)
                 {
                     var key = GetRecommendationKey(rec);
-                    _historicalRecommendations.Add(key);
+                    _historicalRecommendations[key] = now;
+                }
+
+                // Bound the set: when over the cap, trim the oldest entries down to ~90% in a single
+                // pass. Computing the evict count from the actual overflow (rather than a fixed 10%)
+                // guarantees Count <= cap afterward for ANY batch size — not just batches that
+                // overflow by <10% (an adversarial-review hardening). Prevents unbounded growth on the
+                // process-lifetime singleton; the on-disk RecommendationHistory backstops anything evicted.
+                if (_historicalRecommendations.Count > _maxHistoryEntries)
+                {
+                    var target = _maxHistoryEntries - Math.Max(1, _maxHistoryEntries / 10);
+                    var evict = _historicalRecommendations.Count - target;
+                    foreach (var old in _historicalRecommendations.OrderBy(kv => kv.Value).Take(evict).ToList())
+                    {
+                        _historicalRecommendations.Remove(old.Key);
+                    }
+                    _logger.Debug($"Recommendation-history dedup set hit cap ({_maxHistoryEntries}); evicted {evict} oldest entries (now {_historicalRecommendations.Count})");
                 }
             }
 
@@ -224,7 +256,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     var key = GetRecommendationKey(rec);
                     var allowedBySession = sessionAllowList != null && sessionAllowList.Contains(key);
-                    if (allowedBySession || !_historicalRecommendations.Contains(key))
+                    if (allowedBySession || !_historicalRecommendations.ContainsKey(key))
                     {
                         filtered.Add(rec);
                         // Don't add to history here - that's the job of DeduplicateRecommendations
@@ -254,6 +286,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// This resets the "already recommended" state, allowing previously filtered items to be recommended again.
         /// Thread-safe operation that can be called during plugin operation for maintenance or testing.
         /// </summary>
+        // Test seam: current size of the in-memory dedup set, to assert it stays bounded.
+        internal int HistoryCount
+        {
+            get { lock (_historyLock) { return _historicalRecommendations.Count; } }
+        }
+
         public void ClearHistory()
         {
             if (_disposed)

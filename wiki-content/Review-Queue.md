@@ -5,7 +5,7 @@
 # Review Queue
 
 > Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
+> Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly).
 
 The Review Queue is Brainarr’s safety net for borderline results. Keep the heavy guidance in sync by updating `docs/troubleshooting.md` first—this page highlights only the key workflow.
 
@@ -26,3 +26,14 @@ The Review Queue is Brainarr’s safety net for borderline results. Keep the hea
 - Tune **Minimum Confidence** and **Require MBIDs** to balance quality vs. throughput. Keep changes recorded in `docs/troubleshooting.md` so future releases stay aligned.
 - Pair **Guarantee Exact Target** (Advanced Settings) with the Review Queue when you need fixed batch sizes without sacrificing safety.
 - For deeper diagnostics (logs, metrics), jump to [Troubleshooting](Troubleshooting.md) and the Observability preview.
+
+## Auto-triage (hidden settings)
+
+When enabled, the triage advisor can automatically accept items that score below the risk threshold without manual review. These are hidden Advanced settings — leave them off unless you want hands-off operation.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Enable Auto Review Triage Actions | `false` | Master switch. Off by default — items queue for manual approval. |
+| Max Auto Review Actions Per Run | `25` | Hard cap on auto-accepts per run. |
+| Review Action Cooldown (Minutes) | `15` | Minimum interval between auto-triage runs. |
+| Enable Provider Calibration | `true` | Apply per-provider confidence calibration to triage scores. Disable for raw scores. |

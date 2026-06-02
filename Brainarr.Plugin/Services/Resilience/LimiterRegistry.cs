@@ -300,5 +300,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
             if (string.IsNullOrWhiteSpace(origin)) return false;
             return _throttleUntil.ContainsKey(origin.Trim().ToLowerInvariant());
         }
+
+        /// <summary>
+        /// <b>TEST-ONLY:</b> live entry count of the throttle dictionary. Used to assert the
+        /// bounded-growth invariant (count never exceeds the cap) without depending on which specific
+        /// entries survive — that exact post-state is racy because the dictionaries are process-wide
+        /// statics that other parallel test collections also mutate via RegisterThrottle.
+        /// </summary>
+        internal static int ThrottleEntryCountForTesting => _throttleUntil.Count;
+
+        /// <summary><b>TEST-ONLY:</b> the per-dictionary capacity, so tests don't hardcode it.</summary>
+        internal static int DictCapForTesting => DictCap;
     }
 }

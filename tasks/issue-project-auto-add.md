@@ -3,6 +3,7 @@
 **Context**
 - Both `.github/workflows/project-auto-add.yml` and `.github/workflows/add-to-project.yml` were disabled on 2025-09-16 because they rely on `secrets.PROJECTS_TOKEN`.
 - The repo currently lacks that PAT or the necessary project-write scope, so the workflows failed whenever triggered.
+<!-- TODO(docval): unverified — `.yml.disabled` files not found in repo; may have been renamed or removed -->
 
 **What Needs To Happen**
 1. Create a PAT (classic) with `project` and `repo` scopes under RicherTunes (or move to a GitHub App) and store it as `PROJECTS_TOKEN` in the repo/org secrets.

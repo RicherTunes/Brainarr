@@ -30,9 +30,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// </para>
     ///
     /// <para>
-    /// Unlike the API-key path, ChatGPT Plus/Team/Pro subscribers can use this provider
-    /// without provisioning a separate billable API key — the Codex CLI's OAuth token already
-    /// covers the request, scoped to whatever models the subscription tier exposes.
+    /// IMPORTANT (known limitation, audited 2026-05-30): this provider POSTs to the public
+    /// <c>api.openai.com/v1/chat/completions</c> Platform endpoint, which authenticates **API keys**.
+    /// A pure ChatGPT-subscription **OAuth token** (<c>tokens.access_token</c> from
+    /// <c>codex auth login</c>, with no <c>OPENAI_API_KEY</c>) is NOT accepted there — the Codex CLI
+    /// uses a separate ChatGPT backend (Responses API + <c>chatgpt-account-id</c> header) that this
+    /// provider does not yet speak. So today this provider works when <c>~/.codex/auth.json</c>
+    /// contains an <c>OPENAI_API_KEY</c>; pure-OAuth users get a 401 with a hint to add one. Real
+    /// ChatGPT-backend support is queued and needs a Codex subscriber to verify the live protocol.
     /// </para>
     /// </summary>
     public sealed class BrainarrOpenAiCodexSubscriptionProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
@@ -379,7 +384,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 LlmErrorCode.AuthenticationFailed =>
                     new BrainarrLlmHint(
-                        "OpenAI Codex subscription token rejected. The OAuth token may have expired or been revoked. Run 'codex auth login' to refresh.",
+                        "OpenAI Codex token rejected. NOTE: ChatGPT subscription (OAuth) tokens from 'codex auth login' are NOT accepted by the OpenAI API endpoint this provider uses — only a Platform API key works. Add an \"OPENAI_API_KEY\" field to ~/.codex/auth.json (or use the OpenAI provider with an API key). If you ARE using an API key, it may have expired or been revoked.",
                         BrainarrConstants.DocsOpenAIInvalidKey),
                 LlmErrorCode.QuotaExceeded =>
                     new BrainarrLlmHint(

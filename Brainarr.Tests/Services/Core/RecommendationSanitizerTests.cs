@@ -53,9 +53,10 @@ namespace Brainarr.Tests.Services.Core
 
             outp.Should().NotContain("<script>");
             outp.Should().NotContain("../");
-            outp.Should().NotContain("etc/passwd");
-            outp.Should().Contain("AC/DC &amp; Friends"); // ampersand encoded and preserved
-            outp.Should().Contain("Selected Works");      // plain words preserved (no SQL-keyword stripping)
+            outp.Should().NotContain("etc/passwd");        // path traversal stripped
+            outp.Should().Contain("AC/DC & Friends");      // ampersand preserved RAW, not HTML-encoded (main's MusicBrainz fix: '&'→'&amp;' corrupted "&"-in-name lookups)
+            outp.Should().NotContain("&amp;");             // must not HTML-encode
+            outp.Should().Contain("Selected Works");       // plain words preserved (#589: no SQL-keyword false-positive stripping)
             outp.Should().Be(outp.Trim());
         }
 

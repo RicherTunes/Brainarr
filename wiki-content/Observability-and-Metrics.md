@@ -178,7 +178,7 @@ Set overall caps without code changes:
 - Observability actions: `Services/Core/BrainarrOrchestrator.cs`
 - Prometheus export: `Services/Telemetry/MetricsCollector.cs`\r\n\r\n## Dashboards & alerting
 
-- Import the starter Grafana panels from `dashboards/grafana-brainarr-observability.json`; they chart provider/model p95 latency, error rate, and 429 ratios.
+- Import the starter Grafana panels from `docs/assets/grafana-brainarr-observability.json`; they chart provider/model p95 latency, error rate, and 429 ratios.
 - Additional queries live in `dashboards/README.md` (PromQL snippets, scrape config examples).
 - Suggested alert thresholds:
   - **Latency**: alert when p95 latency doubles its 7-day baseline for >10 minutes.
