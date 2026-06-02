@@ -95,69 +95,64 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
             }
 
-            // Style filtering (if style catalog is available and filters are configured).
+            // Post-validation style enforcement (live, deterministic, model-agnostic).
             //
-            // KNOWN-INERT IN PRODUCTION (intentional; do not "fix" by blindly wiring it on):
-            //   The composition root (BrainarrOrchestratorFactory) constructs this pipeline WITHOUT
-            //   the optional _styleCatalog (it defaults to null), so this whole block is skipped in
-            //   the live DI graph. Even when a catalog IS injected, IsStyleSeededDiscovery below
-            //   short-circuits because the pipeline's LibraryProfile comes from
-            //   LibraryContextBuilder.BuildProfile, which never populates StyleContext → coverage is
-            //   null → "genre-first" is always true → the hard drop never runs. The block is therefore
-            //   exercised only by unit tests that inject both a catalog and a coverage-bearing profile.
+            // Catches the LLM's intermittent off-style slippage: GLM returns on-style items most of the
+            // time, but the SAME prompt occasionally yields jazz/classical/rock when the user asked for
+            // electronic styles. This filter is the deterministic guarantee — it DROPS items confidently
+            // off EVERY selected style and KEEPS everything else.
             //
-            //   This is NOT safe to enable as-is. With the strict (relax=false) default, the selected
-            //   slug set is the catalog-resolved styles ONLY (e.g. "edm techno trance" → {techno,
-            //   trance}; "edm" has no slug and is dropped by Normalize). A live filter would correctly
-            //   drop off-style jazz/classical/rock slippage (which GLM does emit intermittently — see
-            //   below) but would ALSO wrongly drop legitimately on-style house / progressive-house /
-            //   big-room / drum-and-bass artists whose genre slug isn't literally techno/trance.
-            //
-            //   Live measurement (GLM-5.1, artists mode, styles "edm techno trance", genre-first
-            //   prompt): off-style adherence is non-deterministic across runs with the SAME prompt —
-            //   one run ~1/28 off-style, another ~12/27 (jazz/classical/indie-rock). So the prompt
-            //   alone does not reliably keep the model on-style, i.e. this post-filter addresses a real
-            //   gap — but turning it on requires a product decision on match strictness (treat "edm" as
-            //   an umbrella over house/techno/trance/etc.) plus flowing StyleContext into the pipeline
-            //   profile. Tracked for the lead; keep the logic + tests until that call is made.
+            // OVER-DROP SAFETY (the load-bearing invariant — never drop a legitimate recommendation):
+            //   1. Hierarchy-aware matching: an item is on-style if its genre equals a selected style OR
+            //      sits anywhere on the ancestor/descendant chain of one (StyleCatalogService.IsMatch with
+            //      relax). So "house"/"big-room"/"drum-and-bass"/"deep-house" all match a selected
+            //      umbrella ("edm" → electronica), and "minimal-techno" matches a selected "techno". This
+            //      runs regardless of the RelaxStyleMatching toggle: the live drop must not over-prune
+            //      on-style descendants just because the user left strict matching on.
+            //   2. Keep-when-ambiguous: an item whose genre is empty OR resolves to NO catalog slug
+            //      (unknown/freeform label) is unclassifiable, so it is KEPT — only items we can
+            //      confidently place off every selected style are dropped.
+            //   3. Unresolvable selected term → lenient: if ANY selected style does not resolve to a
+            //      catalog slug (a genuine freeform term we can't classify against), the hard drop is
+            //      skipped entirely and membership is trusted to the prompt — dropping on the resolvable
+            //      subset alone could prune items the user wanted via the freeform term.
+            //   4. Genre-first discovery: when the library has zero coverage of the selected styles the
+            //      prompt already enforces membership and the LLM's approximate free-text labels would be
+            //      wrongly dropped, so the hard drop is skipped (IsStyleSeededDiscovery), matching the
+            //      prompt renderer's genre-first signal exactly.
             if (_styleCatalog != null && settings.StyleFilters?.Any() == true)
             {
                 var preStyleFilter = validated.Count;
-                var slugs = _styleCatalog.Normalize(settings.StyleFilters);
-                if (slugs.Count > 0)
-                {
-                    // Style-seeded ("genre-first") discovery: the user asked for styles their library
-                    // doesn't contain (e.g. "lo-fi" over a rock library). The prompt already enforces
-                    // style membership; the LLM's free-text genre labels are approximate (lo-fi vs
-                    // chillhop vs downtempo) and would be wrongly dropped here, gutting the whole point.
-                    // So skip the hard drop in that case and trust the prompt.
-                    if (IsStyleSeededDiscovery(_styleCatalog, settings, libraryProfile))
-                    {
-                        _logger.Info("Style-seeded discovery (library lacks the selected styles): skipping post-validation style filter; style membership is enforced at the prompt level.");
-                    }
-                    else
-                    {
-                        var relax = settings.RelaxStyleMatching;
-                        validated = validated
-                            .Where(r =>
-                            {
-                                // Build genre list from recommendation's genre (may have multiple comma-separated)
-                                var genres = new List<string>();
-                                if (!string.IsNullOrWhiteSpace(r.Genre))
-                                {
-                                    genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
-                                        .Select(g => g.Trim())
-                                        .Where(g => !string.IsNullOrWhiteSpace(g)));
-                                }
-                                return genres.Count == 0 || _styleCatalog.IsMatch(genres, slugs, relax);
-                            })
-                            .ToList();
+                var selectedTerms = settings.StyleFilters.Where(s => !string.IsNullOrWhiteSpace(s)).ToList();
+                var slugs = _styleCatalog.Normalize(selectedTerms);
 
-                        var styleFiltered = preStyleFilter - validated.Count;
-                        if (styleFiltered > 0)
-                        {
-                            _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
-                        }
+                // Over-drop guard #3: a selected term that resolves to no slug is a freeform style we
+                // cannot classify against — trust the prompt rather than drop on the resolvable subset.
+                var hasUnresolvableSelectedTerm = selectedTerms
+                    .Any(t => string.IsNullOrEmpty(_styleCatalog.ResolveSlug(t)));
+
+                if (slugs.Count == 0)
+                {
+                    // Nothing resolvable to enforce against (pure freeform) — keep everything.
+                }
+                else if (hasUnresolvableSelectedTerm)
+                {
+                    _logger.Info("Style filter: a selected style is freeform/unrecognized; skipping the hard drop and trusting prompt-level style membership.");
+                }
+                else if (IsStyleSeededDiscovery(_styleCatalog, settings, libraryProfile))
+                {
+                    _logger.Info("Style-seeded discovery (library lacks the selected styles): skipping post-validation style filter; style membership is enforced at the prompt level.");
+                }
+                else
+                {
+                    validated = validated
+                        .Where(r => IsOnStyle(r, slugs))
+                        .ToList();
+
+                    var styleFiltered = preStyleFilter - validated.Count;
+                    if (styleFiltered > 0)
+                    {
+                        _logger.Info($"Style filter removed {styleFiltered} candidate(s) not matching selected styles.");
                     }
                 }
             }
@@ -307,6 +302,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var selectedCoverage = slugs.Sum(s => coverage.TryGetValue(s, out var c) ? c : 0);
             return selectedCoverage == 0;
+        }
+
+        /// <summary>
+        /// Decides whether a recommendation is on-style for the post-validation enforcement drop.
+        ///
+        /// Over-drop-safe by construction:
+        ///   - No genre, or a genre that resolves to NO catalog slug → KEEP (unclassifiable; we only
+        ///     drop items we can confidently place off every selected style — "keep-when-ambiguous").
+        ///   - Otherwise the item is on-style iff any of its genres equals a selected style or sits on
+        ///     its ancestor/descendant chain (hierarchy-aware <see cref="IStyleCatalogService.IsMatch"/>
+        ///     with relax=true), so umbrella descendants (house/big-room/DnB under "edm") are kept.
+        ///
+        /// <paramref name="selectedSlugs"/> is the already-normalized set of selected style slugs.
+        /// </summary>
+        private bool IsOnStyle(Recommendation r, ISet<string> selectedSlugs)
+        {
+            // Build genre list from the recommendation's genre (may be multiple comma/semicolon-delimited).
+            var genres = new List<string>();
+            if (!string.IsNullOrWhiteSpace(r.Genre))
+            {
+                genres.AddRange(r.Genre.Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(g => g.Trim())
+                    .Where(g => !string.IsNullOrWhiteSpace(g)));
+            }
+
+            if (genres.Count == 0)
+            {
+                return true; // no genre at all → keep-when-ambiguous
+            }
+
+            // Keep-when-ambiguous: if none of the item's genres resolve to a catalog slug, we cannot
+            // classify it, so keep it rather than risk dropping a legitimate recommendation.
+            var itemSlugs = _styleCatalog.Normalize(genres);
+            if (itemSlugs.Count == 0)
+            {
+                return true;
+            }
+
+            // Hierarchy-aware match (relax=true) so the live drop never over-prunes on-style descendants.
+            return _styleCatalog.IsMatch(genres, selectedSlugs, relaxParentMatch: true);
         }
 
         /// <summary>
