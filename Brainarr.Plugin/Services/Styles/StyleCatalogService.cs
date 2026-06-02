@@ -107,33 +107,99 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Styles
             EnsureLoaded();
             lock (_syncRoot)
             {
+                // In relaxed mode, precompute the transitive ancestor closure of every selected slug
+                // once so we can test the "library genre is an ANCESTOR of a selected style" direction
+                // without recomputing per library genre (e.g. selected "techno", library "electronica").
+                HashSet<string> selectedAncestorsClosure = null;
+                if (relaxParentMatch)
+                {
+                    selectedAncestorsClosure = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var sel in selectedStyleSlugs)
+                    {
+                        CollectAncestors(sel, selectedAncestorsClosure);
+                    }
+                }
+
                 foreach (var g in libraryGenres)
                 {
                     var slug = ResolveSlugInternal(g);
-                    if (!string.IsNullOrEmpty(slug))
+                    if (string.IsNullOrEmpty(slug))
                     {
-                        if (selectedStyleSlugs.Contains(slug))
+                        continue;
+                    }
+
+                    if (selectedStyleSlugs.Contains(slug))
+                    {
+                        return true;
+                    }
+
+                    // Relaxed mode: match anywhere on the hierarchy edge between the library genre and a
+                    // selected style — a genre matches a selected style if the genre is a DESCENDANT of the
+                    // style (umbrella case: "house" under selected "electronica"/"edm") OR an ANCESTOR of it
+                    // ("electronica" when "techno" is selected). Walks the FULL transitive parent chain, not
+                    // just one level, so deep-house → house → electronica resolves against a selected
+                    // "electronica". Cycle-guarded.
+                    if (relaxParentMatch)
+                    {
+                        // Direction 1: some selected slug is an ancestor of this genre (genre is a descendant).
+                        var ancestors = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                        CollectAncestors(slug, ancestors);
+                        foreach (var a in ancestors)
                         {
-                            return true;
+                            if (selectedStyleSlugs.Contains(a))
+                            {
+                                return true;
+                            }
                         }
 
-                        // If relaxParentMatch is enabled, also check if any parent style matches
-                        if (relaxParentMatch && _entriesBySlug.TryGetValue(slug, out var entry) && entry.Parents != null)
+                        // Direction 2: this genre is an ancestor of some selected slug (genre is broader).
+                        if (selectedAncestorsClosure != null && selectedAncestorsClosure.Contains(slug))
                         {
-                            foreach (var parent in entry.Parents)
-                            {
-                                var parentSlug = ResolveSlugInternal(parent) ?? parent;
-                                if (!string.IsNullOrEmpty(parentSlug) && selectedStyleSlugs.Contains(parentSlug))
-                                {
-                                    return true;
-                                }
-                            }
+                            return true;
                         }
                     }
                 }
             }
 
             return false;
+        }
+
+        /// <summary>
+        /// Adds the transitive set of ancestor slugs of <paramref name="slug"/> (its parents, their
+        /// parents, ...) to <paramref name="accumulator"/>. The slug itself is NOT added. Cycle-guarded
+        /// against malformed catalogs that declare a parent loop. Caller holds <c>_syncRoot</c>.
+        /// </summary>
+        private void CollectAncestors(string slug, HashSet<string> accumulator)
+        {
+            if (string.IsNullOrEmpty(slug))
+            {
+                return;
+            }
+
+            var stack = new Stack<string>();
+            stack.Push(slug);
+            var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { slug };
+
+            while (stack.Count > 0)
+            {
+                var current = stack.Pop();
+                if (!_entriesBySlug.TryGetValue(current, out var entry) || entry.Parents == null)
+                {
+                    continue;
+                }
+
+                foreach (var parent in entry.Parents)
+                {
+                    var parentSlug = ResolveSlugInternal(parent) ?? parent;
+                    if (string.IsNullOrEmpty(parentSlug) || !visited.Add(parentSlug))
+                    {
+                        continue;
+                    }
+
+                    accumulator.Add(parentSlug);
+                    stack.Push(parentSlug);
+                }
+            }
         }
 
         public string? ResolveSlug(string value)
