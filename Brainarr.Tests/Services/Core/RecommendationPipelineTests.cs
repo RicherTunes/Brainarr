@@ -161,7 +161,7 @@ namespace Brainarr.Tests.Services.Core
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
                 topUp.Verify(t => t.TopUpAsync(
                     It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
-                    It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                    It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -225,7 +225,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.Is<int>(need => need >= 1 && need <= 3),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "B" },
@@ -289,7 +289,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.Is<int>(need => need == 2),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "B" },
@@ -433,7 +433,7 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.Single(items);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -460,7 +460,7 @@ namespace Brainarr.Tests.Services.Core
                     .Returns(new List<Recommendation>());
 
                 topUp.Setup(t => t.TopUpAsync(
-                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo> { new ImportListItemInfo { Artist = "A", Album = "B" }, new ImportListItemInfo { Artist = "C", Album = "D" } });
 
                 var callOrder = new List<string>();
@@ -517,7 +517,7 @@ namespace Brainarr.Tests.Services.Core
                     });
                 // Return no top-up items to stay under target
                 topUp.Setup(t => t.TopUpAsync(
-                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
                 var items = await pipeline.ProcessAsync(
@@ -705,7 +705,7 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.Equal(2, items.Count);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally
             {
@@ -743,7 +743,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.IsAny<int>(),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "E", Album = "F" },
@@ -769,7 +769,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(),
                     It.Is<int>(needed => needed == 3),
-                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Once);
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Once);
             }
             finally
             {
@@ -813,7 +813,7 @@ namespace Brainarr.Tests.Services.Core
                 artists.Verify(a => a.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.Never);
                 gates.Verify(g => g.ApplySafetyGates(It.IsAny<List<Recommendation>>(), It.IsAny<BrainarrSettings>(), It.IsAny<ReviewQueueService>(), It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(), It.IsAny<CancellationToken>()), Times.Never);
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.Never);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -858,7 +858,7 @@ namespace Brainarr.Tests.Services.Core
 
                 topUp.Setup(t => t.TopUpAsync(
                         It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
-                        It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
+                        It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
                 var items = await pipeline.ProcessAsync(
@@ -1372,7 +1372,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(), It.IsAny<int>(),
                     It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
-                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -1544,7 +1544,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(), It.IsAny<int>(),
                     It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
-                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
+                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
