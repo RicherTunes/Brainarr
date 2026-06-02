@@ -11,6 +11,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 {
     internal sealed class RecommendationTriageAdvisor
     {
+        /// <summary>
+        /// Reason code for an item whose confidence the model never reported (the parser
+        /// fabricated a placeholder). Brainarr-local until promoted to Common's
+        /// <c>TriageReasonCodes</c> (queued — touches the Lidarr.Plugin.Common submodule).
+        /// </summary>
+        internal const string ConfidenceNotProvidedCode = "CONFIDENCE_NOT_PROVIDED";
+
+        /// <summary>Band label for an item with no model-reported confidence (not High/Medium/Low).</summary>
+        internal const string UnscoredBand = "unscored";
 
         private static readonly string[] DuplicateSignals =
         {
@@ -44,39 +53,54 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 detailedReasons.Add(new ReviewTriageReason(code, message, weight));
             }
 
-            // Apply provider-specific calibration if provider is known
+            // Provider calibration and confidence-threshold scoring are meaningful ONLY when the
+            // model actually reported a confidence. When it didn't (ConfidenceProvided == false),
+            // item.Confidence is a fabricated placeholder (parser default) — calibrating or
+            // threshold-penalizing it mislabels a score-less item (e.g. flagging it "below
+            // threshold" purely because the model omitted a self-rating, the same cliff
+            // SafetyGateService closed with its `!ConfidenceProvided || ...` gate). Skip all
+            // confidence-derived signals and surface the provenance explicitly instead.
             var confidence = item.Confidence;
-            var profile = ProviderCalibrationRegistry.GetProfileOrNull(provider);
-            if (profile != null && !profile.IsIdentity)
-            {
-                var calibrated = profile.Calibrate(confidence);
-                AddReason(
-                    TriageReasonCodes.CalibrationApplied,
-                    $"provider {profile.ProviderName} calibration: {confidence:F2} -> {calibrated:F2} (scale={profile.Scale:F2}, bias={profile.Bias:F2})",
-                    0);
-                confidence = calibrated;
+            var confidenceProvided = item.ConfidenceProvided;
 
-                if (profile.QualityTier < 0.6)
+            if (confidenceProvided)
+            {
+                var profile = ProviderCalibrationRegistry.GetProfileOrNull(provider);
+                if (profile != null && !profile.IsIdentity)
+                {
+                    var calibrated = profile.Calibrate(confidence);
+                    AddReason(
+                        TriageReasonCodes.CalibrationApplied,
+                        $"provider {profile.ProviderName} calibration: {confidence:F2} -> {calibrated:F2} (scale={profile.Scale:F2}, bias={profile.Bias:F2})",
+                        0);
+                    confidence = calibrated;
+
+                    if (profile.QualityTier < 0.6)
+                    {
+                        AddReason(
+                            TriageReasonCodes.LowCalibrationProvider,
+                            $"provider {profile.ProviderName} has low quality tier ({profile.QualityTier:F2})",
+                            1);
+                    }
+                }
+
+                var minConfidence = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                if (confidence < minConfidence)
                 {
                     AddReason(
-                        TriageReasonCodes.LowCalibrationProvider,
-                        $"provider {profile.ProviderName} has low quality tier ({profile.QualityTier:F2})",
-                        1);
+                        TriageReasonCodes.ConfidenceBelowThreshold,
+                        $"confidence {confidence:F2} below threshold {minConfidence:F2}",
+                        2);
+                }
+
+                if (confidence < (minConfidence - 0.15))
+                {
+                    AddReason(TriageReasonCodes.ConfidenceFarBelowThreshold, "confidence substantially below threshold", 2);
                 }
             }
-
-            var minConfidence = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
-            if (confidence < minConfidence)
+            else
             {
-                AddReason(
-                    TriageReasonCodes.ConfidenceBelowThreshold,
-                    $"confidence {confidence:F2} below threshold {minConfidence:F2}",
-                    2);
-            }
-
-            if (confidence < (minConfidence - 0.15))
-            {
-                AddReason(TriageReasonCodes.ConfidenceFarBelowThreshold, "confidence substantially below threshold", 2);
+                AddReason(ConfidenceNotProvidedCode, "model did not report a confidence score; confidence-based triage skipped", 0);
             }
 
             if (settings.RequireMbids)
@@ -96,7 +120,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 AddReason(TriageReasonCodes.DuplicateSignal, "duplicate-like signal in recommendation rationale", 3);
             }
 
-            if (confidence >= 0.9 && !string.IsNullOrWhiteSpace(item.ArtistMusicBrainzId))
+            if (confidenceProvided && confidence >= 0.9 && !string.IsNullOrWhiteSpace(item.ArtistMusicBrainzId))
             {
                 var reducedBy = Math.Min(1, riskScore);
                 if (reducedBy > 0)
@@ -106,8 +130,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
 
             var suggestedAction = riskScore >= 6 ? "reject" : riskScore >= 3 ? "review" : "accept";
-            var band = confidence >= 0.8 ? CommonBand.High : confidence >= 0.6 ? CommonBand.Medium : CommonBand.Low;
-            var confidenceBand = band.ToString().ToLowerInvariant();
+            string confidenceBand;
+            if (!confidenceProvided)
+            {
+                // Don't fabricate a High/Medium/Low band from a placeholder score.
+                confidenceBand = UnscoredBand;
+            }
+            else
+            {
+                var band = confidence >= 0.8 ? CommonBand.High : confidence >= 0.6 ? CommonBand.Medium : CommonBand.Low;
+                confidenceBand = band.ToString().ToLowerInvariant();
+            }
             if (detailedReasons.Count == 0)
             {
                 detailedReasons.Add(new ReviewTriageReason(TriageReasonCodes.ConsistentSignals, "signals look consistent for queue approval", 0));

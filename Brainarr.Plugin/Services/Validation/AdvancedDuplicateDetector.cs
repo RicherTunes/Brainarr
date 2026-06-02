@@ -152,7 +152,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             };
         }
 
-        private string NormalizeArtistName(string artistName)
+        // internal for direct normalization unit tests (InternalsVisibleTo "Brainarr.Tests").
+        internal string NormalizeArtistName(string artistName)
         {
             if (string.IsNullOrWhiteSpace(artistName)) return string.Empty;
 
@@ -161,25 +162,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             // Handle "The" prefix variations
             normalized = Regex.Replace(normalized, @"^the\s+", "", RegexOptions.IgnoreCase);
 
+            // Unify "&"/"+" to the word "and" BEFORE punctuation stripping so "Simon & Garfunkel" and
+            // "Simon and Garfunkel" dedup alike (the [^\w\s] pass below would otherwise drop "&" to a
+            // space → "simon garfunkel" ≠ "simon and garfunkel"). Spaced so tokens never glue
+            // ("A&B" → "a and b"); the whitespace collapse below tidies any doubled spaces (#72).
+            normalized = normalized.Replace("&", " and ").Replace("+", " and ");
+
             // Remove common punctuation and special characters
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");
 
             // Normalize whitespace
             normalized = Regex.Replace(normalized, @"\s+", " ").Trim();
 
-            // Handle common abbreviations and variations
+            // Normalize "featuring" abbreviations to a canonical word so "X ft Y" / "X feat Y" dedup
+            // against "X featuring Y". Word boundaries are load-bearing: a plain substring Replace
+            // turned "Daft Punk" -> "dafeaturing punk" and "Lifton" -> "lifeaturingon", corrupting any
+            // name containing "ft"/"feat" and distorting the fuzzy-similarity match (#68).
+            // NOTE: "&"/"+" are unified to "and" above (before the strip); "w/" is simply dropped to a
+            // space by the [^\w\s] pass (a former "w/"->"with" map entry was dead and removed).
             var abbreviations = new Dictionary<string, string>
             {
                 ["ft"] = "featuring",
                 ["feat"] = "featuring",
-                ["w/"] = "with",
-                ["&"] = "and",
-                ["+"] = "and"
             };
 
             foreach (var abbrev in abbreviations)
             {
-                normalized = normalized.Replace(abbrev.Key, abbrev.Value);
+                normalized = Regex.Replace(normalized, $@"\b{Regex.Escape(abbrev.Key)}\b", abbrev.Value);
             }
 
             return normalized;
@@ -206,6 +215,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
             {
                 normalized = Regex.Replace(normalized, pattern, "", RegexOptions.IgnoreCase);
             }
+
+            // Unify "&"/"+" to "and" before stripping punctuation, so an album like "Rum, Sodomy &
+            // the Lash" dedups against an "...and the Lash" variant (same rationale as the artist
+            // normalizer, #72).
+            normalized = normalized.Replace("&", " and ").Replace("+", " and ");
 
             // Remove common punctuation
             normalized = Regex.Replace(normalized, @"[^\w\s]", " ");

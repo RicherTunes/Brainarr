@@ -263,17 +263,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Warn("Provider reported unhealthy; proceeding best-effort for resilience");
             }
 
-            // Step 3-6: Delegate to coordinator
-            var importItems = await _coordinator.RunAsync(
-                settings,
-                async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken).ConfigureAwait(false),
-                _reviewQueue,
-                _providerLifecycle.CurrentProvider,
-                _promptBuilder,
-                cancellationToken).ConfigureAwait(false);
+            // Per-run, race-free accumulation of safety-gate drop reasons. The scope's holder flows
+            // down to the gate via AsyncLocal (the gate runs inside the awaited coordinator call), so
+            // its writes are visible here afterward — and concurrent fetches get isolated holders, so
+            // one run's floor drops never inflate another's hint (a shared cumulative counter would).
+            List<ImportListItemInfo> importItems;
+            int floorDropsThisRun;
+            using (GateMetricsContext.BeginScope())
+            {
+                // Step 3-6: Delegate to coordinator
+                importItems = await _coordinator.RunAsync(
+                    settings,
+                    async (lp, ct) => await _recommendationGenerator.GenerateRecommendationsAsync(settings, lp, cancellationToken).ConfigureAwait(false),
+                    _reviewQueue,
+                    _providerLifecycle.CurrentProvider,
+                    _promptBuilder,
+                    cancellationToken).ConfigureAwait(false);
+
+                floorDropsThisRun = GateMetricsContext.ConfidenceFloorDrops;
+            }
 
             // Record metrics (non-critical)
-            RecordRunSummary(settings, importItems);
+            RecordRunSummary(settings, importItems, floorDropsThisRun);
 
             return importItems;
         }
@@ -306,7 +317,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
-        private void RecordRunSummary(BrainarrSettings settings, List<ImportListItemInfo> importItems)
+        private void RecordRunSummary(BrainarrSettings settings, List<ImportListItemInfo> importItems, int confidenceFloorDropsThisRun = 0)
         {
             try
             {
@@ -314,7 +325,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var snap = _metrics.GetSnapshot();
                 var providerName = _providerLifecycle.CurrentProvider?.ProviderName ?? settings.Provider.ToString();
                 var pm = _providerHealth.GetMetrics(providerName);
-                _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, cache=miss, successRate={pm.SuccessRate:F1}%, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                var target = settings.MaxRecommendations > 0
+                    ? settings.MaxRecommendations
+                    : BrainarrConstants.DefaultRecommendations;
+                var attainment = AttainmentPercent(importItems.Count, target);
+                // `providerSuccess` is the provider-health success rate (successful HTTP calls /
+                // total) — it can read 100% even when we deliver far fewer items than asked. Report
+                // target attainment separately so the two are never conflated (the "100% but 17/50"
+                // confusion). When under target, say why so the user knows which knob to turn.
+                _logger.InfoWithCorrelation($"Run summary: provider={providerName}, items={importItems.Count}, target={target}, attainment={attainment}%, providerSuccess={pm.SuccessRate:F1}%, cache=miss, avgMs={pm.AverageResponseTimeMs:F0}, cacheHitRate={snap.CacheHitRate:P0}");
+                if (importItems.Count < target)
+                {
+                    if (confidenceFloorDropsThisRun > 0)
+                    {
+                        // The floor demonstrably gated items THIS run — name it as the concrete cause
+                        // and the exact knob, rather than only the generic typical-causes list.
+                        var floor = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
+                        // "held below" (not "dropped"): with Queue Borderline Items on these go to the
+                        // review queue (recoverable); either way, lowering the floor re-admits them.
+                        _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. {confidenceFloorDropsThisRun} recommendation(s) were held below your Minimum Confidence floor ({floor:F2}) this run — lower it (Settings → Minimum Confidence) to include them. Other causes: provider truncation/timeout, dedup, or MBID gating.");
+                    }
+                    else
+                    {
+                        _logger.InfoWithCorrelation($"Under target: delivered {importItems.Count}/{target}. Typical causes: provider truncation/timeout (raise AI Request Timeout), dedup against your library/history as it grows, or confidence/MBID gating. Widen Discovery (Adjacent/Exploratory) or add style filters to surface more.");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -322,10 +357,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             }
         }
 
+        /// <summary>
+        /// Target attainment as a whole-number percent of delivered items vs the requested count,
+        /// clamped to [0,100]. Distinct from provider-health success rate. Pure for testability.
+        /// </summary>
+        internal static int AttainmentPercent(int items, int target)
+        {
+            if (target <= 0) return 0;
+            if (items <= 0) return 0;
+            // Truncate (floor) rather than round: rounding 199/200 up to 100% while the run is still
+            // under target would contradict the "Under target" explainer printed alongside it.
+            var pct = (int)(100.0 * items / target);
+            return pct > 100 ? 100 : pct;
+        }
+
         public IList<ImportListItemInfo> FetchRecommendations(BrainarrSettings settings)
         {
-            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult())
-            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(() => FetchRecommendationsAsync(settings));
+            // Synchronous wrapper for backward compatibility (avoid direct GetAwaiter().GetResult()).
+            // Budget the overall fetch from the user's per-request timeout × the iterations the run
+            // may make, rather than the hardcoded 120s default — otherwise a raised "AI Request
+            // Timeout" (e.g. 360s for slow GLM-5.x reasoning models) was silently guillotined at 2
+            // minutes mid-top-up, capping results well under target.
+            var overallTimeoutMs = settings.GetOverallFetchTimeoutMs();
+            return NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                () => FetchRecommendationsAsync(settings), overallTimeoutMs);
         }
 
         // ====== PROVIDER MANAGEMENT ======
@@ -395,10 +450,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
                     "metrics/prometheus" => NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.MetricsCollector.ExportPrometheus(),
-                    // Observability (respect feature flag)
-                    "observability/get" => settings.EnableObservabilityPreview ? _observability.GetObservabilitySummary(query) : new { disabled = true },
+                    // Observability (respect feature flag). get/html are the metric VIEWS — apply the
+                    // configured default provider/model filter when the request omits one. getoptions is
+                    // the picker (lists ALL series), so it is deliberately NOT pre-filtered.
+                    "observability/get" => settings.EnableObservabilityPreview ? _observability.GetObservabilitySummary(WithObservabilityFilterDefaults(query, settings)) : new { disabled = true },
                     "observability/getoptions" => settings.EnableObservabilityPreview ? _observability.GetObservabilityOptions() : new { options = Array.Empty<object>() },
-                    "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(query) : "<html><body><p>Observability preview is disabled.</p></body></html>",
+                    "observability/html" => settings.EnableObservabilityPreview ? _observability.GetObservabilityHtml(WithObservabilityFilterDefaults(query, settings)) : "<html><body><p>Observability preview is disabled.</p></body></html>",
                     // Styles TagSelect options
                     "styles/getoptions" => _reviewQueueHandler.GetStylesOptions(query),
                     // Options for Approve Suggestions Select field
@@ -438,6 +495,39 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        /// <summary>
+        /// Merges the configured <c>ObservabilityProviderFilter</c>/<c>ObservabilityModelFilter</c>
+        /// defaults into an observability-view query: a default is applied only when the request did
+        /// not already specify that key (an explicit request filter always wins). Returns a fresh,
+        /// case-insensitive copy so the caller's query is never mutated. Static + internal so the
+        /// wiring is unit-testable without constructing the orchestrator.
+        /// </summary>
+        internal static IDictionary<string, string> WithObservabilityFilterDefaults(
+            IDictionary<string, string> query, BrainarrSettings settings)
+        {
+            // Build defensively (last-wins) rather than the copy-constructor, which THROWS on a query
+            // that contains case-colliding duplicate keys (e.g. both "provider" and "Provider") once
+            // re-hashed under OrdinalIgnoreCase. Case-insensitive so an explicit "Provider" filter is
+            // still seen as present and not clobbered by the default.
+            var merged = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            if (query != null)
+            {
+                foreach (var kv in query) merged[kv.Key] = kv.Value;
+            }
+
+            if (settings == null) return merged;
+
+            static bool Missing(IDictionary<string, string> q, string key)
+                => !q.TryGetValue(key, out var v) || string.IsNullOrWhiteSpace(v);
+
+            if (!string.IsNullOrWhiteSpace(settings.ObservabilityProviderFilter) && Missing(merged, "provider"))
+                merged["provider"] = settings.ObservabilityProviderFilter;
+            if (!string.IsNullOrWhiteSpace(settings.ObservabilityModelFilter) && Missing(merged, "model"))
+                merged["model"] = settings.ObservabilityModelFilter;
+
+            return merged;
         }
 
         // ====== GAP PLANNER v2 ======

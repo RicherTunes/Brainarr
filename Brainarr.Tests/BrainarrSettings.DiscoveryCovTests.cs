@@ -62,6 +62,30 @@ namespace Brainarr.Tests
                 "because the constructor sets BackfillStrategy to Standard (line 36)");
         }
 
+        [Fact]
+        public void BackfillStrategy_FieldLabelAndHelp_MatchActualDefault()
+        {
+            // Drift guard: the UI label once advertised "Default: Aggressive" while the constructor
+            // (and the test above) set Standard — a user-facing contradiction. Pin the label/help-text
+            // "(Default)" annotation to the ACTUAL default so the two can never diverge again.
+            var defaultStrategy = Create().BackfillStrategy.ToString();
+            var attr = typeof(BrainarrSettings)
+                .GetProperty(nameof(BrainarrSettings.BackfillStrategy))!
+                .GetCustomAttributes(typeof(NzbDrone.Core.Annotations.FieldDefinitionAttribute), false)
+                .Cast<NzbDrone.Core.Annotations.FieldDefinitionAttribute>()
+                .Single();
+
+            attr.Label.Should().Contain($"Default: {defaultStrategy}",
+                "the field label must name the actual constructor default");
+            attr.HelpText.Should().Contain($"{defaultStrategy} (Default)",
+                "the help text must mark the actual default option as (Default)");
+            foreach (var other in System.Enum.GetNames(typeof(BackfillStrategy)).Where(n => n != defaultStrategy))
+            {
+                attr.HelpText.Should().NotContain($"{other} (Default)",
+                    $"a non-default option ({other}) must not be marked (Default)");
+            }
+        }
+
         #endregion
 
         #region Constructor Defaults — Core Numeric & Bool Fields
@@ -213,48 +237,6 @@ namespace Brainarr.Tests
 
         #region Defaults — Model, Fallback, and Validation
 
-        // Source line 61: EnableFallbackModel { get; set; } = true;
-        // Proof: grep -n "EnableFallbackModel" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   61:        public bool EnableFallbackModel { get; set; } = true;
-        [Fact]
-        public void EnableFallbackModel_Default_IsTrue()
-        {
-            var s = Create();
-            s.EnableFallbackModel.Should().BeTrue("because the default is true (Discovery.cs:61)");
-        }
-
-        // Source line 62: FallbackModel { get; set; } = "qwen2.5:latest";
-        // Proof: grep -n "FallbackModel" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   62:        public string FallbackModel { get; set; } = "qwen2.5:latest";
-        [Fact]
-        public void FallbackModel_Default_IsQwen25()
-        {
-            var s = Create();
-            s.FallbackModel.Should().Be("qwen2.5:latest",
-                "because the default fallback model is qwen2.5:latest (Discovery.cs:62)");
-        }
-
-        // Source line 63: EnableLibraryAnalysis { get; set; } = true;
-        // Proof: grep -n "EnableLibraryAnalysis" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   63:        public bool EnableLibraryAnalysis { get; set; } = true;
-        [Fact]
-        public void EnableLibraryAnalysis_Default_IsTrue()
-        {
-            var s = Create();
-            s.EnableLibraryAnalysis.Should().BeTrue("because the default is true (Discovery.cs:63)");
-        }
-
-        // Source line 107: PreferStructuredJsonForChat { get; set; } = true;
-        // Proof: grep -n "PreferStructuredJsonForChat" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   107:        public bool PreferStructuredJsonForChat { get; set; } = true;
-        [Fact]
-        public void PreferStructuredJsonForChat_Default_IsTrue()
-        {
-            var s = Create();
-            s.PreferStructuredJsonForChat.Should().BeTrue(
-                "because the default is true (Discovery.cs:107)");
-        }
-
         // Source line 112: LMStudioTemperature { get; set; } = 0.5;
         // Proof: grep -n "LMStudioTemperature" Brainarr.Plugin/BrainarrSettings.Discovery.cs
         //   112:        public double LMStudioTemperature { get; set; } = 0.5;
@@ -263,16 +245,6 @@ namespace Brainarr.Tests
         {
             var s = Create();
             s.LMStudioTemperature.Should().Be(0.5, "because the default is 0.5 (Discovery.cs:112)");
-        }
-
-        // Source line 116: LMStudioMaxTokens { get; set; } = 2000;
-        // Proof: grep -n "LMStudioMaxTokens" Brainarr.Plugin/BrainarrSettings.Discovery.cs
-        //   116:        public int LMStudioMaxTokens { get; set; } = 2000;
-        [Fact]
-        public void LMStudioMaxTokens_Default_Is2000()
-        {
-            var s = Create();
-            s.LMStudioMaxTokens.Should().Be(2000, "because the default is 2000 (Discovery.cs:116)");
         }
 
         // Source line 121: CustomFilterPatterns { get; set; } = string.Empty;

@@ -147,7 +147,7 @@ For development with full test suite:
     - Latency (seconds): `provider_latency_seconds{provider,model}`
     - Errors: `provider_errors_total{provider,model}`
     - Throttles (HTTP 429): `provider_throttles_total{provider,model}`
-- Structured outputs: toggle with `PreferStructuredJsonForChat` in settings; providers consult capabilities and apply `StructuredJsonValidator` repair before parsing.
+- Structured outputs: applied automatically for every provider that advertises the `JsonMode` capability (OpenAI-compatible, Gemini, etc.) — `LlmProviderAdapter` always requests strict JSON so recommendation parsing is reliable; providers without the capability fall back to system-prompt-driven JSON shaping, and `StructuredJsonValidator` repair runs before parsing regardless.
 
 ## CI/CD Notes
 

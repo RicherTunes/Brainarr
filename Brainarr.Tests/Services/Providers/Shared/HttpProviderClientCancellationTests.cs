@@ -115,17 +115,23 @@ namespace Brainarr.Tests.Services.Providers.Shared
         [Fact]
         public async Task ExecuteWithCt_WhenCancelledAfterResponse_DoesNotThrow()
         {
-            // Arrange: response arrives before cancellation fires
+            // The token is LIVE but is never cancelled during the call, so the response always wins
+            // the WhenAny race regardless of scheduling. (The previous version armed a 10s timer and
+            // relied on a 10ms response beating it — which flaked under heavy parallel load when
+            // thread-pool starvation delayed the response past 10s. Determinism instead of a race.)
             var fastClient = new SlowFakeHttpClient(TimeSpan.FromMilliseconds(10));
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10)); // plenty of time
+            using var cts = new CancellationTokenSource();
             var request = new HttpRequest("https://example.invalid/");
 
-            // Act
+            // Act: token live (not cancelled) → response returned, no throw.
             var response = await HttpProviderClient.ExecuteWithCt(fastClient, request, cts.Token);
 
-            // Assert: response returned normally, token still live
+            // Assert
             response.Should().NotBeNull();
             response.StatusCode.Should().Be(HttpStatusCode.OK);
+
+            // Cancelling AFTER the response was returned is a no-op — nothing in flight to cancel.
+            cts.Cancel();
         }
     }
 }

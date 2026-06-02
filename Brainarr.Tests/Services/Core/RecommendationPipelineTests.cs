@@ -161,7 +161,7 @@ namespace Brainarr.Tests.Services.Core
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.AtLeastOnce);
                 topUp.Verify(t => t.TopUpAsync(
                     It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
-                    It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
+                    It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -225,7 +225,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.Is<int>(need => need >= 1 && need <= 3),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "B" },
@@ -289,7 +289,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.Is<int>(need => need == 2),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "B" },
@@ -433,7 +433,7 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.Single(items);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -460,7 +460,7 @@ namespace Brainarr.Tests.Services.Core
                     .Returns(new List<Recommendation>());
 
                 topUp.Setup(t => t.TopUpAsync(
-                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo> { new ImportListItemInfo { Artist = "A", Album = "B" }, new ImportListItemInfo { Artist = "C", Album = "D" } });
 
                 var callOrder = new List<string>();
@@ -517,7 +517,7 @@ namespace Brainarr.Tests.Services.Core
                     });
                 // Return no top-up items to stay under target
                 topUp.Setup(t => t.TopUpAsync(
-                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
                 var items = await pipeline.ProcessAsync(
@@ -533,6 +533,80 @@ namespace Brainarr.Tests.Services.Core
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
+
+        [Fact]
+        public void ResolveValidator_WithEmptyPatternsAndNonStrict_ReturnsInjectedValidator()
+        {
+            // Default case: no custom patterns + not strict → reuse the injected (singleton) validator,
+            // so the common path has zero behavior change and a mock validator stays in effect.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                Assert.Same(validator.Object, pipeline.ResolveValidator(string.Empty, false));
+                Assert.Same(validator.Object, pipeline.ResolveValidator(null, false));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithCustomPatterns_BuildsValidatorThatFiltersThem()
+        {
+            // #67: settings.CustomFilterPatterns must actually reach the validator. With a pattern set,
+            // the pipeline builds a configured validator (NOT the injected default) that filters matches.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                var resolved = pipeline.ResolveValidator("(demo version)", false);
+                Assert.NotSame(validator.Object, resolved);
+
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Real Artist", Album = "Real Album", Year = 2001 },
+                    new Recommendation { Artist = "Hallucinated", Album = "Some Album (demo version)", Year = 2001 },
+                };
+                var result = resolved.ValidateBatch(recs, allowArtistOnly: false);
+                Assert.Equal(1, result.ValidCount);
+                Assert.Equal(1, result.FilteredCount);
+                Assert.Contains(result.FilteredRecommendations, r => r.Album.Contains("(demo version)"));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithStrictModeOnly_BuildsConfiguredValidator()
+        {
+            // EnableStrictValidation shares the same ctor/gap; strict-only must also build a configured validator.
+            var (pipeline, _, validator, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                Assert.NotSame(validator.Object, pipeline.ResolveValidator(string.Empty, true));
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public void ResolveValidator_WithPatternsAndStrict_BothApply()
+        {
+            // Patterns + strict together: custom patterns and strict-mode parenthetical filtering are
+            // independent and compose (custom-pattern check runs first, then strict rules).
+            var (pipeline, _, _, _, _, _, _, _, _, _, _, tmp) = CreatePipeline();
+            try
+            {
+                var resolved = pipeline.ResolveValidator("(radio mix)", true);
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "A", Album = "Clean Album", Year = 1999 },                 // passes
+                    new Recommendation { Artist = "B", Album = "Track (radio mix)", Year = 1999 },           // custom pattern
+                    new Recommendation { Artist = "C", Album = "Greatest Hits (deluxe)", Year = 1999 },      // strict: possibly-legit pattern not in strict allow-list
+                };
+                var result = resolved.ValidateBatch(recs, allowArtistOnly: false);
+                Assert.Equal(1, result.ValidCount);
+                Assert.Equal(2, result.FilteredCount);
+                Assert.Contains(result.ValidRecommendations, r => r.Album == "Clean Album");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
         private static (RecommendationPipeline pipeline,
             Mock<IDuplicateFilterService> dupFilter,
             Mock<IRecommendationValidator> validator,
@@ -631,7 +705,7 @@ namespace Brainarr.Tests.Services.Core
                     CancellationToken.None);
 
                 Assert.Equal(2, items.Count);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally
             {
@@ -669,7 +743,7 @@ namespace Brainarr.Tests.Services.Core
                         It.IsAny<IDuplicationPrevention>(),
                         It.IsAny<LibraryProfile>(),
                         It.IsAny<int>(),
-                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>
                     {
                         new ImportListItemInfo { Artist = "E", Album = "F" },
@@ -695,7 +769,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(),
                     It.Is<int>(needed => needed == 3),
-                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Once);
+                    It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Once);
             }
             finally
             {
@@ -739,7 +813,7 @@ namespace Brainarr.Tests.Services.Core
                 artists.Verify(a => a.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.Never);
                 gates.Verify(g => g.ApplySafetyGates(It.IsAny<List<Recommendation>>(), It.IsAny<BrainarrSettings>(), It.IsAny<ReviewQueueService>(), It.IsAny<RecommendationHistory>(), It.IsAny<Logger>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Performance.IPerformanceMetrics>(), It.IsAny<CancellationToken>()), Times.Never);
                 dedup.Verify(d => d.DeduplicateRecommendations(It.IsAny<List<ImportListItemInfo>>()), Times.Never);
-                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()), Times.Never);
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -784,7 +858,7 @@ namespace Brainarr.Tests.Services.Core
 
                 topUp.Setup(t => t.TopUpAsync(
                         It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(),
-                        It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>()))
+                        It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()))
                     .ReturnsAsync(new List<ImportListItemInfo>());
 
                 var items = await pipeline.ProcessAsync(
@@ -872,7 +946,9 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected style (by slug) → exercises the library-aligned
+                    // filter path (not style-seeded discovery, which intentionally skips the filter).
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -957,7 +1033,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected style (by slug) → exercises the filter path.
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -1092,7 +1169,8 @@ namespace Brainarr.Tests.Services.Core
                 var items = await pipeline.ProcessAsync(
                     settings,
                     recs,
-                    new LibraryProfile(),
+                    // Library covers the selected style (by slug) → not style-seeded, relaxed filter runs.
+                    ProfileCovering("rock"),
                     new ReviewQueueService(logger, tmp),
                     Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
                     Mock.Of<ILibraryAwarePromptBuilder>(),
@@ -1145,6 +1223,17 @@ namespace Brainarr.Tests.Services.Core
                 Assert.Single(items);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        // A library profile whose StyleContext covers the given slugs — makes IsStyleSeededDiscovery
+        // return false so the library-aligned style filter path is exercised (not genre-first discovery).
+        private static LibraryProfile ProfileCovering(params string[] slugs)
+        {
+            var ctx = new NzbDrone.Core.ImportLists.Brainarr.Models.LibraryStyleContext();
+            var dict = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+            foreach (var s in slugs) dict[s] = 10;
+            ctx.SetCoverage(dict);
+            return new LibraryProfile { StyleContext = ctx };
         }
 
         private static IStyleCatalogService CreateMatchingStyleCatalog()
@@ -1283,7 +1372,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(), It.IsAny<int>(),
                     It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
-                    It.IsAny<CancellationToken>()), Times.Never);
+                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }
@@ -1455,7 +1544,7 @@ namespace Brainarr.Tests.Services.Core
                     It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(),
                     It.IsAny<LibraryProfile>(), It.IsAny<int>(),
                     It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
-                    It.IsAny<CancellationToken>()), Times.Never);
+                    It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>()), Times.Never);
             }
             finally { try { Directory.Delete(tmp, true); } catch { } }
         }

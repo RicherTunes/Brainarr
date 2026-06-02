@@ -4,7 +4,7 @@ This document is the canonical security note for Brainarr releases. It describes
 
 ## Compatibility
 
-- Brainarr v1.3.1 requires Lidarr 2.14.2.4786+ on the plugins/nightly branch. See README for exact wording and CI source of truth.
+- Brainarr requires Lidarr 3.0.0.4855+ on the plugins/nightly branch. See README for exact wording and CI source of truth.
 
 ## Threat Model (concise)
 

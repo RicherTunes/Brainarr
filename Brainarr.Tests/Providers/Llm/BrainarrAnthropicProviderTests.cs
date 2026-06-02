@@ -48,6 +48,30 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesXApiKeyAndVersion_AgainstMessagesEndpoint()
+        {
+            // Contract guard (COV1, provider-matrix #5): pin Anthropic's auth shape on the
+            // actually-exercised CompleteAsync path. x-api-key is CORRECT for sk-ant- API keys —
+            // and the OAuth-token providers must NOT regress into x-api-key, so this also asserts
+            // NO Authorization header leaks onto the API-key provider.
+            var provider = new BrainarrAnthropicProvider(_http.Object, _logger, "sk-ant-xyz", "claude-3-5-haiku-latest");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"content\":[{\"type\":\"text\",\"text\":\"[]\"}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("x-api-key").Should().Be("sk-ant-xyz");
+            captured.Headers.GetSingleValue("anthropic-version").Should().Be("2023-06-01");
+            captured.Headers.GetSingleValue("Authorization").Should().BeNull(
+                "the API-key provider authenticates via x-api-key, never Authorization: Bearer");
+            captured.Url.ToString().Should().Be("https://api.anthropic.com/v1/messages");
+        }
+
+        [Fact]
         public void Constructor_NullHttpClient_Throws()
         {
             Action act = () => new BrainarrAnthropicProvider(null!, _logger, "sk-ant-test");

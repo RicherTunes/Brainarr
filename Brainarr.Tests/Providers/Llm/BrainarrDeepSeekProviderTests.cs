@@ -28,6 +28,24 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_UsesBearerAuth_AgainstChatCompletionsEndpoint()
+        {
+            // Contract guard (MED-1, provider-matrix sweep): pin auth header + endpoint on CompleteAsync.
+            var provider = new BrainarrDeepSeekProvider(_http.Object, _logger, "sk-deepseek-xyz", "deepseek-chat");
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"[]\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            captured.Should().NotBeNull();
+            captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer sk-deepseek-xyz");
+            captured.Url.ToString().Should().Be("https://api.deepseek.com/chat/completions");
+        }
+
+        [Fact]
         public void Capabilities_ReportsExpectedFlags()
         {
             var provider = new BrainarrDeepSeekProvider(_http.Object, _logger, "sk-deepseek-test", "deepseek-chat");

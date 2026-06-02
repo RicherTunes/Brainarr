@@ -58,8 +58,7 @@ namespace Brainarr.Tests.Resilience
             {
                 Provider = AIProvider.OpenAI,
                 ApiKey = "sk-test-key-12345",
-                MaxRecommendations = 5,
-                EnableLibraryAnalysis = false
+                MaxRecommendations = 5
             };
         }
 

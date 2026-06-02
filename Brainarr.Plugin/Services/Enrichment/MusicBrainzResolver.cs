@@ -51,8 +51,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
             // Deduplicate within this batch to avoid repeated queries
             foreach (var rec in recommendations)
             {
-                if (ct.IsCancellationRequested)
-                    break;
+                // Propagate run cancellation (don't silently return a partial enrichment as success) —
+                // matches the orchestrator's cancellation-aware path which maps cancel → empty result.
+                ct.ThrowIfCancellationRequested();
 
                 try
                 {
@@ -63,8 +64,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
                     resolvableCount++;
 
-                    // Check LRU cache first
-                    var key = MakeKey(rec.Artist, rec.Album);
+                    // Check LRU cache first. Build the key from the SAME HtmlDecoded text that
+                    // ResolveMbidAsync uses for the query/match (#66, heuristic-s residual of #60):
+                    // otherwise "Simon & Garfunkel" and a model-emitted "Simon &amp; Garfunkel" — the
+                    // identical entity — key differently, so the duplicate misses the cache and fires a
+                    // redundant MusicBrainz query (and a decoded entry would be stored under a raw key).
+                    var key = MakeKey(
+                        System.Net.WebUtility.HtmlDecode(rec.Artist),
+                        System.Net.WebUtility.HtmlDecode(rec.Album));
                     Recommendation cached = null;
                     lock (_lruLock)
                     {
@@ -97,6 +104,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                         // Downstream safety gates (RequireMbids) can still enforce MBID presence when configured.
                         result.Add(rec);
                     }
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw; // run cancelled mid-request — propagate, don't log as a resolution error
                 }
                 catch (Exception ex)
                 {
@@ -131,8 +142,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
 
         private async Task<Recommendation> ResolveMbidAsync(Recommendation rec, CancellationToken ct)
         {
-            var encodedArtist = Uri.EscapeDataString(rec.Artist);
-            var encodedAlbum = Uri.EscapeDataString(rec.Album);
+            // Defensively decode HTML entities (e.g. a model that emitted "Simon &amp; Garfunkel") so
+            // BOTH the MusicBrainz query and the local name-match operate on the real text. Otherwise
+            // "&amp;" escapes to %26amp%3B in the query and normalizes to "...amp..." in the match —
+            // never matching the real artist (#60). Uri.EscapeDataString handles a raw '&' correctly.
+            var artistName = System.Net.WebUtility.HtmlDecode(rec.Artist ?? string.Empty);
+            var albumName = System.Net.WebUtility.HtmlDecode(rec.Album ?? string.Empty);
+
+            var encodedArtist = Uri.EscapeDataString(artistName);
+            var encodedAlbum = Uri.EscapeDataString(albumName);
 
             // Search release-groups for artist/title
             var url = $"{BaseUrl}/release-group/?query=artist:{encodedArtist}%20AND%20releasegroup:{encodedAlbum}&fmt=json&limit=5";
@@ -156,9 +174,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 return null;
             }
 
-            // Choose best candidate by score, then by normalized title match
-            var normAlbum = Normalize(rec.Album);
-            var normArtist = Normalize(rec.Artist);
+            // Choose best candidate by score, then by normalized title match. Use the DECODED names
+            // (same as the query) so a model-emitted "&amp;" doesn't normalize to "...amp..." and miss.
+            var normAlbum = Normalize(albumName);
+            var normArtist = Normalize(artistName);
 
             JToken best = null;
             int bestScore = -1;
@@ -208,21 +227,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment
                 year = dt.Year;
             }
 
-            return new Recommendation
+            // Use `with` so every unchanged field (incl. ConfidenceProvided and any future member) is
+            // preserved automatically — a field-by-field rebuild here silently dropped the confidence
+            // provenance flag, resetting it to the default before the safety gate.
+            return rec with
             {
-                Artist = rec.Artist,
-                Album = rec.Album,
-                Genre = rec.Genre,
-                Confidence = rec.Confidence,
-                Reason = rec.Reason,
                 Year = rec.Year ?? year,
                 ReleaseYear = rec.ReleaseYear ?? year,
-                Source = rec.Source,
-                Provider = rec.Provider,
                 ArtistMusicBrainzId = artistId,
                 AlbumMusicBrainzId = releaseGroupId,
-                MusicBrainzId = releaseGroupId,
-                SpotifyId = rec.SpotifyId
+                MusicBrainzId = releaseGroupId
             };
         }
     }

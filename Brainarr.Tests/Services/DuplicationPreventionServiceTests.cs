@@ -29,6 +29,62 @@ namespace Brainarr.Tests.Services
             _service?.Dispose();
         }
 
+        [Fact]
+        public void DeduplicateRecommendations_BoundsHistorySet_AcrossManyBatches()
+        {
+            // Anti-leak: the cross-session dedup set is on a process-lifetime singleton; before the
+            // cap it grew forever (one entry per unique artist|album, never evicted). Feeding many
+            // small batches (mirrors many runs over weeks) must keep it bounded.
+            using var svc = new DuplicationPreventionService(_logger, maxHistoryEntries: 10);
+
+            for (int i = 0; i < 40; i++)
+            {
+                svc.DeduplicateRecommendations(new List<ImportListItemInfo>
+                {
+                    new ImportListItemInfo { Artist = $"Artist{i}", Album = $"Album{i}" }
+                });
+            }
+
+            svc.HistoryCount.Should().BeLessOrEqualTo(10,
+                "the in-memory dedup set must stay bounded by maxHistoryEntries");
+        }
+
+        [Fact]
+        public void DeduplicateRecommendations_StillDedupsRecentItems_AfterBounding()
+        {
+            // Bounding must not break dedup for recently-seen items.
+            using var svc = new DuplicationPreventionService(_logger, maxHistoryEntries: 10);
+            svc.DeduplicateRecommendations(new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Recent", Album = "Album" }
+            });
+
+            var filtered = svc.FilterPreviouslyRecommended(new List<ImportListItemInfo>
+            {
+                new ImportListItemInfo { Artist = "Recent", Album = "Album" }
+            });
+
+            filtered.Should().BeEmpty("a just-recommended item is still filtered as previously-recommended");
+        }
+
+        [Fact]
+        public void DeduplicateRecommendations_SingleBatchLargerThanCap_StillBounded()
+        {
+            // Single-pass eviction must trim to <= cap even when ONE batch overflows it (the bound is
+            // computed from the actual overflow, not a fixed 10%). Production batches are small, but
+            // this guarantees the invariant regardless.
+            using var svc = new DuplicationPreventionService(_logger, maxHistoryEntries: 10);
+
+            var batch = Enumerable.Range(0, 25)
+                .Select(i => new ImportListItemInfo { Artist = $"A{i}", Album = $"B{i}" })
+                .ToList();
+
+            svc.DeduplicateRecommendations(batch);
+
+            svc.HistoryCount.Should().BeLessOrEqualTo(10,
+                "a single over-cap batch must still be trimmed to the cap in one pass");
+        }
+
         #region Constructor Tests
 
         [Fact]

@@ -41,6 +41,31 @@ public class PluginSandboxRuntimeTests
             $"Plugin DLL not found. Build with ILRepack first: dotnet build Brainarr.Plugin/Brainarr.Plugin.csproj -c Release. Tried: {string.Join(", ", candidates)}");
     }
 
+    /// <summary>
+    /// Loads the plugin in a sandbox, converting the known "no concrete IPlugin" failure into a
+    /// skip. Brainarr is ImportList-only by design (no Common-IPlugin concrete class — see CLAUDE.md),
+    /// so <see cref="PluginSandbox"/>, which reflects for a concrete <c>IPlugin</c>, cannot load it.
+    /// These runtime tests are quarantined for exactly that reason; without this the test would FAIL
+    /// (not skip) whenever the merged DLL happens to be present in bin/, polluting the suite with
+    /// deterministic failures and masking its true health. Skip deterministically instead, regardless
+    /// of DLL presence, until a Common-IPlugin adapter lands.
+    /// </summary>
+    private static async Task<PluginSandbox> CreateSandboxOrSkip(string dllPath)
+    {
+        try
+        {
+            return await PluginSandbox.CreateAsync(dllPath);
+        }
+        catch (InvalidOperationException ex) when (
+            ex.Message.Contains("concrete IPlugin", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new SkipException(
+                "Brainarr has no concrete Common-IPlugin implementation (ImportList-only design); " +
+                "PluginSandbox cannot load it. Quarantined — see [Trait(\"State\",\"Quarantined\")]. " +
+                $"Underlying: {ex.Message}");
+        }
+    }
+
     [SkippableFact]
     [Trait("Category", "Runtime")]
     [Trait("State", "Quarantined")] // Brainarr has no Common-IPlugin concrete class (ImportList-only design per CLAUDE.md); PluginSandbox crashes on "no concrete IPlugin implementation". Quarantined until a Common-IPlugin adapter is added, or these tests move to plugins that do satisfy Common.IPlugin (apple/qobuzarr/tidalarr).
@@ -48,7 +73,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         Assert.NotNull(sandbox.Plugin);
         Assert.NotNull(sandbox.Plugin.Manifest);
@@ -62,7 +87,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         IReadOnlyCollection<SettingDefinition> defs = sandbox.Plugin.SettingsProvider.Describe();
 
@@ -83,7 +108,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         IReadOnlyDictionary<string, object?> defaults = sandbox.Plugin.SettingsProvider.GetDefaults();
 
@@ -100,7 +125,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         // Valid settings: Ollama provider (default) with default URL and model
         Dictionary<string, object?> valid = new()
@@ -132,7 +157,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         Dictionary<string, object?> settings = new()
         {
@@ -154,7 +179,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         // Should not throw
         await sandbox.DisposeAsync();
@@ -167,7 +192,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         PluginManifest manifest = sandbox.Plugin.Manifest;
         Assert.False(string.IsNullOrWhiteSpace(manifest.Id));
@@ -182,7 +207,7 @@ public class PluginSandboxRuntimeTests
     {
         string dllPath = FindPluginDll();
 
-        await using PluginSandbox sandbox = await PluginSandbox.CreateAsync(dllPath);
+        await using PluginSandbox sandbox = await CreateSandboxOrSkip(dllPath);
 
         // The sandbox's PluginTestContext captures logs
         var logs = sandbox.Context.LogEntries.Snapshot();

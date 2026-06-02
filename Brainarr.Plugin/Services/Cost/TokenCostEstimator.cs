@@ -353,8 +353,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             return $"Budget healthy: {percentUsed:F1}% used.";
         }
 
-        private const int MaxUsageHistoryEntries = 10_000;
+        internal const int MaxUsageHistoryEntries = 10_000;
         private static readonly List<UsageReport> UsageHistory = new List<UsageReport>();
+
+        // Test hooks (InternalsVisibleTo "Brainarr.Tests"): UsageHistory is process-wide static state,
+        // so a bounded-growth test must be able to reset it (before AND after, so it neither inherits
+        // nor leaks pollution) and read the count. Both go through the same lock as the real paths.
+        internal static void ResetUsageHistoryForTesting()
+        {
+            lock (_usageHistoryLock) { UsageHistory.Clear(); }
+        }
+
+        internal static int UsageHistoryCountForTesting
+        {
+            get { lock (_usageHistoryLock) { return UsageHistory.Count; } }
+        }
 
         private class ProviderPricing
         {

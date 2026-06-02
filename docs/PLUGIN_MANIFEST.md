@@ -8,17 +8,24 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 
 ```json
 {
+  "id": "brainarr",
+  "apiVersion": "1.x",
   "name": "Brainarr",
-  "version": "1.3.0",
-  "description": "AI-powered music discovery with 9 providers including local and cloud options",
+  "version": "1.6.1",
+  "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.2.4786",
-  "entryPoint": "Lidarr.Plugin.Brainarr.dll",
-  "owner": "RicherTunes",
+  "commonVersion": "1.18.0-dev",
+  "minHostVersion": "3.0.0.4855",
+  "main": "Lidarr.Plugin.Brainarr.dll",
   "homepage": "https://github.com/RicherTunes/Brainarr",
+  "owner": "RicherTunes",
   "repository": "https://github.com/RicherTunes/Brainarr",
   "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
-  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md"
+  "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
+  "license": "MIT",
+  "tags": ["music", "ai", "recommendations", "import-list"],
+  "targetFramework": "net8.0",
+  "rootNamespace": "NzbDrone.Core.ImportLists.Brainarr"
 }
 ```
 
@@ -70,7 +77,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"description": "Multi-provider AI-powered music discovery with support for 9 providers including local and cloud options"
+"description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options"
 ```
 
 **Guidelines:**
@@ -97,7 +104,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 - Team: `"Brainarr Team"`
 - With email: `"John Doe <john@example.com>"`
 
-### minimumVersion
+### minHostVersion
 
 **Type:** `string`
 **Required:** Yes
@@ -107,14 +114,14 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"minimumVersion": "2.14.2.4786"
+"minHostVersion": "3.0.0.4855"
 ```
 
 **Important Versions:**
 
-- `2.14.2.4786` - Lidarr nightly (plugin support)
+- `3.0.0.4855` - Lidarr nightly (plugins branch, required for .NET 8 plugins)
 
-### entryPoint
+### main
 
 **Type:** `string`
 **Required:** Yes
@@ -123,7 +130,7 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"entryPoint": "Lidarr.Plugin.Brainarr.dll"
+"main": "Lidarr.Plugin.Brainarr.dll"
 ```
 
 **Naming Convention:**
@@ -197,20 +204,24 @@ Here's a fully-featured manifest with all optional fields:
 
 ```json
 {
+  "id": "brainarr",
+  "apiVersion": "1.x",
   "name": "Brainarr",
-  "version": "1.3.0",
-  "description": "AI-powered music discovery with 9 providers including local and cloud options",
-  "author": "Brainarr Team <team@brainarr.ai>",
-  "minimumVersion": "2.14.2.4786",
-  "entryPoint": "Lidarr.Plugin.Brainarr.dll",
+  "version": "1.6.1",
+  "description": "AI-powered music discovery with 11 providers including local, cloud, and subscription options",
+  "author": "Brainarr Team",
+  "commonVersion": "1.18.0-dev",
+  "minHostVersion": "3.0.0.4855",
+  "main": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "homepage": "https://github.com/RicherTunes/Brainarr",
   "repository": "https://github.com/RicherTunes/Brainarr",
   "supportUri": "https://github.com/RicherTunes/Brainarr/issues",
   "changelogUri": "https://github.com/RicherTunes/Brainarr/blob/main/CHANGELOG.md",
-  "tags": ["ai", "recommendations", "import-list", "discovery", "music"],
-  "dependencies": {},
-  "permissions": ["network"]
+  "license": "MIT",
+  "tags": ["music", "ai", "recommendations", "import-list"],
+  "targetFramework": "net8.0",
+  "rootNamespace": "NzbDrone.Core.ImportLists.Brainarr"
 }
 ```
 
@@ -294,11 +305,11 @@ When releasing a new version:
 
 ```json
 {
-  "version": "1.3.0"  // Increment appropriately
+  "version": "1.6.1"  // Increment appropriately
 }
 ```
 
-2. Update assembly version in `.csproj`:
+1. Update assembly version in `.csproj`:
 
 ```xml
 <PropertyGroup>
@@ -308,7 +319,7 @@ When releasing a new version:
 </PropertyGroup>
 ```
 
-3. Tag the release in git:
+1. Tag the release in git:
 
 ```bash
 git tag v1.1.0
@@ -319,9 +330,9 @@ git push origin v1.1.0
 
 | Plugin Version | Minimum Lidarr | Maximum Lidarr | Notes |
 |---------------|----------------|----------------|-------|
-| 1.0.0 | 2.14.2.4786 | - | Initial release |
-| 1.1.0 | 2.14.2.4786 | - | Added features |
-| 2.0.0 | 4.5.0.0 | - | Breaking changes |
+| 1.6.1 | 3.0.0.4855 | - | Current release |
+| 1.5.x | 3.0.0.4855 | - | Previous releases |
+| 1.3.0 | 3.0.0.4855 | - | Planning refactor |
 
 ## Best Practices
 
@@ -343,14 +354,14 @@ git push origin v1.1.0
 python -m json.tool plugin.json
 ```
 
-2. Verify file location:
+1. Verify file location:
 
 ```bash
 # Correct location (owner/name layout)
 ls -la /var/lib/lidarr/plugins/RicherTunes/Brainarr/plugin.json
 ```
 
-3. Check Lidarr logs:
+1. Check Lidarr logs:
 
 ```bash
 tail -f /var/log/lidarr/lidarr.txt | grep -i plugin

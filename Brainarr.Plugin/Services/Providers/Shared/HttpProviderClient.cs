@@ -39,15 +39,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
 
             var winner = await Task.WhenAny(executeTask, cancelTask).ConfigureAwait(false);
 
-            if (winner == cancelTask)
+            // Prefer a completed HTTP call: if the response already arrived (or the call faulted),
+            // honor it even when the token ALSO fired. Task.WhenAny may return cancelTask although
+            // executeTask is already complete (both ready at once), and a cancellation that lands
+            // after the response is moot — discarding a completed response would be wrong. Only treat
+            // it as cancelled when the response genuinely hasn't arrived yet.
+            if (winner == cancelTask && !executeTask.IsCompleted)
             {
-                // Token fired before the HTTP response arrived.
                 cancellationToken.ThrowIfCancellationRequested();
                 // Fallback in case ThrowIfCancellationRequested doesn't throw (shouldn't happen).
                 throw new OperationCanceledException(cancellationToken);
             }
 
-            // executeTask won — propagate any exception it may have thrown.
+            // executeTask completed (success or fault) — propagate its result/exception.
             return await executeTask.ConfigureAwait(false);
         }
 

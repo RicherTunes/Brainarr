@@ -2,13 +2,14 @@
 
 ## Prerequisites
 
-- .NET SDK 6.0+ (8.0 recommended)
+- .NET 8.0 SDK
 - Git
 - PowerShell (Windows) or Bash (Linux/macOS)
 
 ## Quick Start
 
 ### Windows
+
 ```powershell
 # First time setup (fetch Lidarr assemblies, restore, build)
 ./setup.ps1
@@ -21,6 +22,7 @@
 ```
 
 ### Linux/macOS
+
 ```bash
 # Make scripts executable (first time only)
 chmod +x setup.sh build.sh
@@ -61,8 +63,8 @@ The `plugin.json` file defines plugin metadata for Lidarr:
   "version": "1.3.0",
   "description": "AI-powered music discovery",
   "author": "Brainarr Team",
-  "minimumVersion": "2.14.2.4786",
-  "entryPoint": "Lidarr.Plugin.Brainarr.dll"
+  "minHostVersion": "3.0.0.4855",
+  "main": "Lidarr.Plugin.Brainarr.dll"
 }
 ```
 
@@ -75,6 +77,7 @@ The `plugin.json` file defines plugin metadata for Lidarr:
 The build scripts handle all dependencies automatically:
 
 #### Windows (PowerShell)
+
 ```powershell
 # Available parameters:
 # -Setup         : Bootstrap Lidarr assemblies (first time only)
@@ -94,6 +97,7 @@ The build scripts handle all dependencies automatically:
 ```
 
 #### Linux/macOS (Bash)
+
 ```bash
 # Available parameters:
 # --setup       : Bootstrap Lidarr assemblies (first time only)
@@ -115,12 +119,14 @@ The build scripts handle all dependencies automatically:
 ### Method 2: Manual Build
 
 1. **Preferred:** Extract Lidarr plugins/nightly assemblies from Docker (no source clone required)
+
 ```bash
 bash ./scripts/extract-lidarr-assemblies.sh
 export LIDARR_PATH="$(pwd)/ext/Lidarr-docker/_output/net8.0"
 ```
 
-2. **Alternative (advanced): Clone Lidarr source:**
+1. **Alternative (advanced): Clone Lidarr source:**
+
 ```bash
 git clone --branch plugins https://github.com/Lidarr/Lidarr.git ext/Lidarr
 cd ext/Lidarr
@@ -128,7 +134,8 @@ dotnet build -c Release
 cd ../..
 ```
 
-3. **Set LIDARR_PATH environment variable:**
+1. **Set LIDARR_PATH environment variable:**
+
 ```bash
 # Linux/macOS
 export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net8.0"
@@ -137,7 +144,8 @@ export LIDARR_PATH="$(pwd)/ext/Lidarr/_output/net8.0"
 $env:LIDARR_PATH = "$(Get-Location)\ext\Lidarr\_output\net8.0"
 ```
 
-4. **Build the plugin:**
+1. **Build the plugin:**
+
 ```bash
 cd Brainarr.Plugin
 dotnet restore
@@ -184,6 +192,7 @@ dotnet test /p:CollectCoverage=true
    - Check logs at `<Lidarr>/logs/`
 
 2. **Enable Debug Logging:**
+
    ```csharp
    _logger.Debug($"Detailed info: {variable}");
    ```
@@ -194,6 +203,7 @@ dotnet test /p:CollectCoverage=true
 ## Configuration Options
 
 ### Sampling Strategy (New)
+
 ```csharp
 public enum SamplingStrategy
 {
@@ -204,9 +214,11 @@ public enum SamplingStrategy
 ```
 
 ### Prompt Budgets
+
 - Brainarr applies provider‑specific budgets and a headroom guard. Actual limits vary by model and provider; see `docs/configuration.md` and the provider’s documentation.
 
 ### Feedback Loop
+
 The plugin tracks:
 - Success rate per provider
 - Duplicate rate

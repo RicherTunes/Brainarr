@@ -1,6 +1,6 @@
 # User Setup Guide (Clean)
 
-> Compatibility\n> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). For the canonical notice, see the README compatibility section.
+> Compatibility — see the [README compatibility notice](../README.md) for the Lidarr version and branch requirements.
 
 ## How to use this guide
 

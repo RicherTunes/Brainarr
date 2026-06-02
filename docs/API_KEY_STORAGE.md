@@ -7,7 +7,7 @@
 
 ### Where keys live
 
-API keys for all cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq, ZaiGlm) are stored as **plain-text strings** inside the `BrainarrSettings` partial class, specifically in `BrainarrSettings.Providers.cs`.
+API keys for all cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq, ZaiGlm, ZaiCoding) are stored as **plain-text strings** inside the `BrainarrSettings` partial class, specifically in `BrainarrSettings.Providers.cs`.
 
 ### How they are stored
 

@@ -326,6 +326,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
 
         private class MetricAggregator
         {
+            // Per-metric raw-point cap. Points are TTL-trimmed by the hourly sweep (24h retention),
+            // but between sweeps a burst would grow _points unbounded (24h × call rate). This caps the
+            // in-memory point count so a single hot metric can't balloon the heap between sweeps; the
+            // newest points are kept (oldest dropped), which is what the time-windowed summaries read.
+            private const int MaxPointsPerMetric = 10_000;
+
             private readonly string _name;
             private readonly ConcurrentBag<MetricPoint> _points = new();
             private readonly object _pointsLock = new();
@@ -342,6 +348,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 lock (_pointsLock)
                 {
                     _points.Add(point);
+                    TrimToCapLocked();
                 }
             }
 
@@ -354,6 +361,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Resilience
                 lock (_pointsLock)
                 {
                     _points.Add(new MetricPoint { Timestamp = DateTime.UtcNow, Value = delta, Tags = tags ?? new Dictionary<string, string>() });
+                    TrimToCapLocked();
+                }
+            }
+
+            // Caller must hold _pointsLock. When over the cap, keep the newest ~90% (ConcurrentBag has
+            // no order/Clear, so drain + rebuild — same pattern as RemoveOldPoints). Trimming to 90%
+            // rather than exactly the cap amortizes the O(n log n) rebuild across ~10% of the cap's
+            // worth of subsequent adds instead of running on every add at steady state.
+            private void TrimToCapLocked()
+            {
+                if (_points.Count <= MaxPointsPerMetric) return;
+
+                var keepCount = MaxPointsPerMetric * 9 / 10;
+                var all = new List<MetricPoint>();
+                while (_points.TryTake(out var p)) all.Add(p);
+                foreach (var p in all.OrderByDescending(p => p.Timestamp).Take(keepCount))
+                {
+                    _points.Add(p);
                 }
             }
 

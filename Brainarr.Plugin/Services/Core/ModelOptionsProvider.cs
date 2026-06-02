@@ -106,6 +106,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 AIProvider.DeepSeek => BuildEnumOptions<DeepSeekModelKind>(),
                 AIProvider.Gemini => BuildEnumOptions<GeminiModelKind>(),
                 AIProvider.Groq => BuildEnumOptions<GroqModelKind>(),
+                // Z.AI PaaS + Coding Plan: without these the model dropdown rendered EMPTY in the
+                // settings UI, so users couldn't pick a model and the unset value fell back to the
+                // "default" sentinel (which Z.AI rejects with [1210]). Both enums share GLM ids.
+                AIProvider.ZaiGlm => BuildEnumOptions<ZaiGlmModelKind>(),
+                AIProvider.ZaiCoding => BuildEnumOptions<ZaiCodingModelKind>(),
                 _ => new { options = Array.Empty<object>() }
             };
         }

@@ -255,10 +255,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 ["model"] = modelRaw,
                 ["messages"] = new[] { new { role = "user", content = request.Prompt } },
-                // Anthropic Messages API requires max_tokens; default matches BrainarrAnthropicProvider/
-                // ClaudeCodeSubscription so behavior is consistent across Anthropic-format providers.
+                // Anthropic Messages API requires max_tokens. The value comes from the pipeline's
+                // timeout-aware output-token budget (BrainarrSettings.GetOutputTokenBudget): it scales
+                // to the target count but is bounded by what the model can generate within the
+                // per-request timeout, so a long budget is only used when the user has granted enough
+                // time. This matters for GLM specifically — overshooting the timeout cancels the call
+                // mid-stream (no body to salvage), strictly worse than a clean truncation. When the
+                // budget is unset (direct/non-pipeline callers) we fall back to the proven-safe 2000;
+                // any tail truncation is still recovered by RecommendationJsonParser's salvage.
                 ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["temperature"] = (double?)request.Temperature ?? 0.7,
+                // NOTE: temperature is intentionally omitted. Z.AI's Coding-Plan (Anthropic-format)
+                // endpoint rejects the request with [1210][Invalid API parameter] when `temperature`
+                // is present — Claude Code (which this endpoint emulates) does not send it. Confirmed
+                // live: with temperature dropped the same request returns 200 + a full completion.
+                //
+                // Reasoning control NOT sent: the endpoint *accepts* Anthropic's `thinking:{type:disabled}`
+                // without [1210], but it has no measurable effect — GLM-5.x latency is raw generation
+                // speed (~47 tok/s; a full 2000-token answer is ~4.2 chars/token of plain JSON, not
+                // thinking-block padding), not a reasoning preamble. So we keep the request minimal and
+                // Claude-Code-shaped rather than ship an ignored param on a strict endpoint.
             };
 
             if (!string.IsNullOrEmpty(request.SystemPrompt))
@@ -266,6 +281,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                 // Anthropic format puts `system` at the top level, NOT in the messages array.
                 body["system"] = request.SystemPrompt;
             }
+
+            // The shared LlmLogger "Model=default" line is an unset-logging default (the adapter
+            // doesn't pass the model through), so it never reflects what's actually sent. Log the
+            // real outbound model at debug so support can confirm the resolved GLM id on the wire.
+            _logger.Debug("[ZaiCoding] outbound model='{0}' max_tokens={1}", modelRaw, body["max_tokens"]);
 
             return body;
         }
@@ -331,9 +351,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (OperationCanceledException)
             {
-                // Our linked CTS fired (per-request timeout), not the caller's token.
+                // Our linked CTS fired (per-request timeout), not the caller's token. GLM reasoning
+                // models (esp. GLM-5.x) generate slowly (~45-60s for a full list), so the default 30s
+                // AI timeout is the usual cause here — point the user at the fix rather than a bare
+                // "timed out" that reads like a network fault.
                 throw LlmErrorMapper.MapException(ProviderIdConst,
-                    new TimeoutException($"Z.AI Coding request timed out after {seconds}s"));
+                    new TimeoutException(
+                        $"Z.AI Coding request timed out after {seconds}s. GLM-5.x reasoning models are " +
+                        "slow (~45-60s per request) — raise 'AI Request Timeout' in the import list's " +
+                        "advanced settings to 60-90s, or select the faster GLM-4.5-Air for ~10s syncs."));
             }
             catch (Exception ex) when (ex is not LlmProviderException)
             {
@@ -377,11 +403,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
         }
 
-        private static string? Truncate(string? body, int max = 500)
-        {
-            if (string.IsNullOrEmpty(body)) return body;
-            return body.Length <= max ? body : body.Substring(0, max);
-        }
 
         BrainarrLlmHint? IBrainarrLlmHintSource.GetUserHint(LlmProviderException exception)
         {

@@ -186,3 +186,59 @@ Fine-tune how Brainarr samples your library for prompt building. These control t
 | `Standard` | Default. Balanced refinement for most libraries. |
 | `Balanced` | More aggressive than Standard; good for sparse results. |
 | `Aggressive` | Maximum refinement attempts; may increase API calls. |
+
+### Validation and filtering
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Enable Strict Validation | `false` | Rejects most parenthetical album suffixes except a small allow-list (e.g. *Original Soundtrack*, *EP*, *Single*). Tightens hallucination filtering. |
+| Custom Filter Patterns | *(empty)* | Comma-separated plain substrings that mark an album title as a hallucination and filter it out (e.g. `(alternate take), (demo version)`). Plain substring match — not regex. Keep entries specific. |
+| Queue Borderline Items | `true` | Send low-confidence or missing-MBID items to the Review Queue instead of dropping them. Hidden setting; see the [Review Queue wiki page](../wiki-content/Review-Queue.md). |
+
+### Provider tuning
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| LM Studio Temperature | `0.5` | Sampling temperature for LM Studio (range 0.0–2.0). Lower is more deterministic; 0.3–0.7 recommended for curation. Other providers use a fixed default of 0.8. |
+
+### Iterative top-up controls
+
+Fine-tune how the iterative backfill planner tops up sparse results.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Top-Up Max Iterations | `3` | Maximum top-up iterations before stopping. The aggressive strategy auto-bumps this. |
+| Zero-Success Stop After | `1` | Stop top-up after this many consecutive iterations returning zero new items. |
+| Low-Success Stop After | `2` | Stop top-up after this many low-success iterations (mode-adjusted). |
+| Top-Up Cooldown (ms) | `1000` | Cooldown between early-stop attempts (primarily for local providers). |
+| Top-Up Stop Sensitivity | `Lenient` | Controls how quickly top-up stops: `Off`, `Lenient` (default, more attempts), `Normal`, `Strict` (stop early), `Aggressive`. |
+
+### Adaptive throttling (hidden)
+
+Automatically reduce per-model concurrency when 429 (Too Many Requests) is observed. Hidden by default; most users never need to adjust these.
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Enable Adaptive Throttling | `false` | Activates automatic 429 backoff. |
+| Adaptive Throttle Seconds | `60` | Duration of reduced concurrency after a 429. |
+| Adaptive Throttle Cap (Cloud) | *(null)* | Temporary per-model concurrency cap for cloud providers after 429. |
+| Adaptive Throttle Cap (Local) | *(null)* | Temporary per-model concurrency cap for local providers after 429. |
+
+### Concurrency overrides (hidden)
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Max Concurrent Per Model (Cloud) | *(null)* | Override per-model concurrency for cloud providers. Leave blank for defaults. |
+| Max Concurrent Per Model (Local) | *(null)* | Override per-model concurrency for local providers. Leave blank for defaults. |
+
+### Logging
+
+| Setting | Default | Notes |
+| --- | --- | --- |
+| Log Per-Item Decisions | `true` | Log each accepted/rejected recommendation with reason. Disable to reduce log noise — aggregate run summaries remain either way. |
+
+### Discovery behaviour
+
+**Discovery-mode escalation**: When iterative top-up stalls due to dedup saturation (low unique-rate streak), the engine automatically widens the effective discovery mode one step (Similar → Adjacent → Exploratory), resets the streak, and continues. This breaks out of saturated recommendation clusters without manual intervention. Escalation is bounded (two steps max) and only activates during aggressive top-up.
+
+**Style-seeded discovery**: When you select music styles that your library has zero coverage of, Brainarr recommends artists *of* those styles rather than library-grounded ones. This enables discovery of entirely new genres. Unrecognised style entries (those not in the built-in catalog) become freestyle anchors that seed recommendations directly.

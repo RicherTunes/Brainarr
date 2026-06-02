@@ -86,10 +86,12 @@ OLLAMA_MAX_LOADED_MODELS=1 ollama serve
 ```yaml
 # Brainarr Settings
 Model: phi3  # Smaller, faster model
-Request Timeout: 30  # Longer timeout for local
-Max Tokens: 1000  # Reduce for speed
+AI Request Timeout: 60  # Per-request timeout (seconds)
+Max Recommendations: 50  # Target count
 Temperature: 0.5  # Lower for consistency
 ```
+
+> **Note:** Local providers (Ollama, LM Studio) automatically use a 360-second (6-minute) timeout when the configured timeout is at or below the default of 30 seconds. The `AI Request Timeout` setting governs the overall fetch budget, not individual request timeouts.
 
 ### LM Studio Performance
 

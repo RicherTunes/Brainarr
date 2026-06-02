@@ -520,6 +520,87 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.Equal(promptA, promptB);
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_StyleSeeded_WithPopulatedDedupSample_ShowsLibrarySection_AndGenreFirstLanguage()
+        {
+            // Improvement B: for genre-first discovery (selected-style coverage == 0) the dedup sample is
+            // now populated (adjacent/dominant library artists). The prompt must:
+            //   - render the genre-first "recommend artists OF the seed styles; library is dedup-only" intent
+            //   - NOT print "0 groups" — the library/dedup section is populated
+            var sample = new LibrarySample();
+            var artist = new LibrarySampleArtist
+            {
+                ArtistId = 1,
+                Name = "Existing Hip Hop Artist",
+                // Dedup-fallback artists carry NO matched styles (they're a dedup audit, not seed matches).
+                MatchedStyles = Array.Empty<string>(),
+                Weight = 0.5
+            };
+            artist.Albums.Add(new LibrarySampleAlbum
+            {
+                AlbumId = 10,
+                ArtistId = 1,
+                ArtistName = "Existing Hip Hop Artist",
+                Title = "Old Beats",
+                MatchedStyles = Array.Empty<string>(),
+                Added = DateTime.UtcNow.AddDays(-30),
+                Year = DateTime.UtcNow.Year - 3
+            });
+            sample.Artists.Add(artist);
+
+            // Style-seeded StylePlanContext: selected slug with ZERO coverage (the renderer's genre-first gate).
+            var styleContext = new StylePlanContext(
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "lofi-hip-hop" },
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "lofi-hip-hop" },
+                new List<StyleEntry> { new() { Name = "Lo-Fi Hip Hop", Slug = "lofi-hip-hop" } },
+                new List<StyleEntry>(),
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase) { ["lofi-hip-hop"] = 0 },
+                relaxed: false,
+                threshold: 1.0,
+                trimmed: new List<string>(),
+                inferred: new List<string>());
+
+            var plan = new PromptPlan(sample, new[] { "lofi-hip-hop" })
+            {
+                Profile = new LibraryProfile
+                {
+                    TotalArtists = 50,
+                    TotalAlbums = 120,
+                    Metadata = new Dictionary<string, object>(),
+                    StyleContext = new LibraryStyleContext()
+                },
+                Settings = new BrainarrSettings
+                {
+                    DiscoveryMode = DiscoveryMode.Adjacent,
+                    SamplingStrategy = SamplingStrategy.Balanced,
+                    MaxRecommendations = 10
+                },
+                StyleContext = styleContext,
+                ShouldRecommendArtists = true,
+                Compression = new PromptCompressionState(maxArtists: 5, maxAlbumGroups: 5, maxAlbumsPerGroup: 3, minAlbumsPerGroup: 1)
+            };
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Default, CancellationToken.None);
+
+            // Genre-first intent is explicit.
+            Assert.Contains("genre-first discovery", prompt, StringComparison.Ordinal);
+            Assert.Contains("avoid duplicates", prompt, StringComparison.Ordinal);
+            Assert.Contains("SEED STYLES (recommend artists OF these styles):", prompt, StringComparison.Ordinal);
+
+            // The dedup/library section is populated (NOT "0 groups") and lists the existing artist.
+            Assert.DoesNotContain("(0 groups shown)", prompt, StringComparison.Ordinal);
+            Assert.Contains("Existing Hip Hop Artist", prompt, StringComparison.Ordinal);
+            // Genre-first header makes the dedup-only intent explicit (still keeps the stable substring).
+            Assert.Contains("LIBRARY ARTISTS & KEY ALBUMS", prompt, StringComparison.Ordinal);
+            Assert.Contains("EXISTING LIBRARY (avoid these duplicates)", prompt, StringComparison.Ordinal);
+
+            // The seed style is NOT presented as library-aligned coverage in this mode.
+            Assert.DoesNotContain("STYLE FILTERS (library-aligned)", prompt, StringComparison.Ordinal);
+        }
+
         private static PromptPlan CreateMinimalPlan(bool recommendArtists = false)
         {
             var sample = new LibrarySample();

@@ -92,6 +92,110 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public void Analyze_UnscoredItem_NotPenalizedBelowThreshold_AndBandIsUnscored()
+        {
+            // Provenance: the model never reported a confidence; item.Confidence (0.7) is a parser
+            // placeholder. Even with the floor raised to 0.85, it must NOT be flagged below-threshold
+            // (mirrors SafetyGateService's !ConfidenceProvided gate), and the band must not fabricate
+            // a High/Medium/Low label.
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings { MinConfidence = 0.85, RequireMbids = false };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.7,
+                ConfidenceProvided = false,
+            };
+
+            var result = advisor.Analyze(item, settings);
+
+            result.ReasonCodes.Should().NotContain(TriageReasonCodes.ConfidenceBelowThreshold);
+            result.ReasonCodes.Should().NotContain(TriageReasonCodes.ConfidenceFarBelowThreshold);
+            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ConfidenceNotProvidedCode);
+            result.ConfidenceBand.Should().Be(RecommendationTriageAdvisor.UnscoredBand);
+            result.RiskScore.Should().Be(0);
+            result.SuggestedAction.Should().Be("accept");
+        }
+
+        [Fact]
+        public void Analyze_UnscoredItem_SkipsProviderCalibration()
+        {
+            // Calibrating a placeholder score is meaningless and its CALIBRATION_APPLIED reason
+            // would mislead, so the whole calibration block is gated on provenance.
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings { MinConfidence = 0.7, RequireMbids = false };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.7,
+                ConfidenceProvided = false,
+                ArtistMusicBrainzId = "artist-mbid",
+            };
+
+            var result = advisor.Analyze(item, settings, provider: AIProvider.Ollama);
+
+            result.ReasonCodes.Should().NotContain(TriageReasonCodes.CalibrationApplied);
+            result.ReasonCodes.Should().NotContain(TriageReasonCodes.LowCalibrationProvider);
+            result.ConfidenceBand.Should().Be(RecommendationTriageAdvisor.UnscoredBand);
+        }
+
+        [Fact]
+        public void Analyze_UnscoredItem_StillEnforcesIndependentSignals()
+        {
+            // Provenance only gates CONFIDENCE-derived scoring. MBID-required and duplicate-signal
+            // checks are independent and must still fire for a score-less item.
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings
+            {
+                MinConfidence = 0.7,
+                RequireMbids = true,
+                RecommendationMode = RecommendationMode.SpecificAlbums,
+            };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.7,
+                ConfidenceProvided = false,
+                Reason = "already in library duplicate",
+            };
+
+            var result = advisor.Analyze(item, settings);
+
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.MissingRequiredMbids);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.DuplicateSignal);
+            result.ReasonCodes.Should().Contain(RecommendationTriageAdvisor.ConfidenceNotProvidedCode);
+        }
+
+        [Fact]
+        public void Analyze_ProvidedLowConfidence_StillPenalized()
+        {
+            // Regression: a model-REPORTED low score must still be penalized — the provenance gate
+            // must not blunt the real floor.
+            var advisor = new RecommendationTriageAdvisor();
+            var settings = new BrainarrSettings { MinConfidence = 0.7, RequireMbids = false };
+
+            var item = new ReviewQueueService.ReviewItem
+            {
+                Artist = "A",
+                Album = "B",
+                Confidence = 0.3,
+                ConfidenceProvided = true,
+            };
+
+            var result = advisor.Analyze(item, settings);
+
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.ConfidenceBelowThreshold);
+            result.ReasonCodes.Should().Contain(TriageReasonCodes.ConfidenceFarBelowThreshold);
+            result.ConfidenceBand.Should().Be("low");
+        }
+
+        [Fact]
         public void CalibrationDisabled_ReturnsRawScores()
         {
             var advisor = new RecommendationTriageAdvisor();

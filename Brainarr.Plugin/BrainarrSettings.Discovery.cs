@@ -32,8 +32,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#recommendation-type")]
         public RecommendationMode RecommendationMode { get; set; }
 
-        [FieldDefinition(9, Label = "Backfill Strategy (Default: Aggressive)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
-            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard: A few passes + initial oversampling\n- Aggressive (Default): More passes, relaxed gating, tries to guarantee target\nNote: Advanced top-up controls are hidden in v1.2.1; strategy is sufficient for most users.",
+        [FieldDefinition(9, Label = "Backfill Strategy (Default: Standard)", Type = FieldType.Select, SelectOptions = typeof(BackfillStrategy),
+            HelpText = "One simple setting to control top-up behavior when under target.\n- Off: No top-up passes (first batch only)\n- Standard (Default): A few passes + initial oversampling\n- Aggressive: More passes, relaxed gating, tries to guarantee target\nNote: Advanced top-up controls are hidden in v1.2.1; strategy is sufficient for most users.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#backfill-strategy")]
         public BackfillStrategy BackfillStrategy { get; set; }
 
@@ -57,10 +57,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             set => AutoDetectModel = value;
         }
 
-        // Additional missing properties
-        public bool EnableFallbackModel { get; set; } = true;
-        public string FallbackModel { get; set; } = "qwen2.5:latest";
-        public bool EnableLibraryAnalysis { get; set; } = true;
         public TimeSpan CacheDuration { get; set; } = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
         [FieldDefinition(17, Label = "Top-Up When Under Target", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
                     HelpText = "If under target, request additional recommendations with feedback to fill the gap.\nFor local providers (Ollama/LM Studio) this runs by default.",
@@ -101,27 +97,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
 
-        // OpenAI-compatible providers
-        [FieldDefinition(30, Label = "Prefer Structured JSON (schema)", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Use JSON Schema structured responses when supported (OpenAI/OpenRouter/Groq/DeepSeek/Perplexity). Disable if your gateway has issues with structured outputs.")]
-        public bool PreferStructuredJsonForChat { get; set; } = true;
-
-        // LM Studio tuning (advanced)
-        [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation.")]
+        // LM Studio tuning (advanced) — wired into the LM Studio provider via ProviderRegistry.
+        // (Max-tokens is intentionally NOT a setting: it's governed by the timeout-aware output
+        // budget so a flat cap can't overshoot the request timeout and lose the response body.)
+        [FieldDefinition(28, Label = "LM Studio Temperature", Type = FieldType.Number, Advanced = true,
+            HelpText = "Sampling temperature for LM Studio (0.0-2.0). Lower is more deterministic; 0.3–0.7 recommended for curation (default 0.5).")]
         public double LMStudioTemperature { get; set; } = 0.5;
 
-        [FieldDefinition(29, Label = "LM Studio Max Tokens", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-            HelpText = "Maximum tokens to generate for LM Studio responses. Increase if responses get cut off.")]
-        public int LMStudioMaxTokens { get; set; } = 2000;
-
-        // Advanced Validation Settings
-        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Additional patterns to filter out AI hallucinations (comma-separated)\nExample: '(alternate take), (radio mix), (demo version)'\nNote: Be careful not to filter legitimate albums!")]
+        // Advanced Validation Settings — now wired into the recommendation pipeline's validator
+        // (RecommendationPipeline.ResolveValidator). Un-hidden because they are functional: a hidden
+        // control that does nothing is worse than a visible one with a clear "use with care" hint.
+        [FieldDefinition(24, Label = "Custom Filter Patterns", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Extra substrings (comma-separated, case-insensitive) that mark an album title as an AI hallucination and filter it out.\nExample: (alternate take), (radio mix), (demo version)\nPlain substring match against the album title — NOT regex, no word boundaries. Keep entries specific: a bare word like 'the' or 'a' would match almost every album and filter your whole list.")]
         public string CustomFilterPatterns { get; set; } = string.Empty;
 
-        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Apply stricter validation rules to reduce false positives\n- Filters more aggressively\n- May block some legitimate albums")]
+        [FieldDefinition(10, Label = "Enable Strict Validation", Type = FieldType.Checkbox, Advanced = true,
+                    HelpText = "Apply stricter validation to reduce false positives.\n- Rejects most parenthetical album suffixes except a small allow-list (e.g. (Original Soundtrack), (EP), (Single))\n- May block some legitimate special editions")]
         public bool EnableStrictValidation { get; set; }
 
         [FieldDefinition(11, Label = "Enable Debug Logging", Type = FieldType.Checkbox, Advanced = true,
@@ -155,11 +146,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             HelpText = "Temporary per-model concurrency cap for cloud providers after 429. Default 2.")]
         public int? AdaptiveThrottleCloudCap { get; set; }
 
-        // ===== Music Styles (dynamic TagSelect) =====
-        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.TagSelect,
-            HelpText = "Select one or more styles (aliases supported). Leave empty to use your library profile.",
-            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles",
-            SelectOptionsProviderAction = "styles/getoptions")]
+        // ===== Music Styles (free-text tags) =====
+        // NOTE: free-text Tag, NOT TagSelect. Lidarr's TagSelect input renders only static, numeric-keyed
+        // `selectOptions` and ignores `SelectOptionsProviderAction` entirely — so a dynamic, string-slug,
+        // action-backed multi-select (what styles need) silently shipped an EMPTY option list and rejected
+        // every typed value ("nothing sticks"). Lidarr has no generic dynamic-multi-select input, so we use
+        // free-text tags: anything typed sticks, and StyleCatalogService resolves names/aliases (and loose
+        // word order, e.g. "Rock Alternative" -> Alternative Rock) to catalog slugs server-side; unmatched
+        // entries become freeform style anchors.
+        [FieldDefinition(34, Label = "Music Styles", Type = FieldType.Tag,
+            HelpText = "Type one or more styles and press Enter (e.g. \"Alternative Rock\", \"Lo-Fi Hip Hop\"). Aliases and loose word order are matched to the catalog; unrecognised entries are used as freeform seeds. Leave empty to use your library profile.",
+            HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Styles")]
         public IEnumerable<string> StyleFilters { get; set; } = Array.Empty<string>();
 
         // Hidden/advanced knobs related to styles & token budgets
@@ -180,8 +177,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         public int? AdaptiveThrottleLocalCap { get; set; }
 
         // Safety Gates
-        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Drop or queue items below this confidence (0.0-1.0)",
+        [FieldDefinition(12, Label = "Minimum Confidence", Type = FieldType.Number, Advanced = true,
+                    HelpText = "Confidence floor (0.0–1.0). Recommendations the model explicitly scores below this are dropped, or sent to the Review Queue when 'Queue Borderline Items' is on. Items the model didn't score are kept (the floor only filters explicit low scores), so raising it won't silently zero out providers that omit confidence. Raise it (e.g. 0.85) for higher precision among scored picks; lower it (e.g. 0.5) for more discovery. Default 0.7.",
                     HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#safety-gates")]
         public double MinConfidence { get; set; } = 0.7;
 
@@ -249,13 +246,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     SelectOptionsProviderAction = "observability/getoptions")]
         public IEnumerable<string> ObservabilityPreview { get; set; } = Array.Empty<string>();
 
-        // Default filters for preview (hidden)
-        [FieldDefinition(32, Label = "Observability Provider Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Optional default provider filter for Observability preview (e.g., 'openai', 'ollama').")]
+        // Default filters for the Observability metric views (get/html). Wired in
+        // BrainarrOrchestrator.WithObservabilityFilterDefaults — an explicit request filter overrides these.
+        [FieldDefinition(32, Label = "Observability Provider Filter", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Optional default provider filter for the Observability views (e.g., 'openai', 'ollama'). Leave blank to show all providers.")]
         public string ObservabilityProviderFilter { get; set; }
 
-        [FieldDefinition(33, Label = "Observability Model Filter", Type = FieldType.Textbox, Advanced = true, Hidden = HiddenType.Hidden,
-                    HelpText = "Optional default model filter for Observability preview (e.g., 'gpt-4o-mini').")]
+        [FieldDefinition(33, Label = "Observability Model Filter", Type = FieldType.Textbox, Advanced = true,
+                    HelpText = "Optional default model filter for the Observability views (e.g., 'gpt-4o-mini'). Leave blank to show all models.")]
         public string ObservabilityModelFilter { get; set; }
 
         // Feature flag: quickly disable Observability UI without code changes (hidden)

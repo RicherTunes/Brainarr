@@ -36,8 +36,13 @@ This document outlines the UI/UX improvements for the Brainarr Lidarr plugin set
 🆓 Google Gemini (Free Tier) - Free tier available, great for testing
 ⚡ Groq (Ultra Fast) - 10x faster responses
 🔍 Perplexity (Web Search) - Real-time web search for current music
-🤖 OpenAI (GPT-4) - Premium quality, higher cost
+🤖 OpenAI (GPT-5/4) - Premium quality, higher cost
 🧠 Anthropic (Claude) - Best reasoning, premium quality
+🇨🇳 Z.AI GLM (PaaS) - GLM-5.x and GLM-4.x families
+🇨🇳 Z.AI Coding (Coding Plan) - Anthropic-compatible GLM endpoint
+📜 Claude Code Sub - Anthropic Claude via subscription OAuth
+📜 OpenAI Codex Sub - OpenAI via subscription credential file
+💻 Claude Code CLI - Shell out to local claude binary
 ```
 
 ### Conditional Field Visibility

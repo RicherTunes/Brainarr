@@ -255,15 +255,18 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CompleteAsync_DefaultTemperature_Matches_ZaiGlm_At_0_7()
+        public async Task CompleteAsync_OmitsTemperature()
         {
+            // Z.AI's Coding-Plan (Anthropic-format) endpoint rejects requests that carry `temperature`
+            // with [1210][Invalid API parameter] — Claude Code (which this endpoint emulates) never
+            // sends it. Regression guard for the live-confirmed fix: the body must NOT include it.
             var handler = OkHandler();
             var provider = CreateProvider(handler);
 
-            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi", Temperature = 0.7f });
 
-            handler.Body.Should().Contain("\"temperature\":0.7",
-                "ZaiCoding and ZaiGlm must use the same default temperature (0.7) for cache/output parity");
+            handler.Body.Should().NotContain("temperature",
+                "sending temperature to the Z.AI Coding endpoint returns [1210][Invalid API parameter]");
         }
 
         [Fact]

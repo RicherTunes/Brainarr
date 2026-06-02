@@ -274,6 +274,49 @@ namespace Brainarr.Tests.Services.Health
         }
 
         [Fact]
+        public async Task GetOllamaModelsAsync_ConnectionFailureThenLateCancellation_StillMarksDown()
+        {
+            // Regression for the #38 load-sensitive flake: under load the overall detection-timeout cts
+            // can cancel a LATER retry attempt, so the exception reaching MarkDown is an OCE instead of
+            // the earlier SocketException. MarkDown only records connection-class failures, so the OCE
+            // would (wrongly) skip it and the NEXT call would re-probe a known-down backend. The fix
+            // preserves the connection-class exception across attempts. Here we simulate it
+            // deterministically: attempt 1 = SocketException, later attempts = cancellation.
+            var fake = MakeFake(DateTimeOffset.UtcNow);
+            var healthCache = new BackendHealthCache(fake);
+            var httpClientMock = new Mock<IHttpClient>();
+            var service = new ModelDetectionService(httpClientMock.Object, TestLogger.CreateNullLogger(), healthCache);
+
+            var attempts = 0;
+            httpClientMock
+                .Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Returns(() =>
+                {
+                    var n = Interlocked.Increment(ref attempts);
+                    Exception ex = n == 1
+                        ? new HttpRequestException("Connection refused", new SocketException((int)SocketError.ConnectionRefused))
+                        : new TaskCanceledException("overall detection timeout");
+                    return Task.FromException<HttpResponse>(ex);
+                });
+
+            await service.GetOllamaModelsAsync("http://localhost:11434");
+
+            // Second call must skip HTTP — the backend was marked down from attempt 1's SocketException
+            // despite the later cancellation overwriting nothing.
+            var secondRoundCalls = 0;
+            httpClientMock.Reset();
+            httpClientMock
+                .Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback(() => Interlocked.Increment(ref secondRoundCalls))
+                .ThrowsAsync(new InvalidOperationException("Should not have been called"));
+
+            await service.GetOllamaModelsAsync("http://localhost:11434");
+
+            secondRoundCalls.Should().Be(0,
+                "a connection-class failure on any attempt must mark the backend down even if a later attempt is cancelled");
+        }
+
+        [Fact]
         public async Task GetLMStudioModelsAsync_SecondCallWithinGrace_DoesNotHitHttp()
         {
             var fake = MakeFake(DateTimeOffset.UtcNow);

@@ -73,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         Album = r.Album,
                         Genre = r.Genre,
                         Confidence = r.Confidence,
+                        ConfidenceProvided = r.ConfidenceProvided,
                         Reason = r.Reason,
                         Year = r.Year ?? r.ReleaseYear,
                         ArtistMusicBrainzId = r.ArtistMusicBrainzId,
@@ -179,6 +180,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                 Album = i.Album,
                 Genre = i.Genre,
                 Confidence = i.Confidence,
+                ConfidenceProvided = i.ConfidenceProvided,
                 Reason = i.Reason,
                 Year = i.Year,
                 ArtistMusicBrainzId = i.ArtistMusicBrainzId,
@@ -195,6 +197,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             public string Album { get; set; }
             public string Genre { get; set; }
             public double Confidence { get; set; }
+
+            /// <summary>
+            /// Whether <see cref="Confidence"/> was reported by the model (true) or is a parser
+            /// fabricated placeholder (false). Drives provenance-aware triage so a score-less
+            /// item isn't penalized for the model omitting a self-rating. Defaults to true so
+            /// review_queue.json entries written before this field existed deserialize as
+            /// "provided" (preserving their prior triage behavior).
+            /// </summary>
+            public bool ConfidenceProvided { get; set; } = true;
             public string Reason { get; set; }
             public int? Year { get; set; }
             public string ArtistMusicBrainzId { get; set; }

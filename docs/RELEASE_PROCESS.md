@@ -8,7 +8,7 @@ Brainarr releases are automated through scripts and GitHub Actions. This page co
 - `./.github/scripts/quick-release.sh` — interactive helper that calls the tag script after letting you pick the version bump.
 - `gh workflow run release.yml -f version=vX.Y.Z` — manual trigger when you need to retry the pipeline or run from automation.
 
-Each script writes detailed progress to the console; see `scripts/README-release.md` in the `.github/scripts/` folder for implementation notes. (If that README is missing or stale, treat the scripts themselves as the authoritative logic.)
+Each script writes detailed progress to the console; see the script files themselves in `.github/scripts/` for implementation notes. <!-- TODO(docval): scripts/README-release.md referenced in earlier versions does not exist; scripts are the authoritative source -->
 
 ## Release checklist
 
