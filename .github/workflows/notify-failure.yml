@@ -12,6 +12,7 @@ on:
       - "Nightly"
       - "Test and Coverage"
       - "Sanity Build"
+      - "📦 Plugin Package"
     types:
       - completed
 
