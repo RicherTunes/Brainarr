@@ -95,7 +95,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 }
             }
 
-            // Style filtering (if style catalog is available and filters are configured)
+            // Style filtering (if style catalog is available and filters are configured).
+            //
+            // KNOWN-INERT IN PRODUCTION (intentional; do not "fix" by blindly wiring it on):
+            //   The composition root (BrainarrOrchestratorFactory) constructs this pipeline WITHOUT
+            //   the optional _styleCatalog (it defaults to null), so this whole block is skipped in
+            //   the live DI graph. Even when a catalog IS injected, IsStyleSeededDiscovery below
+            //   short-circuits because the pipeline's LibraryProfile comes from
+            //   LibraryContextBuilder.BuildProfile, which never populates StyleContext → coverage is
+            //   null → "genre-first" is always true → the hard drop never runs. The block is therefore
+            //   exercised only by unit tests that inject both a catalog and a coverage-bearing profile.
+            //
+            //   This is NOT safe to enable as-is. With the strict (relax=false) default, the selected
+            //   slug set is the catalog-resolved styles ONLY (e.g. "edm techno trance" → {techno,
+            //   trance}; "edm" has no slug and is dropped by Normalize). A live filter would correctly
+            //   drop off-style jazz/classical/rock slippage (which GLM does emit intermittently — see
+            //   below) but would ALSO wrongly drop legitimately on-style house / progressive-house /
+            //   big-room / drum-and-bass artists whose genre slug isn't literally techno/trance.
+            //
+            //   Live measurement (GLM-5.1, artists mode, styles "edm techno trance", genre-first
+            //   prompt): off-style adherence is non-deterministic across runs with the SAME prompt —
+            //   one run ~1/28 off-style, another ~12/27 (jazz/classical/indie-rock). So the prompt
+            //   alone does not reliably keep the model on-style, i.e. this post-filter addresses a real
+            //   gap — but turning it on requires a product decision on match strictness (treat "edm" as
+            //   an umbrella over house/techno/trance/etc.) plus flowing StyleContext into the pipeline
+            //   profile. Tracked for the lead; keep the logic + tests until that call is made.
             if (_styleCatalog != null && settings.StyleFilters?.Any() == true)
             {
                 var preStyleFilter = validated.Count;
