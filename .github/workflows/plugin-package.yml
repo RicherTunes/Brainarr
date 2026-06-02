@@ -93,6 +93,15 @@ jobs:
           exit 1
         fi
 
+    - name: Set LIDARR_PATH
+      shell: bash
+      # Export the extracted Lidarr assemblies path so Brainarr.Tests + the Common TestKit
+      # resolve $(LidarrPath) when the packaging-validation step builds the test project.
+      # Without this, the TestKit drops Http/HttpResponseFactory.cs from compilation
+      # (it requires Lidarr.Common.dll), and the Brainarr.Tests forwarding shim fails with
+      # CS0234. Matches the green "Test and Coverage" job (which sets LIDARR_PATH).
+      run: echo "LIDARR_PATH=${{ github.workspace }}/ext/Lidarr-docker/_output/net8.0" >> "$GITHUB_ENV"
+
     - name: Build Plugin
       shell: bash
       run: |
@@ -191,7 +200,8 @@ jobs:
         dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
           --configuration Release \
           --filter "Category=Packaging" \
-          --nologo
+          --nologo \
+          -p:PluginPackagingDisable=true
 
     - name: Upload Package Artifact
       uses: actions/upload-artifact@v7
