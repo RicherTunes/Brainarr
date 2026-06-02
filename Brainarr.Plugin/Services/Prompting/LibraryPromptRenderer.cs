@@ -109,6 +109,10 @@ public class LibraryPromptRenderer : IPromptRenderer
                 }
 
                 builder.AppendLine("Rule: Recommendations must live inside these styles and be grounded in the user's existing collection footprint.");
+                // Negative constraint: the library shown below is mixed-genre, and models drift off-style
+                // by pulling neighbours of unrelated library artists. Bind every recommendation to the
+                // selected styles and forbid out-of-style picks even when they appear in that library.
+                builder.AppendLine("Do NOT recommend artists or albums outside the selected styles (e.g. no jazz, classical, rock, metal, or other styles not listed above) even if they appear in the library shown below. The library is context for adjacency within these styles, not a license to leave them.");
             }
             builder.AppendLine();
         }
