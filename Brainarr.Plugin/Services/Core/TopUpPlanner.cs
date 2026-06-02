@@ -38,7 +38,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult? initialValidation,
             CancellationToken cancellationToken,
             IReadOnlyList<ImportListItemInfo>? alreadyAccepted = null,
-            IArtistMbidResolver? artistResolver = null)
+            IArtistMbidResolver? artistResolver = null,
+            IMusicBrainzResolver? mbidResolver = null)
         {
             var importItems = new List<ImportListItemInfo>();
             if (provider == null)
@@ -137,6 +138,30 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                         topUpRecs = topUpRecs.Where(r => !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId)).ToList();
                         // Genuinely-unresolvable artists still drop (real gate, not a bug) — but the drop
                         // is now ATTRIBUTED in the summary below instead of silently lost.
+                        noMbidDropped = beforeMbidFilter - topUpRecs.Count;
+                    }
+                    else if (!shouldRecommendArtists && settings.RequireMbids)
+                    {
+                        // Album-mode parity with the artist-mode T2 fix above: album top-up recs also arrive
+                        // from the provider WITHOUT MBIDs and are not enrichment-resolved anywhere else on the
+                        // top-up path (the initial-batch MusicBrainz enrichment at RecommendationPipeline runs
+                        // BEFORE top-up). Without this, every album top-up item was added RAW — bypassing the
+                        // RequireMbids gate the first pass enforces (SafetyGateService requires BOTH artist and
+                        // album MBIDs in album mode), so the user's MBID-reliability contract silently did not
+                        // apply to top-up items. Resolve here with the SAME injected resolver as the initial
+                        // batch (bounded by the deficit; the resolver owns its rate-limit/LRU cache).
+                        if (mbidResolver != null)
+                        {
+                            topUpRecs = await mbidResolver.EnrichWithMbidsAsync(topUpRecs, cancellationToken).ConfigureAwait(false);
+                        }
+                        var beforeMbidFilter = topUpRecs.Count;
+                        enrichmentDropped = suggested - beforeMbidFilter;
+                        // Album mode needs BOTH artist+album MBIDs for reliable import mapping (mirrors the
+                        // first-pass gate). Items still missing either after enrichment drop here — now
+                        // ATTRIBUTED in the summary below rather than slipping through unguarded.
+                        topUpRecs = topUpRecs
+                            .Where(r => !string.IsNullOrWhiteSpace(r.ArtistMusicBrainzId) && !string.IsNullOrWhiteSpace(r.AlbumMusicBrainzId))
+                            .ToList();
                         noMbidDropped = beforeMbidFilter - topUpRecs.Count;
                     }
 

@@ -137,6 +137,89 @@ namespace Brainarr.Tests.Services.Core
             resolver.Verify(r => r.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
         }
 
+        // ---------- Album-mode parity: top-up MBID-enriches + gates album recs (same gap as T2, for albums) ----------
+
+        [Fact]
+        [Trait("Category", "TopUp")]
+        public async Task TopUp_AlbumMode_WithRequireMbids_EnrichesTopUpRecs_SoResolvableAlbumSurvivesMbidFilter()
+        {
+            var (planner, provider, analyzer, prompt, dedup, _) = Build();
+
+            // Provider returns two NEW album recs, neither carrying MBIDs (as real GLM output never does).
+            List<Recommendation> Returned() => new List<Recommendation>
+            {
+                Rec("Boards of Canada", "Music Has the Right to Children"),
+                Rec("Obscure Krautrock Act", "Unknown Tape")
+            };
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Returned);
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(Returned);
+
+            // The album resolver assigns BOTH artist+album MBIDs to the resolvable album, leaves the other bare.
+            var mbidResolver = new Mock<IMusicBrainzResolver>();
+            mbidResolver.Setup(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<Recommendation> recs, CancellationToken ct) =>
+                    recs.Select(r => r.Artist == "Boards of Canada"
+                        ? r with { ArtistMusicBrainzId = "mbid-boc", AlbumMusicBrainzId = "rg-mhtrtc" }
+                        : r).ToList());
+
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.Ollama,
+                MaxRecommendations = 10,
+                RecommendationMode = RecommendationMode.SpecificAlbums,
+                RequireMbids = true
+            };
+
+            var result = await planner.TopUpAsync(
+                settings, provider.Object, analyzer.Object, prompt.Object, dedup.Object,
+                new LibraryProfile(), needed: 2, initialValidation: null, cancellationToken: CancellationToken.None,
+                alreadyAccepted: null, artistResolver: null, mbidResolver: mbidResolver.Object);
+
+            // Album-mode top-up must MBID-enrich (parity with artist mode) and gate the unresolvable album,
+            // so the user's RequireMbids contract holds for top-up items exactly as it does on the first pass.
+            result.Should().ContainSingle();
+            result[0].Artist.Should().Be("Boards of Canada");
+            result[0].AlbumMusicBrainzId.Should().Be("rg-mhtrtc");
+            result[0].ArtistMusicBrainzId.Should().Be("mbid-boc");
+            mbidResolver.Verify(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce);
+        }
+
+        [Fact]
+        [Trait("Category", "TopUp")]
+        public async Task TopUp_AlbumMode_WithoutRequireMbids_DoesNotDropUnenrichedRecs()
+        {
+            var (planner, provider, analyzer, prompt, dedup, _) = Build();
+
+            List<Recommendation> Returned() => new List<Recommendation>
+            {
+                Rec("Boards of Canada", "Music Has the Right to Children"),
+                Rec("Obscure Krautrock Act", "Unknown Tape")
+            };
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>())).ReturnsAsync(Returned);
+            provider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>())).ReturnsAsync(Returned);
+
+            // Resolver enriches neither (simulating MusicBrainz misses); without RequireMbids nothing is gated.
+            var mbidResolver = new Mock<IMusicBrainzResolver>();
+            mbidResolver.Setup(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                .ReturnsAsync((List<Recommendation> recs, CancellationToken ct) => recs);
+
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.Ollama,
+                MaxRecommendations = 10,
+                RecommendationMode = RecommendationMode.SpecificAlbums,
+                RequireMbids = false
+            };
+
+            var result = await planner.TopUpAsync(
+                settings, provider.Object, analyzer.Object, prompt.Object, dedup.Object,
+                new LibraryProfile(), needed: 2, initialValidation: null, cancellationToken: CancellationToken.None,
+                alreadyAccepted: null, artistResolver: null, mbidResolver: mbidResolver.Object);
+
+            // RequireMbids off: both album recs flow through (no MBID gate), matching first-pass behavior.
+            result.Should().HaveCount(2);
+        }
+
         [Fact]
         [Trait("Category", "TopUp")]
         public async Task TopUp_ExcludesAlreadyDelivered_AndReturnsOnlyResolvedNewArtists()

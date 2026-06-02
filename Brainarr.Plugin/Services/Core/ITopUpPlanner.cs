@@ -25,6 +25,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             // T1: recommendations already delivered this run (avoid re-suggesting them in top-up).
             IReadOnlyList<ImportListItemInfo>? alreadyAccepted = null,
             // T2: resolver used to MBID-enrich top-up recs before the require-MBID filter (artist mode).
-            IArtistMbidResolver? artistResolver = null);
+            IArtistMbidResolver? artistResolver = null,
+            // Album-mode parity: resolver used to MBID-enrich album top-up recs before the require-MBID gate.
+            IMusicBrainzResolver? mbidResolver = null);
     }
 }

@@ -203,7 +203,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     // T1: exclude the already-delivered set from the top-up prompt + dedup.
                     alreadyAccepted: importItems,
                     // T2: MBID-enrich top-up recs (artist mode) with the same resolver as the initial batch.
-                    artistResolver: _artistResolver).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
+                    artistResolver: _artistResolver,
+                    // Album-mode parity: enrich album top-up recs with the same MBID resolver as the first pass.
+                    mbidResolver: _mbidResolver).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
                 if (topUp.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
