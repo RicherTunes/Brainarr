@@ -601,6 +601,94 @@ namespace Brainarr.Tests.Services.Prompting
             Assert.DoesNotContain("STYLE FILTERS (library-aligned)", prompt, StringComparison.Ordinal);
         }
 
+        // The literal negative-constraint marker the renderer must emit in the library-aligned
+        // (non-genre-first) style path. Kept as a const so the RED/GREEN tests and any future
+        // grep stay anchored to the exact phrase.
+        private const string OffStyleNegativeConstraintMarker =
+            "Do NOT recommend artists or albums outside the selected styles";
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_LibraryAlignedStyles_IncludesOffStyleNegativeConstraint()
+        {
+            // Library-aligned path: selected slugs that DO have coverage (sum > 0) → NOT genre-first.
+            // This is the path iteration-7 flagged: positive anchors but no explicit instruction
+            // forbidding off-style picks pulled from the (mixed-genre) library shown below.
+            var sample = new LibrarySample();
+            sample.Artists.Add(new LibrarySampleArtist
+            {
+                ArtistId = 1,
+                Name = "ExistingEdmArtist",
+                MatchedStyles = new[] { "techno" },
+                Weight = 1.0,
+            });
+
+            var styleContext = new StylePlanContext(
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "edm", "techno", "trance" },
+                new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "edm", "techno", "trance" },
+                new List<StyleEntry>
+                {
+                    new() { Name = "EDM", Slug = "edm" },
+                    new() { Name = "Techno", Slug = "techno" },
+                    new() { Name = "Trance", Slug = "trance" }
+                },
+                new List<StyleEntry>(),
+                new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase)
+                {
+                    ["edm"] = 5,
+                    ["techno"] = 4,
+                    ["trance"] = 3
+                },
+                relaxed: false,
+                threshold: 0.75,
+                trimmed: new List<string>(),
+                inferred: new List<string>());
+
+            var plan = new PromptPlan(sample, new[] { "edm", "techno", "trance" })
+            {
+                Profile = new LibraryProfile
+                {
+                    TotalArtists = 12,
+                    TotalAlbums = 30,
+                    Metadata = new Dictionary<string, object>(),
+                    StyleContext = new LibraryStyleContext()
+                },
+                Settings = new BrainarrSettings
+                {
+                    DiscoveryMode = DiscoveryMode.Adjacent,
+                    SamplingStrategy = SamplingStrategy.Balanced,
+                    MaxRecommendations = 30
+                },
+                StyleContext = styleContext,
+                ShouldRecommendArtists = true,
+                Compression = new PromptCompressionState(maxArtists: 5, maxAlbumGroups: 5, maxAlbumsPerGroup: 3, minAlbumsPerGroup: 1)
+            };
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Default, CancellationToken.None);
+
+            // Sanity: this is the library-aligned path, not genre-first.
+            Assert.Contains("STYLE FILTERS (library-aligned)", prompt, StringComparison.Ordinal);
+            // The negative constraint binds the model to the seed styles and tells it not to be
+            // pulled off-style by the library shown below.
+            Assert.Contains(OffStyleNegativeConstraintMarker, prompt, StringComparison.Ordinal);
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        [Trait("Category", "PromptRenderer")]
+        public void Render_NoStyles_OmitsOffStyleNegativeConstraint()
+        {
+            // No styleFilters set → behavior must be unchanged (no negative style constraint).
+            var plan = CreateMinimalPlan(recommendArtists: true);
+
+            var renderer = new LibraryPromptRenderer();
+            var prompt = renderer.Render(plan, ModelPromptTemplate.Default, CancellationToken.None);
+
+            Assert.DoesNotContain(OffStyleNegativeConstraintMarker, prompt, StringComparison.Ordinal);
+        }
+
         private static PromptPlan CreateMinimalPlan(bool recommendArtists = false)
         {
             var sample = new LibrarySample();
