@@ -171,6 +171,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 // Render the prompt under the (possibly escalated) discovery mode. The scope restores
                 // settings.DiscoveryMode immediately after so nothing else observes the override.
                 string prompt;
+                string? modelKey;
                 using (SettingScope.Apply(
                     getter: () => settings.DiscoveryMode,
                     setter: v => settings.DiscoveryMode = v,
@@ -185,11 +186,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         rejectedAlbums,
                         allRecommendations,
                         rejectedNames,
+                        out modelKey,
                         shouldRecommendArtists,
                         validationReasons,
                         rejectedExamplesFromValidation);
                 }
-                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt)); }
+                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt, modelKey)); }
                 catch (OperationCanceledException) { throw; } // Propagate cancellation
                 catch (Exception) { /* Token estimation failure is non-critical */ }
 
@@ -264,7 +266,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         try
                         {
                             var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
-                            var est = _promptBuilder.EstimateTokens(prompt);
+                            var est = _promptBuilder.EstimateTokens(prompt, modelKey);
                             _logger.Info($"[Brainarr Debug] Iteration Summary => SuccessRate={successRate:P1}, Tokens≈{est}/{limit}, Requested={requestSize}, Unique={uniqueRecs.Count}");
                         }
                         catch (OperationCanceledException) { throw; }
@@ -437,6 +439,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             HashSet<string> rejectedAlbums,
             List<Recommendation> existingRecommendations,
             List<string> rejectedNames,
+            out string? modelKey,
             bool shouldRecommendArtists = false,
             Dictionary<string, int>? validationReasons = null,
             List<Recommendation>? rejectedExamplesFromValidation = null)
@@ -453,6 +456,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 baseRes = null;
             }
+
+            // Surface the resolved model key (e.g. "zaicoding:glm-5.1") the metrics path computed so
+            // the top-up's token-estimate diagnostics resolve the SAME model-specific tokenizer the
+            // initial prompt used — rather than passing null and silently falling back to the
+            // "<default>" tokenizer (which both diverges the estimate and emits a misleading
+            // "no tokenizer registered for <default>" WARN). Null/empty when unresolved; callers
+            // pass it straight through to EstimateTokens, whose registry treats blank as <default>.
+            modelKey = baseRes?.BudgetModelKey;
 
             // Backwards-compat fallback for tests/mocks that only implement BuildLibraryAwarePrompt
             if (string.IsNullOrWhiteSpace(basePrompt))
@@ -485,7 +496,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 try
                 {
                     var limit = _promptBuilder.GetEffectiveTokenLimit(settings.SamplingStrategy, settings.Provider);
-                    var est = _promptBuilder.EstimateTokens(prompt);
+                    var est = _promptBuilder.EstimateTokens(prompt, modelKey);
                     _logger.Info($"[Brainarr Debug] Iteration Tokens => Strategy={settings.SamplingStrategy}, Provider={settings.Provider}, Limit≈{limit}, EstimatedUsed≈{est}, Sampled: {baseRes.SampledArtists} artists, {baseRes.SampledAlbums} albums, Request={requestSize}");
                 }
                 catch (OperationCanceledException) { throw; }
