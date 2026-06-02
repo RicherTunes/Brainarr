@@ -396,7 +396,7 @@ Provenance
 - Each tagged release publishes a software bill of materials (SBOM) and a SHA-256 checksum.
 - Starting with v1.5.7, release ZIPs are also signed with Sigstore Cosign (keyless). Verify the `.sig` signature against the GitHub OIDC identity.
 
-## Shared Infrastructure
+## Built on Lidarr.Plugin.Common
 
 Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidarr.Plugin.Common) — the shared library for all RicherTunes Lidarr streaming plugins.
 
