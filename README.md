@@ -118,6 +118,8 @@ For detailed Docker and manual setup instructions, see the wiki's [Installation]
 
 See CHANGELOG.md for the complete 1.3.0 list.
 
+Read the focused upgrade checklist in [docs/upgrade-notes-1.3.0.md](./docs/upgrade-notes-1.3.0.md) for planner changes, cache behaviour updates, and post-upgrade actions.
+
 ## Screenshots
 
 - Landing
@@ -375,10 +377,6 @@ For per-provider model lists, defaults, and subscription setup, see [docs/PROVID
 | **Perplexity** | `Sonar_Pro` | Web-augmented |
 | **OpenRouter** | `Auto` | Gateway to many models |
 
-## Upgrade Notes: 1.3.0
-
-Read the focused upgrade checklist in [docs/upgrade-notes-1.3.0.md](./docs/upgrade-notes-1.3.0.md) for planner changes, cache behaviour updates, and post-upgrade actions.
-
 ## Troubleshooting
 
 Consult [docs/troubleshooting.md](./docs/troubleshooting.md) for symptom-driven guidance, cache reset tips, and links to tokenizer and provider diagnostics. Quick pointers:
@@ -421,7 +419,7 @@ Run the same sanity build locally as CI:
 - PowerShell: `pwsh ./test-local-ci.ps1 -ExcludeHeavy`
 - POSIX: `bash ./test-local-ci.sh --exclude-heavy`
 
-## ⚠️ Disclaimer
+## Disclaimer
 
 Brainarr is an independent, open-source project developed by RicherTunes for **educational and research purposes**. It generates music recommendations using AI providers and returns them to Lidarr as import-list items; it does not download or distribute copyrighted audio.
 
