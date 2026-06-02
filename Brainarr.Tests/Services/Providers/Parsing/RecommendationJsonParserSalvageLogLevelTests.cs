@@ -27,6 +27,48 @@ namespace Brainarr.Tests.Services.Providers.Parsing
             return (factory.GetLogger(name), warnTarget, factory);
         }
 
+        // Capture DEBUG-and-above, rendering any attached exception. The fence-noise we are killing is
+        // a Debug line ("Primary recommendations-JSON parse failed but recovered N item(s)...") that
+        // carries the full JsonReaderException render — invisible to WarnCapture but spammed on every
+        // GLM run because the live host logs at Debug. An empty target == "primary parse did not fail".
+        private static (Logger logger, MemoryTarget debugTarget, LogFactory factory) DebugCapture(string name)
+        {
+            var debugTarget = new MemoryTarget { Layout = "${message}${onexception:|${exception:format=Type,Message}}" };
+            var config = new LoggingConfiguration();
+            config.AddRule(LogLevel.Debug, LogLevel.Fatal, debugTarget, name);
+            var factory = new LogFactory(config);
+            return (factory.GetLogger(name), debugTarget, factory);
+        }
+
+        [Fact]
+        public void CompleteFencedPayload_ParsesCleanly_NoPrimaryParseFailureNoise()
+        {
+            // The dominant live GLM shape: a COMPLETE, well-formed JSON array wrapped in a ```json fence
+            // (response did NOT truncate). Before the fix the strict parse threw JsonReaderException on
+            // the leading backtick and the catch logged a Debug line carrying the full exception render
+            // on every successful run (~5x/session). After the fix the fence is stripped BEFORE the
+            // strict parse, so the strict parse succeeds: items are extracted AND no parse-failure /
+            // exception line is logged at all.
+            var content = "```json\n[\n" +
+                          "  { \"artist\": \"Nujabes\", \"album\": \"Modal Soul\", \"confidence\": 0.95 },\n" +
+                          "  { \"artist\": \"J Dilla\", \"album\": \"Donuts\", \"confidence\": 0.9 }\n" +
+                          "]\n```";
+
+            var (logger, debugTarget, factory) = DebugCapture("complete-fence");
+            using (factory)
+            {
+                var list = RecommendationJsonParser.Parse(content, logger);
+
+                list.Should().HaveCount(2, "the fenced array is complete and must parse fully");
+                debugTarget.Logs.Should().NotContain(
+                    l => l.Contains("Primary recommendations-JSON parse failed"),
+                    "stripping the fence before the strict parse must make the primary parse succeed");
+                debugTarget.Logs.Should().NotContain(
+                    l => l.Contains("JsonReaderException"),
+                    "no JsonReaderException should be captured/rendered when the fence is stripped up front");
+            }
+        }
+
         [Fact]
         public void TruncatedPayload_SalvageRecovers_DoesNotWarn()
         {
