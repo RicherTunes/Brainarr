@@ -20,6 +20,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
             var results = new List<Recommendation>();
             if (string.IsNullOrWhiteSpace(json)) return results;
 
+            // Strip a leading/trailing Markdown code fence (```json … ```, or a bare ```) BEFORE the
+            // strict parse. Verbose chat models (Z.AI Coding / GLM in particular, but also OpenRouter,
+            // DeepSeek, etc.) wrap their JSON answer in a fence; the strict parse then throws on the
+            // opening backtick ("'`' is an invalid start of a value") and only the salvage path below
+            // recovered the items — emitting a misleading exception-bearing Debug line on every
+            // otherwise-successful run. Cleaning the fence up front lets the strict parse succeed, so
+            // there is no exception to capture and no noise. This is a generic clean (not GLM-only) and
+            // a no-op for unfenced payloads, so it cannot regress providers that already return raw JSON.
+            json = StripCodeFence(json);
+
             // Captured (not logged immediately): the primary parse may throw on a truncated/fenced
             // payload that salvage recovers below. The log LEVEL is decided at the end from the outcome.
             Exception parseFailure = null;
@@ -287,6 +297,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Parsing
                         break;
                 }
             }
+        }
+
+        /// <summary>
+        /// Removes a Markdown code fence wrapping the payload so the strict parse sees raw JSON.
+        /// Handles the common chat-model shapes: an opening <c>```</c> optionally followed by a
+        /// language tag (<c>```json</c>, <c>```JSON</c>) on its own line, and a closing <c>```</c>
+        /// line. The closing fence is optional — a response truncated at the token cap keeps the
+        /// opening fence but loses the close, and we still want to drop the leading backtick that
+        /// makes the strict parse throw. Returns the input unchanged when no fence is present (so it
+        /// never alters raw-JSON payloads), and leaves any non-fence prose around the JSON intact for
+        /// the existing array-extraction / salvage passes to handle.
+        /// </summary>
+        private static string StripCodeFence(string text)
+        {
+            if (string.IsNullOrEmpty(text)) return text;
+
+            var trimmed = text.Trim();
+
+            // Only act when the payload actually starts with a fence; otherwise leave it untouched so
+            // prose-wrapped JSON (e.g. "Some text before ```json [..] ```") still flows to the
+            // text-extraction fallback unchanged.
+            if (!trimmed.StartsWith("```", StringComparison.Ordinal))
+            {
+                return text;
+            }
+
+            // Drop the opening fence line in full (covers ``` and ```<lang>). The fence marker runs to
+            // the end of its line; the JSON begins on the next line.
+            var afterOpen = trimmed.Substring(3);
+            var newline = afterOpen.IndexOf('\n');
+            var body = newline >= 0 ? afterOpen.Substring(newline + 1) : afterOpen;
+
+            // Drop a trailing closing fence if present (it may be absent on a truncated response).
+            body = body.TrimEnd();
+            if (body.EndsWith("```", StringComparison.Ordinal))
+            {
+                body = body.Substring(0, body.Length - 3);
+            }
+
+            return body.Trim();
         }
 
         private static string TryExtractJsonArrayFromText(string text)
