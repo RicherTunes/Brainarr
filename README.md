@@ -189,7 +189,7 @@ Troubleshooting
 - [Upgrade Notes: 1.3.0](#upgrade-notes-130)
 - [Troubleshooting](#troubleshooting)
 - [Security](#security)
-- [Shared Infrastructure](#shared-infrastructure)
+- [Built on Lidarr.Plugin.Common](#built-on-lidarrplugincommon)
 - [Contributing](#contributing)
 
 ## What is Brainarr
