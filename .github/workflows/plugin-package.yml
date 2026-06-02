@@ -196,11 +196,19 @@ jobs:
       env:
         REQUIRE_PACKAGE_TESTS: "true"
         PLUGIN_PACKAGE_PATH: "${{ github.workspace }}/Brainarr-latest.net8.0.zip"
+        # Avoid transient file-lock flakiness from shared MSBuild/VBCSCompiler servers
+        # (matches "Test and Coverage"). Combined with -m:1 below, this serializes the
+        # test-project build so the Common+Abstractions submodule projects aren't built
+        # concurrently into both bin/ and bin-tests/ (which raced into MSB3030/CS2012:
+        # "Lidarr.Plugin.Abstractions.dll ... being used by another process").
+        DOTNET_CLI_DISABLE_BUILD_SERVERS: "1"
       run: |
         dotnet test Brainarr.Tests/Brainarr.Tests.csproj \
           --configuration Release \
           --filter "Category=Packaging" \
           --nologo \
+          -m:1 \
+          --disable-build-servers \
           -p:PluginPackagingDisable=true
 
     - name: Upload Package Artifact
