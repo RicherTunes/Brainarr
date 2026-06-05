@@ -26,7 +26,7 @@ jobs:
         submodules: false
 
     - name: Dependency Review
-      uses: actions/dependency-review-action@v4
+      uses: actions/dependency-review-action@v5
       with:
         # Fail on high or critical vulnerabilities
         fail-on-severity: high
