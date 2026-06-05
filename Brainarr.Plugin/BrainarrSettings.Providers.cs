@@ -85,7 +85,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 return null;
             }
 
-            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
+            // R2-10: the UTF-8 encoding holds the API-key plaintext — zero it after hashing so it doesn't
+            // linger on the managed heap (consistent with the rest of the F-03 secret-handling path).
+            var bytes = Encoding.UTF8.GetBytes(plaintext);
+            try
+            {
+                return Convert.ToHexString(SHA256.HashData(bytes));
+            }
+            finally
+            {
+                CryptographicOperations.ZeroMemory(bytes);
+            }
         }
 
         /// <summary>
