@@ -1,66 +1,67 @@
 # API Key Storage Model
 
-> Phase 1 documentation — branch `cleanup/delete-dead-enhanced-rate-limiter`.
-> Phase 1.1 will implement DataProtection integration.
+> Updated for BRN-001: API keys are **encrypted at rest**. This supersedes the earlier "Phase 1 plaintext /
+> Phase 1.1 DataProtection-recommended" model — that work is now implemented (see below).
 
 ## Current Storage Model
 
 ### Where keys live
 
-API keys for all cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq, ZaiGlm, ZaiCoding) are stored as **plain-text strings** inside the `BrainarrSettings` partial class, specifically in `BrainarrSettings.Providers.cs`.
+API keys for all cloud providers (OpenAI, Anthropic, Perplexity, OpenRouter, DeepSeek, Gemini, Groq, ZaiGlm,
+ZaiCoding) live in the `BrainarrSettings` partial class, specifically in `BrainarrSettings.Providers.cs`. The
+private backing fields hold **ciphertext**, not plaintext.
 
-### How they are stored
+### How they are stored (encrypted at rest)
 
 Each provider has:
 
-1. A **private backing field** — e.g., `private string? _openAIApiKey;`
-2. A **public property** that calls `SanitizeApiKey(value)` on write — e.g., `OpenAIApiKey { get => _openAIApiKey; set => _openAIApiKey = SanitizeApiKey(value); }`
-3. A **unified `ApiKey` property** (lines 8–55 of `BrainarrSettings.Providers.cs`) that dispatches to the correct backing field based on `Provider` enum.
+1. A **private backing field** that holds the **encrypted** value — e.g., `private string? _openAIApiKey;`
+   (ciphertext in `lpc:ps:v1:` format).
+2. A **public property** whose **setter encrypts** the incoming plaintext and whose **getter decrypts** on read —
+   e.g. `OpenAIApiKey { get => DecryptApiKeyField(_openAIApiKey); set => _openAIApiKey = EncryptApiKeyField(value, ...); }`,
+   where `EncryptApiKeyField`/`DecryptApiKeyField` wrap the protector below.
+3. A **unified `ApiKey` property** that dispatches to the correct backing field based on the `Provider` enum.
 
-`SanitizeApiKey` trims whitespace and removes obvious injection characters — it does **not** encrypt the value.
+Encryption uses Common's `IStringProtector`:
+
+- `SharedProtector` is a `Lazy<IStringProtector>` initialized from `BrainarrApiKeyProtection.GetDefaultStringProtector()`.
+- Setters call `SharedProtector.Value.Protect(plaintext)` → `lpc:ps:v1:`-prefixed ciphertext.
+- Getters call `BrainarrApiKeyProtection.UnprotectString(storedValue, SharedProtector.Value)`. Values not in the
+  protected format (e.g. a legacy plaintext value migrated from an older settings row) are returned as-is, so
+  upgrades don't break existing configs.
+
+`SanitizeApiKey` runs **before** encryption — it trims whitespace and strips obvious injection characters. It is
+defensive input cleaning, not the encryption step.
 
 ### How they are read
 
-At runtime, `BrainarrSettings` is deserialized from Lidarr's own settings store (SQLite via NzbDrone). The `[FieldDefinition(..., Privacy = PrivacyLevel.Password)]` annotation on the `ApiKey` property tells the Lidarr UI to render the field as a password input and redact it in API responses, but the value is still stored as plaintext in the database.
-
-### What `SanitizeApiKey` does
-
-Sanitization is defensive input cleaning only — no encryption, no key derivation, no platform-native secret storage. The comment in the source (line 89) acknowledges this:
-
-> "SECURITY: API keys are stored as strings and only marked as Password in UI fields. Do not log these values; consider external secret storage if needed."
+`BrainarrSettings` is deserialized from Lidarr's own settings store (SQLite via NzbDrone). The backing field
+materializes as the stored **ciphertext**; the property getter decrypts it on access. The
+`[FieldDefinition(..., Privacy = PrivacyLevel.Password)]` annotation additionally tells the Lidarr UI to render
+the field as a masked password input and redact it in API responses.
 
 ### Subscription-based providers (Claude Code, OpenAI Codex)
 
-These providers do not use API keys; instead they reference **credential file paths** on disk (e.g., `~/.claude/.credentials.json`). The paths are stored as plain strings in `ClaudeCodeCredentialsPath` and `OpenAICodexCredentialsPath`.
+These providers do not use API keys; they reference **credential file paths** on disk (e.g.,
+`~/.claude/.credentials.json`). The paths are stored as plain strings in `ClaudeCodeCredentialsPath` and
+`OpenAICodexCredentialsPath` — they are not secrets themselves (the credential files they point to are
+protected by the OS file permissions of the user running Lidarr).
 
-## Why DataProtection is recommended next
+## What this protects (and what it doesn't)
 
-Plain-text storage in a database file means:
+- **At rest:** the SQLite settings database holds ciphertext, not plaintext keys, so a read of the database file
+  (or a database backup) does not directly yield the keys.
+- **In the UI / API:** the `PrivacyLevel.Password` annotation masks + redacts the field.
+- **In memory / logs:** keys are decrypted in memory when used, and the backing fields are ciphertext — do **not**
+  log the backing fields (they are ciphertext) nor the decrypted property values. `HashApiKey` (the idempotency
+  fingerprint) zeroes its transient UTF-8 buffer after hashing.
 
-- Anyone with read access to the Lidarr SQLite database file can extract all API keys without any further attack.
-- Backups of the database ship the keys in cleartext.
-- Log scrubbing / UI redaction is the only protection layer, and that layer is incomplete (e.g., diagnostic tools may print settings objects).
-
-### Recommended approach (Phase 1.1)
-
-Common already ships `DataProtectionTokenProtector` (and its cross-platform factory `TokenProtectorFactory`) at:
-
-```
-ext/Lidarr.Plugin.Common/src/Security/TokenProtection/DataProtectionTokenProtector.cs
-ext/Lidarr.Plugin.Common/src/Security/TokenProtection/TokenProtectorFactory.cs
-```
-
-`TokenProtectorFactory.CreateFromEnvironment()` returns the right protector for the current OS (DPAPI on Windows, keychain on macOS, SecretService or file-based AES on Linux). Wrapping each `set =>` in `protector.Protect(...)` and each `get =>` in `protector.Unprotect(...)` would provide OS-level secret storage with no change to the Lidarr settings schema.
+The `IStringProtector` strength depends on the platform protector resolved at runtime (DPAPI on Windows, etc.).
 
 ## Files involved
 
 | File | Role |
 |------|------|
-| `Brainarr.Plugin/BrainarrSettings.Providers.cs` | All API key backing fields, properties, and `SanitizeApiKey` |
-| `Brainarr.Plugin/BrainarrSettings.cs` | `SanitizeApiKey` helper (defined in parent partial) |
-| `ext/Lidarr.Plugin.Common/src/Security/TokenProtection/DataProtectionTokenProtector.cs` | Recommended replacement storage mechanism |
-| `ext/Lidarr.Plugin.Common/src/Security/TokenProtection/TokenProtectorFactory.cs` | Cross-platform factory for `ITokenProtector` |
-
-## TODO tracker
-
-See `TODO` comment in `BrainarrSettings.Providers.cs` (added in Phase 1) and tracking issue to be filed for Phase 1.1.
+| `Brainarr.Plugin/BrainarrSettings.Providers.cs` | Encrypted backing fields, encrypt-on-set / decrypt-on-get properties, `SanitizeApiKey`, `SharedProtector` |
+| `Brainarr.Plugin/BrainarrSettings.cs` | `SanitizeApiKey` helper (parent partial) |
+| `BrainarrApiKeyProtection` | `GetDefaultStringProtector()` + `UnprotectString(...)` over Common's `IStringProtector` |
