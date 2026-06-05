@@ -146,11 +146,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         DateTimeOffset? expiresAtDate = null;
                         if (oauth.TryGetProperty("expiresAt", out var expiresAtElement))
                         {
-                            expiresAtDate = DateTimeOffset.FromUnixTimeMilliseconds(expiresAtElement.GetInt64());
-                            if (expiresAtDate < DateTimeOffset.UtcNow)
+                            expiresAtDate = EpochExpiry.FromMilliseconds(expiresAtElement);
+                            if (expiresAtDate is null || expiresAtDate < DateTimeOffset.UtcNow)
                             {
                                 return CredentialResult.Failure(
-                                    $"Claude Code token expired at {expiresAtDate:u}. Run 'claude login' to refresh.");
+                                    "Claude Code token is expired or has a malformed expiry. Run 'claude login' to refresh.");
                             }
 
                             // Warn if expiring soon (within 24 hours)
@@ -250,10 +250,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         DateTimeOffset? expiresAt = null;
                         if (tokens.TryGetProperty("expires_at", out var expiresAtElement))
                         {
-                            if (expiresAtElement.ValueKind == JsonValueKind.Number)
-                            {
-                                expiresAt = DateTimeOffset.FromUnixTimeSeconds(expiresAtElement.GetInt64());
-                            }
+                            expiresAt = EpochExpiry.FromSeconds(expiresAtElement);
                         }
 
                         // Extract refresh token if available
