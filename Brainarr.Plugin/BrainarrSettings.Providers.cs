@@ -1,4 +1,6 @@
 using System;
+using System.Security.Cryptography;
+using System.Text;
 
 using Lidarr.Plugin.Common.Interfaces;
 
@@ -20,40 +22,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             new(() => BrainarrApiKeyProtection.GetDefaultStringProtector());
 
         // Per-instance idempotency caches — one pair per API key field.
-        // If the caller sets the same plaintext key that was last loaded,
-        // we re-use the original encrypted blob so non-deterministic protectors
-        // (DPAPI, Keychain) do not produce spurious ciphertext changes on each save.
+        // If the caller sets the same plaintext key that was last loaded, we re-use the original encrypted
+        // blob so non-deterministic protectors (DPAPI, Keychain) do not produce spurious ciphertext changes
+        // on each save. F-03: we keep a one-way HASH of the last plaintext (not the plaintext itself), so a
+        // heap dump of a live settings instance cannot recover the API key from these bookkeeping fields.
         private string? _lastEncryptedPerplexityApiKey;
-        private string? _lastDecryptedPerplexityApiKey;
+        private string? _lastDecryptedPerplexityApiKeyHash;
         private string? _lastEncryptedOpenAIApiKey;
-        private string? _lastDecryptedOpenAIApiKey;
+        private string? _lastDecryptedOpenAIApiKeyHash;
         private string? _lastEncryptedAnthropicApiKey;
-        private string? _lastDecryptedAnthropicApiKey;
+        private string? _lastDecryptedAnthropicApiKeyHash;
         private string? _lastEncryptedOpenRouterApiKey;
-        private string? _lastDecryptedOpenRouterApiKey;
+        private string? _lastDecryptedOpenRouterApiKeyHash;
         private string? _lastEncryptedDeepSeekApiKey;
-        private string? _lastDecryptedDeepSeekApiKey;
+        private string? _lastDecryptedDeepSeekApiKeyHash;
         private string? _lastEncryptedGeminiApiKey;
-        private string? _lastDecryptedGeminiApiKey;
+        private string? _lastDecryptedGeminiApiKeyHash;
         private string? _lastEncryptedGroqApiKey;
-        private string? _lastDecryptedGroqApiKey;
+        private string? _lastDecryptedGroqApiKeyHash;
         private string? _lastEncryptedZaiGlmApiKey;
-        private string? _lastDecryptedZaiGlmApiKey;
+        private string? _lastDecryptedZaiGlmApiKeyHash;
 
         // ===== Private helpers =====
 
         /// <summary>
-        /// Encrypts <paramref name="plaintext"/>. If it equals the
-        /// <paramref name="lastDecrypted"/> value from the last load/set, re-uses
-        /// <paramref name="lastEncryptedBlob"/> for idempotency.
+        /// Encrypts <paramref name="plaintext"/>. If its hash equals the
+        /// <paramref name="lastDecryptedHash"/> from the last load/set, re-uses
+        /// <paramref name="lastEncryptedBlob"/> for idempotency. The comparison is on a hash so the plaintext
+        /// key is never retained in a long-lived field (F-03).
         /// </summary>
         private static string? EncryptApiKeyField(
             string? plaintext,
-            string? lastDecrypted,
+            string? lastDecryptedHash,
             string? lastEncryptedBlob)
         {
             if (lastEncryptedBlob is not null
-                && string.Equals(plaintext, lastDecrypted, StringComparison.Ordinal))
+                && string.Equals(HashApiKey(plaintext), lastDecryptedHash, StringComparison.Ordinal))
             {
                 return lastEncryptedBlob;
             }
@@ -67,6 +71,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
 
             return SharedProtector.Value.Protect(plaintext);
+        }
+
+        /// <summary>
+        /// F-03: a one-way fingerprint of an API key plaintext, used only to detect "same key as last time"
+        /// for the idempotency cache without retaining the plaintext. Returns null for null input. API keys
+        /// are high-entropy, so a SHA-256 of the value is not practically reversible from a heap dump.
+        /// </summary>
+        private static string? HashApiKey(string? plaintext)
+        {
+            if (plaintext is null)
+            {
+                return null;
+            }
+
+            return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(plaintext)));
         }
 
         /// <summary>
@@ -118,42 +137,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 case nameof(PerplexityApiKey):
                     _lastEncryptedPerplexityApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _perplexityApiKey = rawValue;
-                    _lastDecryptedPerplexityApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedPerplexityApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(OpenAIApiKey):
                     _lastEncryptedOpenAIApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _openAIApiKey = rawValue;
-                    _lastDecryptedOpenAIApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedOpenAIApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(AnthropicApiKey):
                     _lastEncryptedAnthropicApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _anthropicApiKey = rawValue;
-                    _lastDecryptedAnthropicApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedAnthropicApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(OpenRouterApiKey):
                     _lastEncryptedOpenRouterApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _openRouterApiKey = rawValue;
-                    _lastDecryptedOpenRouterApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedOpenRouterApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(DeepSeekApiKey):
                     _lastEncryptedDeepSeekApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _deepSeekApiKey = rawValue;
-                    _lastDecryptedDeepSeekApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedDeepSeekApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(GeminiApiKey):
                     _lastEncryptedGeminiApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _geminiApiKey = rawValue;
-                    _lastDecryptedGeminiApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedGeminiApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(GroqApiKey):
                     _lastEncryptedGroqApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _groqApiKey = rawValue;
-                    _lastDecryptedGroqApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedGroqApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 case nameof(ZaiGlmApiKey):
                     _lastEncryptedZaiGlmApiKey = protector.IsProtected(rawValue) ? rawValue : null;
                     _zaiGlmApiKey = rawValue;
-                    _lastDecryptedZaiGlmApiKey = DecryptApiKeyField(rawValue);
+                    _lastDecryptedZaiGlmApiKeyHash = HashApiKey(DecryptApiKeyField(rawValue));
                     break;
                 default:
                     throw new ArgumentException($"Unknown API key property: {propertyName}", nameof(propertyName));
@@ -265,10 +284,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_perplexityApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedPerplexityApiKey, _lastEncryptedPerplexityApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedPerplexityApiKeyHash, _lastEncryptedPerplexityApiKey);
                 _perplexityApiKey = newEncrypted;
                 _lastEncryptedPerplexityApiKey = newEncrypted;
-                _lastDecryptedPerplexityApiKey = value;
+                _lastDecryptedPerplexityApiKeyHash = HashApiKey(value);
             }
         }
         // New canonical model id properties per provider
@@ -280,10 +299,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_openAIApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenAIApiKey, _lastEncryptedOpenAIApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenAIApiKeyHash, _lastEncryptedOpenAIApiKey);
                 _openAIApiKey = newEncrypted;
                 _lastEncryptedOpenAIApiKey = newEncrypted;
-                _lastDecryptedOpenAIApiKey = value;
+                _lastDecryptedOpenAIApiKeyHash = HashApiKey(value);
             }
         }
         public string? OpenAIModelId { get; set; }
@@ -293,10 +312,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_anthropicApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedAnthropicApiKey, _lastEncryptedAnthropicApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedAnthropicApiKeyHash, _lastEncryptedAnthropicApiKey);
                 _anthropicApiKey = newEncrypted;
                 _lastEncryptedAnthropicApiKey = newEncrypted;
-                _lastDecryptedAnthropicApiKey = value;
+                _lastDecryptedAnthropicApiKeyHash = HashApiKey(value);
             }
         }
         public string? AnthropicModelId { get; set; }
@@ -306,10 +325,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_openRouterApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenRouterApiKey, _lastEncryptedOpenRouterApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedOpenRouterApiKeyHash, _lastEncryptedOpenRouterApiKey);
                 _openRouterApiKey = newEncrypted;
                 _lastEncryptedOpenRouterApiKey = newEncrypted;
-                _lastDecryptedOpenRouterApiKey = value;
+                _lastDecryptedOpenRouterApiKeyHash = HashApiKey(value);
             }
         }
         public string? OpenRouterModelId { get; set; }
@@ -319,10 +338,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_deepSeekApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedDeepSeekApiKey, _lastEncryptedDeepSeekApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedDeepSeekApiKeyHash, _lastEncryptedDeepSeekApiKey);
                 _deepSeekApiKey = newEncrypted;
                 _lastEncryptedDeepSeekApiKey = newEncrypted;
-                _lastDecryptedDeepSeekApiKey = value;
+                _lastDecryptedDeepSeekApiKeyHash = HashApiKey(value);
             }
         }
         public string? DeepSeekModelId { get; set; }
@@ -332,10 +351,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_geminiApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGeminiApiKey, _lastEncryptedGeminiApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGeminiApiKeyHash, _lastEncryptedGeminiApiKey);
                 _geminiApiKey = newEncrypted;
                 _lastEncryptedGeminiApiKey = newEncrypted;
-                _lastDecryptedGeminiApiKey = value;
+                _lastDecryptedGeminiApiKeyHash = HashApiKey(value);
             }
         }
         public string? GeminiModelId { get; set; }
@@ -345,10 +364,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_groqApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGroqApiKey, _lastEncryptedGroqApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedGroqApiKeyHash, _lastEncryptedGroqApiKey);
                 _groqApiKey = newEncrypted;
                 _lastEncryptedGroqApiKey = newEncrypted;
-                _lastDecryptedGroqApiKey = value;
+                _lastDecryptedGroqApiKeyHash = HashApiKey(value);
             }
         }
         public string? GroqModelId { get; set; }
@@ -360,10 +379,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             get => DecryptApiKeyField(_zaiGlmApiKey);
             set
             {
-                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedZaiGlmApiKey, _lastEncryptedZaiGlmApiKey);
+                var newEncrypted = EncryptApiKeyField(value, _lastDecryptedZaiGlmApiKeyHash, _lastEncryptedZaiGlmApiKey);
                 _zaiGlmApiKey = newEncrypted;
                 _lastEncryptedZaiGlmApiKey = newEncrypted;
-                _lastDecryptedZaiGlmApiKey = value;
+                _lastDecryptedZaiGlmApiKeyHash = HashApiKey(value);
             }
         }
         public string? ZaiGlmModelId { get; set; }
