@@ -36,14 +36,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             When(s => s.Provider == AIProvider.Ollama, () =>
             {
                 RuleFor(s => s.OllamaUrl)
-                    .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
+                    // R2-04/F-06: permissive local-provider shape AND the SSRF guard (blocks cloud-metadata
+                    // endpoints, dangerous schemes, path traversal) — any host still allowed.
+                    .Must(url => string.IsNullOrWhiteSpace(url)
+                        || (Configuration.UrlValidator.IsValidLocalProviderUrl(url)
+                            && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url)))
                     .WithMessage("Please enter a valid URL for Ollama (scheme + host + port). Example: http://localhost:11434 (or http://192.168.1.10:11434 for a remote server).");
             });
 
             When(s => s.Provider == AIProvider.LMStudio, () =>
             {
                 RuleFor(s => s.LMStudioUrl)
-                    .Must(url => string.IsNullOrWhiteSpace(url) || Configuration.UrlValidator.IsValidLocalProviderUrl(url))
+                    // R2-04/F-06: permissive local-provider shape AND the SSRF guard.
+                    .Must(url => string.IsNullOrWhiteSpace(url)
+                        || (Configuration.UrlValidator.IsValidLocalProviderUrl(url)
+                            && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url)))
                     .WithMessage("Please enter a valid URL for LM Studio (scheme + host + port). Example: http://localhost:1234 (LM Studio's default OpenAI-compatible endpoint).");
             });
 
