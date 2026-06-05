@@ -60,7 +60,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
 
         private bool BeValidUrl(string url)
         {
-            return UrlValidator.IsValidLocalProviderUrl(url);
+            // F-06: keep the permissive host policy but additionally block SSRF/exfil vectors
+            // (cloud-metadata endpoints, dangerous schemes, path traversal).
+            return UrlValidator.IsValidLocalProviderUrl(url)
+                && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url);
         }
     }
 
@@ -119,7 +122,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration.Providers
 
         private bool BeValidUrl(string url)
         {
-            return UrlValidator.IsValidLocalProviderUrl(url);
+            // F-06: keep the permissive host policy but additionally block SSRF/exfil vectors
+            // (cloud-metadata endpoints, dangerous schemes, path traversal).
+            return UrlValidator.IsValidLocalProviderUrl(url)
+                && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url);
         }
     }
 }

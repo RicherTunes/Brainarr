@@ -200,7 +200,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             }
         }
 
-        private bool IsAllowedScheme(string scheme)
+        /// <summary>
+        /// F-06: SSRF guard for user-supplied provider URLs (Ollama / LM Studio). Allows ANY host (local
+        /// or remote — a model server may live on a LAN box or a remote tunnel) but blocks the exfil/SSRF
+        /// vectors: non-http(s) schemes, cloud-metadata endpoints/paths, and path traversal. Unlike
+        /// <see cref="IsValidLocalProviderUrl"/> it deliberately does NOT require the host to be local. A
+        /// bare <c>host[:port]</c> is accepted (http assumed), matching the prior validators' behaviour.
+        /// </summary>
+        public static bool IsSafeProviderUrl(string? url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            // Accept a bare host[:port] by assuming http (as the prior provider validators did), but only
+            // when there is no explicit scheme — never rewrite an explicit "file://"/"gopher://" into http.
+            var candidate = url.Trim();
+            if (!candidate.Contains("://", StringComparison.Ordinal))
+            {
+                candidate = "http://" + candidate;
+            }
+
+            if (!Uri.TryCreate(candidate, UriKind.Absolute, out var uri))
+            {
+                return false;
+            }
+
+            return IsAllowedScheme(uri.Scheme)
+                && IsValidPort(uri.Port)
+                && !PathTraversalGuard.ContainsTraversalAttempt(uri.AbsolutePath)
+                && !IsBlockedEndpoint(uri);
+        }
+
+        private static bool IsAllowedScheme(string scheme)
         {
             if (string.IsNullOrEmpty(scheme))
                 return false;
@@ -289,7 +322,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             return false;
         }
 
-        private bool IsValidPort(int port)
+        private static bool IsValidPort(int port)
         {
             // Default HTTP/HTTPS ports are always valid
             if (port == 80 || port == 443 || port == -1)
@@ -313,7 +346,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Security
             return port >= 1024 && port <= 65535;
         }
 
-        private bool IsBlockedEndpoint(Uri uri)
+        private static bool IsBlockedEndpoint(Uri uri)
         {
             // Check against blocked hosts (metadata services)
             if (BlockedHosts.Contains(uri.Host))

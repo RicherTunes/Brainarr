@@ -163,8 +163,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (string.IsNullOrWhiteSpace(url))
                 return false;
 
-            return Uri.TryCreate(url, UriKind.Absolute, out var result) ||
-                   Uri.TryCreate("http://" + url, UriKind.Absolute, out result);
+            // F-06: a parseable URL must also clear the SSRF guard (blocks cloud-metadata endpoints,
+            // dangerous schemes, path traversal; any local/remote host is still allowed).
+            return (Uri.TryCreate(url, UriKind.Absolute, out var result) ||
+                    Uri.TryCreate("http://" + url, UriKind.Absolute, out result))
+                && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url);
         }
     }
 
@@ -195,8 +198,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
             if (string.IsNullOrWhiteSpace(url))
                 return false;
 
-            return Uri.TryCreate(url, UriKind.Absolute, out var result) ||
-                   Uri.TryCreate("http://" + url, UriKind.Absolute, out result);
+            // F-06: a parseable URL must also clear the SSRF guard (blocks cloud-metadata endpoints,
+            // dangerous schemes, path traversal; any local/remote host is still allowed).
+            return (Uri.TryCreate(url, UriKind.Absolute, out var result) ||
+                    Uri.TryCreate("http://" + url, UriKind.Absolute, out result))
+                && NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url);
         }
     }
 }
