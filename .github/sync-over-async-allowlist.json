@@ -1,10 +1,9 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$comment": "Allowlist of intentional sync-over-async (.GetAwaiter().GetResult()) call-sites. Category A = host requires synchronous entry-point; Category B = avoidable (never listed here). Review entries when they expire -- if the host constraint still exists, renew the date.",
+  "$comment": "Allowlist of intentional sync-over-async (.GetAwaiter().GetResult()) call-sites. Category A = host requires synchronous entry-point; Category B = avoidable (never listed here); Category C = lint false-positive (e.g. inside a doc comment). Entries are identified semantically by file + pattern + method, NOT by line number — line numbers drift and the linter reports the accurate current line at scan time. Review entries when they expire; if the host constraint still exists, renew the date.",
   "entries": [
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 45,
       "pattern": "return mainTask.GetAwaiter().GetResult();",
       "method": "SafeAsyncHelper.RunSafeSync<T>()",
       "category": "A",
@@ -14,7 +13,6 @@
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 74,
       "pattern": "mainTask.GetAwaiter().GetResult();",
       "method": "SafeAsyncHelper.RunSafeSync()",
       "category": "A",
@@ -24,7 +22,6 @@
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 127,
       "pattern": "var completed = Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult();",
       "method": "SafeAsyncHelper.RunSyncWithTimeout<T>()",
       "category": "A",
@@ -34,18 +31,15 @@
     },
     {
       "file": "Brainarr.Plugin/Utils/SafeAsyncHelper.cs",
-      "line": 132,
       "pattern": "return task.GetAwaiter().GetResult();",
       "method": "SafeAsyncHelper.RunSyncWithTimeout<T>()",
       "category": "A",
       "reason": "Intentional sync bridge for Lidarr host sync entry-points",
       "owner": "alex",
       "expiresOn": "2026-08-01"
-    }
-    ,
+    },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 23,
       "pattern": ".GetAwaiter().GetResult()",
       "method": "ReviewQueueService XML doc comment",
       "category": "C",
@@ -55,7 +49,6 @@
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 28,
       "pattern": "Task.Run(async () => ...).GetAwaiter().GetResult()",
       "method": "ReviewQueueService XML doc comment",
       "category": "C",
@@ -65,7 +58,6 @@
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 63,
       "pattern": "Task.Run(async () => await _store.GetAsync(key).ConfigureAwait(false)).GetAwaiter().GetResult()",
       "method": "ReviewQueueService.Enqueue()",
       "category": "A",
@@ -75,47 +67,42 @@
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 80,
       "pattern": ".ConfigureAwait(false)).GetAwaiter().GetResult()",
       "method": "ReviewQueueService.Enqueue() — SetAsync bridge",
       "category": "A",
-      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "reason": "Wave 16C Path-2 bridge: same rationale as ReviewQueueService.Enqueue().",
       "owner": "alex",
       "expiresOn": "2027-01-01"
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 104,
       "pattern": ".GetAwaiter().GetResult()",
       "method": "ReviewQueueService.DequeueAccepted() — RemoveAsync bridge",
       "category": "A",
-      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "reason": "Wave 16C Path-2 bridge: same rationale as ReviewQueueService.Enqueue().",
       "owner": "alex",
       "expiresOn": "2027-01-01"
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 119,
       "pattern": "Task.Run(async () => await _store.GetAsync(key).ConfigureAwait(false)).GetAwaiter().GetResult()",
       "method": "ReviewQueueService.SetStatus() — GetAsync bridge",
       "category": "A",
-      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "reason": "Wave 16C Path-2 bridge: same rationale as ReviewQueueService.Enqueue().",
       "owner": "alex",
       "expiresOn": "2027-01-01"
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 126,
       "pattern": "Task.Run(async () => await _store.SetAsync(key, item).ConfigureAwait(false)).GetAwaiter().GetResult()",
       "method": "ReviewQueueService.SetStatus() — SetAsync bridge",
       "category": "A",
-      "reason": "Wave 16C Path-2 bridge: same rationale as line 63.",
+      "reason": "Wave 16C Path-2 bridge: same rationale as ReviewQueueService.Enqueue().",
       "owner": "alex",
       "expiresOn": "2027-01-01"
     },
     {
       "file": "Brainarr.Plugin/Services/Support/ReviewQueueService.cs",
-      "line": 163,
       "pattern": "}).GetAwaiter().GetResult()",
       "method": "ReviewQueueService.EnumerateAll()",
       "category": "A",
