@@ -200,6 +200,7 @@ internal sealed class ConfigurationValidator
         if (!(uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase) ||
               uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase))) return false;
         if (!uri.IsDefaultPort && (uri.Port < 1 || uri.Port > 65535)) return false;
-        return true;
+        // F-06: also reject SSRF/exfil vectors (cloud-metadata endpoints, path traversal); any host allowed.
+        return NzbDrone.Core.ImportLists.Brainarr.Services.Security.SecureUrlValidator.IsSafeProviderUrl(url);
     }
 }
