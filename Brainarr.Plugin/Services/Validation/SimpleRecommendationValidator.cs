@@ -274,27 +274,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
         }
 
         private int LevenshteinDistance(string str1, string str2)
-        {
-            var matrix = new int[str1.Length + 1, str2.Length + 1];
-
-            for (int i = 0; i <= str1.Length; i++)
-                matrix[i, 0] = i;
-            for (int j = 0; j <= str2.Length; j++)
-                matrix[0, j] = j;
-
-            for (int i = 1; i <= str1.Length; i++)
-            {
-                for (int j = 1; j <= str2.Length; j++)
-                {
-                    var cost = str1[i - 1] == str2[j - 1] ? 0 : 1;
-                    matrix[i, j] = Math.Min(
-                        Math.Min(matrix[i - 1, j] + 1, matrix[i, j - 1] + 1),
-                        matrix[i - 1, j - 1] + cost);
-                }
-            }
-
-            return matrix[str1.Length, str2.Length];
-        }
+            // LOOP-010: delegate to Common's canonical edit-distance (byte-identical algorithm).
+            => global::Lidarr.Plugin.Common.Utilities.StringSimilarity.LevenshteinDistance(str1, str2);
 
         private bool HasAIHallucinationPatterns(string album)
         {
