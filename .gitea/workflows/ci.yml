@@ -1,0 +1,31 @@
+name: CI
+# Gitea-primary CI (GitHub Actions is out of credits). This workflow is LINT-ONLY by design:
+#   * The 3 ecosystem gates (date-parsing, sync-over-async, ecosystem-parity) need only pwsh + the
+#     Common submodule scripts -- no Lidarr host assemblies -- so they run cleanly on the shared runner.
+#   * The plugin BUILD + UNIT TESTS need the Lidarr plugins-branch host assemblies (Lidarr.dll etc.),
+#     obtained via the Docker image (download-plugins-branch-assemblies). That is NOT available on the
+#     shared act_runner, so build + tests remain LOCAL-VALIDATION-ONLY (the established merge gate).
+# ACTIVATION: this file does nothing until the repo's Actions are enabled AND the dead .github/workflows
+# are neutralized on the Gitea copy (else Gitea would also run ~20-30 GitHub workflows and clog the
+# single serial runner). See memory: gitea-primary-host.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Date-parsing gate (culture-safety + epoch guard)
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/lint-date-parsing.ps1 -Path . -Mode ci
+      - name: Sync-over-async gate
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/lint-sync-over-async.ps1 -Path . -Mode ci
+      - name: Ecosystem parity gate
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/ecosystem-parity-lint.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
