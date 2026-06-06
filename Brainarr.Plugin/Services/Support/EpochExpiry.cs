@@ -1,34 +1,33 @@
 using System;
 using System.Text.Json;
+using Lidarr.Plugin.Common.Utilities;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
 {
     /// <summary>
-    /// R2-08: parse an untrusted <c>expiresAt</c>/<c>expires_at</c> epoch from credential JSON without throwing
-    /// on a malformed or overflowing value. <see cref="DateTimeOffset.FromUnixTimeMilliseconds"/> /
-    /// <see cref="DateTimeOffset.FromUnixTimeSeconds"/> throw <see cref="ArgumentOutOfRangeException"/> past their
-    /// representable range (e.g. <see cref="long.MaxValue"/>), so a hostile token file would otherwise blow up the
-    /// credential-load path. These return <c>null</c> instead, so the caller treats the value as "no usable
-    /// expiry". Mirrors Common's <c>TimeParsing</c>; collapses onto it once the plugin re-pins to a Common that
-    /// ships it.
+    /// R2-08 / LOOP-007: parse an untrusted <c>expiresAt</c>/<c>expires_at</c> epoch from credential JSON without
+    /// throwing on a malformed or overflowing value. This is a thin JSON adapter over Common's
+    /// <see cref="TimeParsing"/>: it pulls an int64 out of the element and delegates the fail-closed range check
+    /// and conversion to <see cref="TimeParsing.TryFromUnixTimeMilliseconds"/> /
+    /// <see cref="TimeParsing.TryFromUnixTimeSeconds"/>, so a hostile token file yields <c>null</c>
+    /// ("no usable expiry") instead of blowing up the credential-load path. The previous bespoke range guard
+    /// (which mirrored Common) has been collapsed onto the shared helper now that the plugin pins a Common that
+    /// ships it — single source of truth for the epoch bounds.
     /// </summary>
     internal static class EpochExpiry
     {
-        private static readonly long MinMs = DateTimeOffset.MinValue.ToUnixTimeMilliseconds();
-        private static readonly long MaxMs = DateTimeOffset.MaxValue.ToUnixTimeMilliseconds();
-        private static readonly long MinS = DateTimeOffset.MinValue.ToUnixTimeSeconds();
-        private static readonly long MaxS = DateTimeOffset.MaxValue.ToUnixTimeSeconds();
-
         /// <summary>Epoch milliseconds → UTC instant, or null when the element is not an in-range integer.</summary>
         public static DateTimeOffset? FromMilliseconds(JsonElement element)
-            => element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var ms) && ms >= MinMs && ms <= MaxMs
-                ? DateTimeOffset.FromUnixTimeMilliseconds(ms)
+            => element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var ms)
+               && TimeParsing.TryFromUnixTimeMilliseconds(ms, out var value)
+                ? value
                 : null;
 
         /// <summary>Epoch seconds → UTC instant, or null when the element is not an in-range integer.</summary>
         public static DateTimeOffset? FromSeconds(JsonElement element)
-            => element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var s) && s >= MinS && s <= MaxS
-                ? DateTimeOffset.FromUnixTimeSeconds(s)
+            => element.ValueKind == JsonValueKind.Number && element.TryGetInt64(out var s)
+               && TimeParsing.TryFromUnixTimeSeconds(s, out var value)
+                ? value
                 : null;
     }
 }
