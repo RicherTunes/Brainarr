@@ -109,6 +109,24 @@
       "reason": "Wave 16C Path-2 bridge: EnumerateAll uses Task.Run to escape sync context before running async enumeration. Same root cause.",
       "owner": "alex",
       "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Resilience/LlmAuthCircuit.cs",
+      "pattern": "entry.Handler.HandleFailureAsync(failure).AsTask().GetAwaiter().GetResult()",
+      "method": "LlmAuthCircuit.RecordAuthFailure()",
+      "category": "A",
+      "reason": "RecordAuthFailure is a synchronous circuit-breaker method on the auth-failure observation path; the awaited IAuthFailureHandler.HandleFailureAsync completes synchronously (ValueTask.CompletedTask in the bridge-default), so no real blocking occurs. Mirrors Common AuthFailureGate's category-A sync bridge.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
+    },
+    {
+      "file": "Brainarr.Plugin/Services/Resilience/LlmAuthCircuit.cs",
+      "pattern": "entry.Handler.HandleSuccessAsync().AsTask().GetAwaiter().GetResult()",
+      "method": "LlmAuthCircuit.RecordSuccess()",
+      "category": "A",
+      "reason": "Same constraint as LlmAuthCircuit.RecordAuthFailure(): synchronous circuit-breaker method; awaited HandleSuccessAsync completes synchronously.",
+      "owner": "alex",
+      "expiresOn": "2027-01-01"
     }
   ]
 }
