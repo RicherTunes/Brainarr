@@ -279,11 +279,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             if (duplicatesFound > 0)
             {
-                _logger.Info($"Filtered out {duplicatesFound} recommendation(s) already present in the library prior to validation");
+                _logger.Info(FormatLibraryDuplicatesMessage(duplicatesFound));
             }
 
             return filtered;
         }
+
+        // internal for log-message accuracy unit tests (InternalsVisibleTo "Brainarr.Tests").
+        internal static string FormatLibraryDuplicatesMessage(int duplicatesFound)
+            => $"Filtered out {duplicatesFound} recommendation(s) already present in the library after validation (before enrichment)";
 
         private static string DecodeComparisonValue(string value)
         {
