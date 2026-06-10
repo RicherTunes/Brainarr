@@ -16,10 +16,23 @@ on:
 jobs:
   lint:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+      # The bare runner image has no pwsh and the catthehacker container can't reach Gitea
+      # for checkout on this host (the qobuz #12 blocker). Fetch the self-contained release
+      # tarball instead - mechanism proven green on Common's lint job.
+      - name: Install PowerShell
+        shell: bash
+        run: |
+          set -e
+          curl -sSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-linux-x64.tar.gz -o /tmp/pwsh.tgz
+          mkdir -p /opt/pwsh
+          tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
+          chmod +x /opt/pwsh/pwsh
+          echo "/opt/pwsh" >> "$GITHUB_PATH"
       - name: Date-parsing gate (culture-safety + epoch guard)
         shell: pwsh
         run: ./ext/Lidarr.Plugin.Common/scripts/lint-date-parsing.ps1 -Path . -Mode ci
