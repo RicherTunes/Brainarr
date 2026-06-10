@@ -13,7 +13,18 @@ namespace Brainarr.Tests.Configuration
         }
 
         [Theory]
-        [InlineData("http://localhost%3a11434", true)] // Encoded characters
+        // Percent-encoded colon in the AUTHORITY ("%3a" between host and port). This is rejected, and
+        // rejection is the correct, more-secure behavior:
+        //   * .NET 8 Uri.TryCreate("http://localhost%3a11434", Absolute) returns FALSE outright — per
+        //     RFC 3986 the authority (host[:port]) component may not be percent-encoded, so the parser
+        //     treats it as malformed (it does NOT decode it to the host "localhost" on port 11434).
+        //   * Literally interpreted the authority is the nonsensical host string "localhost%3a11434";
+        //     no Ollama server is reachable at it. The real URL a user wants is "http://localhost:11434".
+        //   * Accepting an encoded authority is a parser-confusion / SSRF-evasion vector: a "decode-first"
+        //     validator would see a different (and possibly allow-listed) host than the raw string the
+        //     HTTP client actually dials. SecureUrlValidator.IsSafeProviderUrl parses the raw string (no
+        //     decode) and rejects it, matching what Lidarr's HttpClient would do at request time.
+        [InlineData("http://localhost%3a11434", false)] // Encoded-authority (percent-encoded colon) — malformed, rejected
         [InlineData("http://user:pass@evil.com", true)] // User info in URL (valid per URI spec, but potentially risky)
         [InlineData("file:///C:/Users/user/secrets.txt", false)] // File path
         [InlineData("javascript:alert('xss')", false)] // Javascript injection
