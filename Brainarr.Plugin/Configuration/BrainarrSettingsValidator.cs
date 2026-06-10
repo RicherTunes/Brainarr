@@ -160,29 +160,5 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 context.AddFailure($"{path}.TopPercent + RecentPercent cannot exceed 100.");
             }
         }
-
-        private static bool BeValidUrlOrEmpty(string url)
-        {
-            if (string.IsNullOrWhiteSpace(url)) return true; // use defaults
-
-            // Accept http/https absolute URLs
-            if (Uri.TryCreate(url, UriKind.Absolute, out var uri))
-            {
-                return uri.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
-                       || uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
-            }
-
-            // If a scheme is present but not http/https, reject immediately (e.g., file:, javascript:)
-            if (url.Contains("://")) return false;
-
-            // Also accept host:port (no scheme); try with http:// prefix
-            if (Uri.TryCreate("http://" + url, UriKind.Absolute, out var prefixed))
-            {
-                return prefixed.Scheme.Equals("http", StringComparison.OrdinalIgnoreCase)
-                       || prefixed.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase);
-            }
-
-            return false;
-        }
     }
 }
