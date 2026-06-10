@@ -19,6 +19,13 @@ public sealed class DefaultSamplingService : ISamplingService
     private readonly IContextPolicy _contextPolicy;
     private const int AbsoluteRelaxedCap = 1200;
 
+    // internal for log-message accuracy unit tests (InternalsVisibleTo "Brainarr.Tests").
+    // Pre-formatted (no structured-template hole) on purpose: passing the joined slug string as a
+    // single template capture renders inside ONE quote pair under the host's NLog 5.x
+    // (selected=["lofi-hip-hop, alternative-rock"]), which misreads as a single slug.
+    internal static string FormatStrictOnlyLogMessage(string scope, int strictCount, IEnumerable<string> selectedSlugs)
+        => $"{scope} style matches remain strict-only: count={strictCount}, selected=[{string.Join(", ", selectedSlugs)}]";
+
     public DefaultSamplingService(Logger logger, IStyleCatalogService styleCatalog, IContextPolicy contextPolicy)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -174,10 +181,7 @@ public sealed class DefaultSamplingService : ISamplingService
             }
             else if (!selection.ShouldUseRelaxedMatches)
             {
-                _logger.Debug(
-                    "Artist style matches remain strict-only: count={StrictCount}, selected=[{Selected}]",
-                    strictIds.Count,
-                    string.Join(", ", selection.SelectedSlugs));
+                _logger.Debug(FormatStrictOnlyLogMessage("Artist", strictIds.Count, selection.SelectedSlugs));
             }
         }
 
@@ -385,10 +389,7 @@ public sealed class DefaultSamplingService : ISamplingService
             }
             else if (!selection.ShouldUseRelaxedMatches)
             {
-                _logger.Debug(
-                    "Album style matches remain strict-only: count={StrictCount}, selected=[{Selected}]",
-                    strictIds.Count,
-                    string.Join(", ", selection.SelectedSlugs));
+                _logger.Debug(FormatStrictOnlyLogMessage("Album", strictIds.Count, selection.SelectedSlugs));
             }
         }
 
