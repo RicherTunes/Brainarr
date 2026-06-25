@@ -170,7 +170,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         // Increment when sanitizer or schema behavior changes in a way that should invalidate caches
         public const int SanitizerVersion = 1;
         // Bump when cache key composition changes
-        public const int CacheKeyVersion = 2;
+        // v4: include review approvals, effective top-up iteration profile, and thinking request
+        // shaping in addition to output-gating settings and ManualModelId.
+        public const int CacheKeyVersion = 4;
 
         // Documentation links (GitHub docs)
         public const string DocsBaseUrl = "https://github.com/RicherTunes/Brainarr/blob/main/docs";
