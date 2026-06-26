@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 11 different AI providers ranging from privacy-focused local models to powerful cloud services (including 2 subscription providers that reuse existing CLI credentials).
+Brainarr is a **production-ready** multi-provider AI-powered import list plugin for Lidarr that generates intelligent music recommendations. The project supports 14 different AI providers ranging from privacy-focused local models to powerful cloud services (including 3 subscription providers and 1 CLI provider that reuse existing CLI credentials).
 
 ## Runtime & Docker Image Requirements (CRITICAL)
 
@@ -154,7 +154,7 @@ The plugin's assembly version comes **only** from the repo-root `VERSION` file: 
   - **Key hashing preserved**: `MakeKey` continues to produce `{providerId}::{SHA256(apiKey)[0..16]}` so raw LLM API keys never appear as dict keys — eliminates the heap-dump / debugger-inspection leak vector that matters more for LLM keys (broad permissions, billing-attached) than for streaming-session tokens.
   - **Sliding-window semantics live in Common now**: `SlidingWindowAuthFailureHandler(failureThreshold, failureWindow, clock)` handles the "K failures within W → latch" + "stale-failure forgetting" logic. Brainarr's `LlmAuthCircuit` ctor passes `failureThreshold=3, failureWindow=5min`.
   - **Open-duration semantics layered locally**: `LlmAuthCircuit` tracks `LatchedAt` per gate entry and refuses probe slots until `openDuration` (default 30 min) has elapsed since the latch. Common's `AuthFailureGate.TryAcquireProbeSlot` grants the FIRST probe immediately on first call after latch, but brainarr's documented behavior is "stay Open for openDuration before any probe" — this is the brainarr-side layer above the shared gate. Any failure while latched refreshes `LatchedAt` so a HalfOpen probe failure correctly resets the 30-min timer.
-  - **Coverage**: `LlmAuthCircuit` is wired in **all 11 cloud / subscription providers** as of wave-22 Phase D: OpenAI, Anthropic, ClaudeCodeSub, Perplexity, OpenRouter, DeepSeek, Groq, Gemini, Z.AI GLM, Z.AI Coding, OpenAI Codex Subscription. Subscription providers key the circuit on their credentials-file path (closest stable identity since the bearer is loaded per-call from disk). Local providers (Ollama, LM Studio) and the CLI provider (ClaudeCodeCli) intentionally skip the circuit — they don't authenticate against an external billable API, so the IP-ban / over-billing risk doesn't apply.
+  - **Coverage**: `LlmAuthCircuit` is wired in **all 11 cloud / subscription providers** as of wave-22 Phase D: OpenAI, Anthropic, ClaudeCodeSub, Perplexity, OpenRouter, DeepSeek, Groq, Gemini, Z.AI GLM, Z.AI Coding, OpenAI Codex Subscription. (Total providers = 14: 2 local, 8 cloud, 3 subscription, 1 CLI) Subscription providers key the circuit on their credentials-file path (closest stable identity since the bearer is loaded per-call from disk). Local providers (Ollama, LM Studio) and the CLI provider (ClaudeCodeCli) intentionally skip the circuit — they don't authenticate against an external billable API, so the IP-ban / over-billing risk doesn't apply.
   - **Convergence retained**: the SHA256-hashed key derivation + sliding-window semantics + open-duration timer are no longer brainarr-specific code — they live in (or layer on top of) the shared Common stack. The ecosystem-parity matrix row for AuthFailureGate is now ✓ across all four plugins.
 
 See `ext/Lidarr.Plugin.Common/CHANGELOG.md` for the full catalog and [`docs/ECOSYSTEM_PARITY_MATRIX.md`](../ext/Lidarr.Plugin.Common/docs/ECOSYSTEM_PARITY_MATRIX.md) for the cross-plugin parity scorecard (30+ axes × 4 plugins).
@@ -216,7 +216,7 @@ Four engine behaviors that are easy to regress (added 2026-05-29):
 
 The project includes:
 
-- Complete implementation with 11 AI providers (2 local, 7 cloud, 2 subscription)
+- Complete implementation with 14 AI providers (2 local, 8 cloud, 3 subscription, 1 CLI)
 - Comprehensive test suite (280+ test files across 50+ test categories)
 - Production-ready architecture with advanced features
 - Full documentation in `docs/` folder
@@ -228,7 +228,7 @@ The implemented architecture includes:
 ### Multi-Provider AI System
 
 - **Local-First Options**: Privacy-focused local providers (Ollama, LM Studio)
-- **Cloud Integration**: 11 total providers including OpenAI, Anthropic, Google Gemini, 2 subscription providers, etc.
+- **Cloud Integration**: 14 total providers including OpenAI, Anthropic, Google Gemini, Z.AI, 3 subscription providers, and 1 CLI provider.
 - **Provider Failover**: Automatic failover with health monitoring
 - **Dynamic Detection**: Auto-detects available models for local providers
 
@@ -246,7 +246,7 @@ Brainarr.Plugin/
 │   │   ├── AIService.cs
 │   │   ├── LibraryAnalyzer.cs
 │   │   └── ProviderRegistry.cs
-│   ├── Providers/         # AI provider implementations (11 providers)
+│   ├── Providers/         # AI provider implementations (14 providers)
 │   ├── Support/           # Supporting services
 │   ├── LocalAIProvider.cs
 │   ├── ModelDetectionService.cs
@@ -281,7 +281,7 @@ Brainarr.Tests/            # Comprehensive test suite
 
 ### Core Functionality
 
-- ✅ 11 AI providers (2 local + 7 cloud + 2 subscription)
+- ✅ 14 AI providers (2 local + 8 cloud + 3 subscription + 1 CLI)
 - ✅ Auto-detection of local models
 - ✅ Provider health monitoring
 - ✅ Rate limiting and caching
