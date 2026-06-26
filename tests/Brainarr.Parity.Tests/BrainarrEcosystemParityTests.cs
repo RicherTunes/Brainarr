@@ -138,6 +138,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void DirectoryBuildProps_HasDeterministic_Test() { var r = DirectoryBuildProps_HasDeterministic(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void DirectoryPackagesProps_Exists_Test() { var r = DirectoryPackagesProps_Exists(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void DirectoryPackagesProps_EnablesCPM_Test() { var r = DirectoryPackagesProps_EnablesCPM(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void DirectoryPackagesProps_HostVersionsMatchCanonical_Test() { var r = DirectoryPackagesProps_HostVersionsMatchCanonical(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_HasAllRequiredFields_Test() { var r = PluginJson_HasAllRequiredFields(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_TargetFramework_IsNet8_Test() { var r = PluginJson_TargetFramework_IsNet8(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void PluginJson_HasCommonVersion_Test() { var r = PluginJson_HasCommonVersion(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
