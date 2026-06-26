@@ -14,7 +14,7 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 
 ### Core
 
-- **11 AI providers** — 2 local (Ollama, LM Studio), 7 cloud (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter), 2 subscription (Claude Code, OpenAI Codex).
+- **14 AI providers** — 2 local (Ollama, LM Studio), 8 cloud (OpenAI, Anthropic, Gemini, Perplexity, Groq, DeepSeek, OpenRouter, Z.AI GLM), 3 subscription (Claude Code, OpenAI Codex, Z.AI Coding), plus 1 CLI provider (Claude Code CLI).
 - **Deterministic planning** — fingerprint your library, select representative styles, sample artists/albums, render prompts in a reproducible pipeline.
 - **Dual recommendation modes** — specific albums or artist-only discovery.
 - **Iterative refinement (top-up)** — backfill sparse results automatically until the target count is met.
@@ -350,8 +350,11 @@ Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidar
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Z.AI GLM | Cloud | ✅ Verified in v1.6.0 | OpenAI-compatible PaaS endpoint |
+| Claude Code CLI | CLI | ✅ Verified in v1.6.1 | Shells out to local `claude` CLI binary |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
 | OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
+| Z.AI Coding | Subscription | ✅ Verified in v1.6.0 | Anthropic-compatible Coding Plan endpoint |
 <!-- PROVIDER_MATRIX_END -->
 
 ### Tested local models
@@ -376,6 +379,9 @@ For per-provider model lists, defaults, and subscription setup, see [docs/PROVID
 | **DeepSeek** | `DeepSeek_Chat` | Budget-friendly |
 | **Perplexity** | `Sonar_Pro` | Web-augmented |
 | **OpenRouter** | `Auto` | Gateway to many models |
+| **Z.AI GLM** | `GLM_4_5_Air` | GLM-4.5-Air default (106B params) |
+| **Z.AI Coding** | `GLM_5_1` | GLM-5.1 Coding Plan default |
+| **Claude Code CLI** | `claude-cli` | Auto-detected from local PATH |
 
 ## Troubleshooting
 
