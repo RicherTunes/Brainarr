@@ -5,8 +5,14 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
-    <EnableNETAnalyzers>true</EnableNETAnalyzers>
-    <AnalysisLevel>latest</AnalysisLevel>
+    <!-- Scoped analyzer wiring (mirrors tidalarr/qobuzarr/applemusicarr): run ONLY the referenced
+         Common LPC0003 analyzer during the build, not the SDK's full .NET (CA) analyzer suite.
+         RunAnalyzersDuringBuild=true overrides the repo default (Directory.Build.props sets false) so
+         the referenced analyzer actually executes; EnableNETAnalyzers=false keeps the StyleCop/.NET CA
+         suite off so only LPC0003 (search-term HtmlEncode ban) is active. LPC0001/LPC0002 are NoWarn'd
+         below — they are pre-existing tech debt on the raw-HttpClient AI provider transports. -->
+    <RunAnalyzersDuringBuild>true</RunAnalyzersDuringBuild>
+    <EnableNETAnalyzers>false</EnableNETAnalyzers>
     <AssemblyName>Lidarr.Plugin.Brainarr</AssemblyName>
     <RootNamespace>NzbDrone.Core.ImportLists.Brainarr</RootNamespace>
     <OutputPath>bin\</OutputPath>
@@ -65,6 +71,16 @@
          NU1903: NuGet vulnerabilities (tracked outside compile)
          MSB3277: Version conflicts resolved by Lidarr at runtime -->
     <NoWarn>CS0618;CS1998;CS8618;CS8625;CS8603;CS8604;CS8601;CS8602;CS8600;CS8619;CS8622;CS8629;NU1903;MSB3277</NoWarn>
+  </PropertyGroup>
+
+  <!-- Scope the wired analyzer to LPC0003: LPC0001 (raw HttpClient.SendAsync / new HttpClient) and
+       LPC0002 (resilience-overload guidance) are pre-existing tech debt on the raw-HttpClient AI
+       provider transports (e.g. BrainarrZaiCodingProvider's claude-cli raw HttpClient) — tracked, not
+       addressed here. Applied unconditionally (the analyzer runs in Debug + Release) and placed AFTER
+       the Release PropertyGroup so its NoWarn assignment (which replaces, not appends) cannot drop
+       these; $(NoWarn) appends to whatever value is in effect for the active configuration. -->
+  <PropertyGroup>
+    <NoWarn>$(NoWarn);LPC0001;LPC0002</NoWarn>
   </PropertyGroup>
 
   <!-- Package dependencies -->
@@ -219,6 +235,16 @@
       <Private>true</Private>
       <!-- Disable analyzers for the submodule to avoid PublicAPI duplicate warnings affecting our CI -->
       <AdditionalProperties>GeneratePackageOnBuild=false;RunAnalyzersDuringBuild=false;RunAnalyzersDuringCompilation=false;EnableNETAnalyzers=false;UseSharedCompilation=false</AdditionalProperties>
+    </ProjectReference>
+    <!-- LPC0003: bans HtmlEncode / Sanitize.DisplayText on search paths (the shipped "Beyoncé"
+         0-result bug class). OutputItemType=Analyzer: consumed as a Roslyn analyzer, not a runtime
+         reference; ReferenceOutputAssembly=false keeps the analyzer DLL out of the compile-time
+         reference set and the merged plugin DLL. Mirrors tidalarr/qobuzarr/applemusicarr adoption. -->
+    <ProjectReference Include="..\ext\Lidarr.Plugin.Common\tools\Analyzers\Lidarr.Plugin.Analyzers\Lidarr.Plugin.Analyzers.csproj"
+                      Condition="Exists('..\ext\Lidarr.Plugin.Common\tools\Analyzers\Lidarr.Plugin.Analyzers\Lidarr.Plugin.Analyzers.csproj')"
+                      OutputItemType="Analyzer"
+                      ReferenceOutputAssembly="false">
+      <PrivateAssets>all</PrivateAssets>
     </ProjectReference>
   </ItemGroup>
 
