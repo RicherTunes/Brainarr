@@ -104,6 +104,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public string GetObservabilityHtml(IDictionary<string, string> query)
         {
+            // LPC0003 is suppressed for this method only. It renders an HTML observability dashboard,
+            // so WebUtility.HtmlEncode here is correct XSS-prevention for HTML output — it is NOT
+            // search-term encoding (the "Beyoncé"->"Beyonc&#233;" 0-result bug class LPC0003 targets).
+            // The analyzer's syntactic heuristic can't tell the difference, so suppress narrowly here
+            // and keep LPC0003 active everywhere else (genuine search paths).
+#pragma warning disable LPC0003
             try
             {
                 var window = TimeSpan.FromMinutes(15);
@@ -143,6 +149,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, "observability/html failed");
                 return $"<html><body><p>Error generating observability view: {System.Net.WebUtility.HtmlEncode(ex.Message)}</p></body></html>";
             }
+#pragma warning restore LPC0003
         }
     }
 }
