@@ -42,6 +42,12 @@ jobs:
       - name: Ecosystem parity gate
         shell: pwsh
         run: ./ext/Lidarr.Plugin.Common/scripts/ecosystem-parity-lint.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
+      - name: Doc script/workflow-ref gate (self-test)
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/lint-doc-script-refs.ps1 -RepoRoot . -SelfTest -CI
+      - name: Doc script/workflow-ref gate
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/lint-doc-script-refs.ps1 -RepoRoot . -CI
 
   # Full build + ILRepack package + packaging-closure + deterministic tests via verify-local.
   # verify-local extracts the Lidarr host assemblies from Docker; the act_runner mounts the Docker
