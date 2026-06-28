@@ -37,8 +37,12 @@ try {
         HostAssembliesPath   = 'ext/Lidarr-docker/_output/net8.0'
         CommonPath           = 'ext/Lidarr.Plugin.Common'
         LidarrDockerVersion  = 'pr-plugins-3.1.2.4913'
-        # -m:1 required: Brainarr has project dependency ordering issues with parallel builds
-        BuildFlags           = @('-p:LidarrPath={HOST_PATH}', '-p:PluginPackagingDisable=true', '-m:1')
+        # -m:1 required: Brainarr has project dependency ordering issues with parallel builds.
+        # NOTE: do NOT add -p:PluginPackagingDisable=true here — these flags also feed the PACKAGE
+        # build, and disabling packaging skips the ILRepack merge so the published DLL keeps external
+        # Lidarr.Plugin.Common/Abstractions refs and ValidatePackageClosure fails. local-ci.ps1 adds
+        # PluginPackagingDisable=true to the TEST build itself (so test types resolve standalone).
+        BuildFlags           = @('-p:LidarrPath={HOST_PATH}', '-m:1')
         TestProjects         = @('Brainarr.Tests/Brainarr.Tests.csproj')
         ExpectedContentsFile = 'packaging/expected-contents.txt'
         WarningBudget        = 80
