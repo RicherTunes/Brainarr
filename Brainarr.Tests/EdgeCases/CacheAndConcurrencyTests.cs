@@ -437,8 +437,13 @@ namespace Brainarr.Tests.EdgeCases
                 });
             });
 
-            // Wait for completion or timeout
-            var completedInTime = await Task.WhenAny(task, Task.Delay(5000)) == task;
+            // Wait for completion or timeout. The work is trivial (~10ms), so this only distinguishes a
+            // genuine deadlock (never completes) from completion. The timeout must be generous: under the
+            // full-suite serial CI runner, thread-pool starvation can delay the nested Task.Run/await
+            // continuations for several seconds, which falsely tripped a tight 5s budget (flaky FAIL on
+            // unrelated PRs). A real deadlock would still never complete and fail at any timeout. Matches
+            // the thread-pool-starvation timeout pattern used by the sibling RateLimiter concurrency tests.
+            var completedInTime = await Task.WhenAny(task, Task.Delay(60000)) == task;
 
             if (!completedInTime)
             {
