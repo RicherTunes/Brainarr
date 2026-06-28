@@ -1,10 +1,10 @@
 name: CI
-# Gitea-primary CI (GitHub Actions is out of credits). This workflow is LINT-ONLY by design:
-#   * The 3 ecosystem gates (date-parsing, sync-over-async, ecosystem-parity) need only pwsh + the
-#     Common submodule scripts -- no Lidarr host assemblies -- so they run cleanly on the shared runner.
-#   * The plugin BUILD + UNIT TESTS need the Lidarr plugins-branch host assemblies (Lidarr.dll etc.),
-#     obtained via the Docker image (download-plugins-branch-assemblies). That is NOT available on the
-#     shared act_runner, so build + tests remain LOCAL-VALIDATION-ONLY (the established merge gate).
+# Gitea-primary CI (GitHub Actions is out of credits). Two jobs:
+#   * lint   -- fast ecosystem gates (date-parsing, sync-over-async, ecosystem-parity); pwsh-only.
+#   * verify -- full build + ILRepack package + packaging-closure + deterministic tests via
+#     scripts/verify-local.ps1. The act_runner mounts the Docker socket (so verify-local can extract
+#     the Lidarr plugins-branch host assemblies); the node image lacks the docker CLI, so the job
+#     installs pwsh / .NET / Docker CLI from self-contained downloads. Mirrors tidal/amazon/qobuz/apple.
 # ACTIVATION: this file does nothing until the repo's Actions are enabled AND the dead .github/workflows
 # are neutralized on the Gitea copy (else Gitea would also run ~20-30 GitHub workflows and clog the
 # single serial runner). See memory: gitea-primary-host.
@@ -42,3 +42,61 @@ jobs:
       - name: Ecosystem parity gate
         shell: pwsh
         run: ./ext/Lidarr.Plugin.Common/scripts/ecosystem-parity-lint.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
+
+  # Full build + ILRepack package + packaging-closure + deterministic tests via verify-local.
+  # verify-local extracts the Lidarr host assemblies from Docker; the act_runner mounts the Docker
+  # socket but the node image lacks the docker CLI, so install it. Mirrors tidal/amazon/qobuz/apple.
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DOTNET_VERSION: 8.0.x
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      # Init ONLY the public Common submodule (ext/Lidarr source is unneeded — verify-local extracts
+      # the host assemblies via Docker).
+      - name: Init Common submodule
+        shell: bash
+        run: git submodule update --init ext/Lidarr.Plugin.Common
+      - name: Common submodule pin guard
+        shell: bash
+        run: bash ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --verify-only --path ext/Lidarr.Plugin.Common
+      - name: Install PowerShell
+        shell: bash
+        run: |
+          set -e
+          curl -sSL https://github.com/PowerShell/PowerShell/releases/download/v7.4.6/powershell-7.4.6-linux-x64.tar.gz -o /tmp/pwsh.tgz
+          mkdir -p /opt/pwsh
+          tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
+          chmod +x /opt/pwsh/pwsh
+          echo "/opt/pwsh" >> "$GITHUB_PATH"
+      - name: Install .NET SDK
+        shell: bash
+        run: |
+          set -e
+          curl -sSL https://dot.net/v1/dotnet-install.sh -o /tmp/dotnet-install.sh
+          bash /tmp/dotnet-install.sh --channel 8.0 --install-dir "$HOME/.dotnet"
+          echo "$HOME/.dotnet" >> "$GITHUB_PATH"
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          echo "DOTNET_ROOT=$HOME/.dotnet" >> "$GITHUB_ENV"
+          "$HOME/.dotnet/dotnet" --version
+      # act_runner runs ubuntu-latest inside a container; the Docker socket is mounted but the node
+      # image ships no docker CLI, which verify-local.ps1 invokes for host-assembly extraction.
+      - name: Install Docker CLI
+        shell: bash
+        run: |
+          set -e
+          if ! command -v docker >/dev/null 2>&1; then
+            apt-get update
+            apt-get install -y --no-install-recommends docker.io
+            rm -rf /var/lib/apt/lists/*
+          fi
+          docker --version
+          docker ps >/dev/null
+      - name: Full local-ci verification
+        shell: bash
+        run: pwsh ./scripts/verify-local.ps1
