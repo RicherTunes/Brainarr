@@ -23,11 +23,11 @@ LIDARR_DOCKER_VERSION=pr-plugins-3.1.2.4913
 **NEVER use `pr-plugins-2.x` tags** — those are .NET 6 images. Loading a .NET 8 plugin into a .NET 6 host causes `System.Runtime` assembly load failures and Lidarr crash-loops. The guardrail in `extract-lidarr-assemblies.sh` will catch this (fails if `System.Runtime.dll` major != 8).
 
 When bumping the Docker image tag, update ALL of these locations:
-- All `.github/workflows/*.yml` files referencing `LIDARR_DOCKER_VERSION`
 - `.github/lidarr_digest.txt`
 - `scripts/extract-lidarr-assemblies.sh` (default fallback)
 - `scripts/snapshots/run-local.sh` and `run-local.ps1`
 - `test-local-ci.sh`
+- `scripts/verify-local.ps1` (`LidarrDockerVersion` default)
 
 ## Plugin DLL Naming Contract (CRITICAL)
 
@@ -127,9 +127,9 @@ At least one asset name must contain `net8.0.zip`.
 
 ## Release versioning: bump VERSION before tagging (CRITICAL)
 
-The plugin's assembly version comes **only** from the repo-root `VERSION` file: `Brainarr.Plugin.csproj` sets `<GenerateAssemblyInfo>true</GenerateAssemblyInfo>` with no `<AssemblyVersion>` literal, and `Directory.Build.props` derives `VersionPrefix`/`AssemblyVersion` from `VERSION`. The release pipeline (`.github/workflows/release.yml` → the shared reusable `release-plugin.yml@workflows/v1`) stamps `plugin.json` and `manifest.json` from the **git tag**, and stamps any csproj `<AssemblyVersion>` tag — but brainarr's csproj has none (only a comment), and **the reusable workflow does NOT stamp the `VERSION` file**. So if you tag a version that differs from the committed `VERSION`, the build produces an assembly with the *old* version while `plugin.json` shows the *new* one → `/api/v1/system/plugins` reports the wrong `installedVersion` (the 1.3.2-vs-1.4.1 bug `VersionContractTests` exists to prevent).
+The plugin's assembly version comes **only** from the repo-root `VERSION` file: `Brainarr.Plugin.csproj` sets `<GenerateAssemblyInfo>true</GenerateAssemblyInfo>` with no `<AssemblyVersion>` literal, and `Directory.Build.props` derives `VersionPrefix`/`AssemblyVersion` from `VERSION`. Releases are published to GitHub (where Lidarr's install flow reads them) via `scripts/new-release.ps1`, which creates a git tag and GitHub release. The release script stamps `plugin.json` and `manifest.json` from the **git tag**, but **does NOT stamp the `VERSION` file**. So if you tag a version that differs from the committed `VERSION`, the build produces an assembly with the *old* version while `plugin.json` shows the *new* one → `/api/v1/system/plugins` reports the wrong `installedVersion` (the 1.3.2-vs-1.4.1 bug `VersionContractTests` exists to prevent).
 
-**Release procedure:** bump `VERSION` **and** `plugin.json` **and** `manifest.json` to the same value, commit (CI's `VersionContractTests` enforce they agree), then tag `v<that-version>`. A `verify-version` pre-flight job in `release.yml` (gates the `release` job via `needs:`) fails the release early if the tag's version ≠ committed `VERSION`/`plugin.json`/`manifest.json`, so a mismatched tag can't ship. (`plugin-package.yml` builds committed sources and never stamps, so it can't drift.)
+**Release procedure:** bump `VERSION` **and** `plugin.json` **and** `manifest.json` to the same value, commit (Gitea CI's `VersionContractTests` enforce they agree), then run `scripts/new-release.ps1` or tag `v<that-version>` manually. The release script validates that the tag version matches `VERSION`/`plugin.json`/`manifest.json` before publishing, so a mismatched tag can't ship.
 
 ## Submodule pin coordination (ext-common-sha.txt)
 
@@ -684,6 +684,7 @@ Claude Code will automatically apply the appropriate specialist context based on
 | `RateLimiter_WithThreadPoolExhaustion_StillEnforcesLimits` | **Fixed (v3).** Thread pool starvation under full-suite load (2400+ tests) caused `TaskCanceledException` even at 10@5/sec with 30s timeout. | Reduced to 5 requests at 3/sec with 60s timeout (PR #513). |
 | `Performance_enhanced_cache_within_10pct_of_basic` | **Fixed (v2).** 50ms absolute floor still too aggressive — enhanced cache hit 71.2ms under full-suite load. | Increased floor from 50ms to 200ms (PR #513). Dual threshold: 10x relative OR 200ms floor. |
 | `LimiterRegistryBoundedTests.Insert_AtCapacity_BoundsAllDicts` (+ sibling `LimiterRegistryMaintenanceTests`) | **Fixed (2026-05-30).** The three classes shared `[Collection("LimiterRegistryBounded")]` but **no `[CollectionDefinition]` existed for that name**, so the collection ran in parallel with everything. `LimiterRegistry`'s `_throttleUntil`/`_overrides` are process-wide statics; other parallel collections mutate them via `ConfigureFromSettings`/`RegisterThrottle`/`ResetForTesting`, racing the test's exact-state assertion (a concurrent insert at cap clear-all-evicts the just-added entry). Passed in isolation, flaked ~1/3 full runs. | Added `LimiterRegistryBoundedCollection.cs` with `[CollectionDefinition("LimiterRegistryBounded", DisableParallelization = true)]` — same mechanism `OrchestratorIntegration` uses — serializing all LimiterRegistry-static-state tests. With the race gone, restored the strong clear-then-insert assertion and added a race-immune bound check via internal `ThrottleEntryCountForTesting`/`DictCapForTesting`. Verified green across 8 consecutive full-suite runs. |
+| `EnhancedConcurrencyTests.RateLimiter_ThunderingHerd_HandlesGracefully` | **Fixed (2026-06-28).** 20 clients × real `Task.Delay` rate-limiting waits (10/sec → max 1.0s per task) blew the 10s `CancellationTokenSource` under full-suite thread-pool starvation → `TaskCanceledException` with 0 failures (hang signature: duration ≈ N×timeout). Root cause: `TokenBucketRateLimiter` used real `Task.Delay(waitTime, ct)`, not fakeable. Common SHA `abd95d4218` fixed the limiter to `Task.Delay(waitTime, _timeProvider, ct)`. | Added `RateLimiter(Logger, TimeProvider)` ctor (passes `TimeProvider` through to `CommonRateLimiter`). Rewrote test to inject `FakeTimeProvider`, assert `PendingDelayCount > 0` before clock advance (proves throttling), advance by 1.5s to release all waits, assert all 20 complete. No real wall-clock dependency. 5/5 repeat runs clean. |
 
 ### Quarantined Tests (OOM — crash test host)
 

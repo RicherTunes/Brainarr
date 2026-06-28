@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Lidarr.Plugin.Common.TestKit.Testing;
 using Moq;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
@@ -172,33 +173,54 @@ namespace Brainarr.Tests.EdgeCases
         [Trait("Category", "Concurrency")]
         public async Task RateLimiter_ThunderingHerd_HandlesGracefully()
         {
-            // Arrange — token bucket waits rather than rejects.
-            // 20 clients at 10/sec ≈ 2s total, well within the 10s timeout.
-            var rateLimiter = new RateLimiter(_logger);
-            rateLimiter.Configure("api", 10, TimeSpan.FromSeconds(1));
+            // DETERMINISTIC via FakeTimeProvider: rate-limiting waits are instant (resolved by clock
+            // advancement, not real wall-clock). Previously flaked under CI thread-pool starvation:
+            // 20 × real Task.Delay blew the 10s CTS even at 10/sec (hang signature: duration ≈ N×timeout
+            // with 0 failures → TaskCanceledException). The fix is to inject FakeTimeProvider so waits
+            // are fake, and advance the clock to release them — no real time consumed for throttling.
+            var fakeTime = new FakeTimeProvider();
+            var rateLimiter = new RateLimiter(_logger, fakeTime);
+            const int burstCapacity = 10;
+            const int clientCount = 20;
+            rateLimiter.Configure("api", burstCapacity, TimeSpan.FromSeconds(1));
 
-            var clientCount = 20;
-            var executionTimes = new ConcurrentBag<DateTime>();
+            var completedCount = 0;
+            // 30s real-time fence for scheduling overhead only — NOT for rate-limiting waits.
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
             // Act — all clients fire at once
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             var tasks = Enumerable.Range(0, clientCount).Select(_ => Task.Run(async () =>
             {
                 await rateLimiter.ExecuteAsync("api", async (ct) =>
                 {
-                    executionTimes.Add(DateTime.UtcNow);
-                    await Task.Delay(1, ct);
+                    Interlocked.Increment(ref completedCount);
+                    await Task.Yield();
                     return true;
                 }, cts.Token);
             })).ToArray();
 
+            // Yield for scheduling: burst tasks complete synchronously; throttled tasks suspend on fake delays.
+            // 100ms real time is ample — no rate-limiting wait happens here.
+            await Task.Delay(100, CancellationToken.None);
+
+            // Assert throttling contract: non-burst requests are suspended on fake-clock delays (not real wall-clock).
+            fakeTime.PendingDelayCount.Should().BeGreaterThan(0,
+                "tasks beyond burst capacity should be throttled — awaiting fake-clock delays, not real wall-clock");
+            completedCount.Should().BeGreaterThanOrEqualTo(burstCapacity,
+                "at least burst-capacity tasks must complete without any clock advancement");
+
+            // Advance fake clock past all pending delay due-times.
+            // Token bucket 10/sec, 20 tasks: max wait = (10 tokens needed / 10 tokens/sec) = 1.0s for task #20.
+            fakeTime.Advance(TimeSpan.FromSeconds(1.5));
+
+            // Yield to allow released task continuations to be scheduled.
+            await Task.Delay(100, CancellationToken.None);
+
+            // Assert — all 20 requests complete; WhenAll must not block (all fake delays now resolved).
             await Task.WhenAll(tasks);
 
-            // Assert — all complete, throttling visible (not all at once)
-            executionTimes.Should().HaveCount(clientCount);
-            var sorted = executionTimes.OrderBy(t => t).ToList();
-            var totalTime = (sorted.Last() - sorted.First()).TotalSeconds;
-            totalTime.Should().BeGreaterThan(0.5, "Thundering herd should be spread over time");
+            completedCount.Should().Be(clientCount,
+                "all thundering-herd requests must complete after fake-clock advancement releases the throttled tasks");
         }
 
         #endregion

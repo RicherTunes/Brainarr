@@ -48,7 +48,7 @@ Brainarr/
 ├── Brainarr.Tests/          # Unit and integration tests
 ├── ext/                     # External dependencies (gitignored)
 │   └── Lidarr/             # Lidarr source checkout
-├── .github/workflows/       # CI/CD pipelines
+├── .gitea/workflows/        # CI/CD pipelines (Gitea-primary)
 ├── docs/                    # Documentation
 └── plugin.json              # Plugin manifest (see below)
 ```
