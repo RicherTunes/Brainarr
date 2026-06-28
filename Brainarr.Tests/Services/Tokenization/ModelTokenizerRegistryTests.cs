@@ -9,6 +9,7 @@ using Xunit;
 
 namespace Brainarr.Tests.Services.Tokenization
 {
+    [Collection("TokenizerFallbackGate")]
     public class ModelTokenizerRegistryTests
     {
         public ModelTokenizerRegistryTests()
