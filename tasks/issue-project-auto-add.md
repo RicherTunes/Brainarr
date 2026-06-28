@@ -1,3 +1,4 @@
+<!-- docval:ignore-workflow-refs -->
 # TODO: Restore project auto-add workflows
 
 **Context**
