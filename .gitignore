@@ -430,3 +430,8 @@ Brainarr.Plugin/bin/
 # only reads it as a last-resort fallback after Brainarr.Plugin/bin/{,Release,Debug};
 # scripts/e2e.ps1 builds into bin/, so the committed copy was redundant (#79).
 _plugins/
+
+# Local tool/build artifacts (not source)
+.glm-delegate-diff/
+_pkgcheck/
+testResults.xml
