@@ -151,7 +151,9 @@ For development with full test suite:
 
 ## CI/CD Notes
 
-CI compiles against the Lidarr plugins branch by extracting assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`. Jobs fail fast if assemblies are missing. See `.github/workflows/` for `sanity-build`, `plugin-package`, and test jobs.
+CI compiles against the Lidarr plugins branch by extracting assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`. Jobs fail fast if assemblies are missing.
+
+**Gitea is the primary CI** (`192.168.2.59:3001`): the authoritative gate lives in `.gitea/workflows/` (run `pwsh scripts/verify-local.ps1` to reproduce it locally — extract + build + package + closure + tests). The `.github/workflows/` definitions (`sanity-build`, `plugin-package`, test jobs) are the GitHub **mirror**, which is out of Actions credits and non-authoritative.
 
 ## Tests and Coverage
 
