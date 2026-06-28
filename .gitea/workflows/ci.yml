@@ -5,9 +5,9 @@ name: CI
 #     scripts/verify-local.ps1. The act_runner mounts the Docker socket (so verify-local can extract
 #     the Lidarr plugins-branch host assemblies); the node image lacks the docker CLI, so the job
 #     installs pwsh / .NET / Docker CLI from self-contained downloads. Mirrors tidal/amazon/qobuz/apple.
-# ACTIVATION: this file does nothing until the repo's Actions are enabled AND the dead .github/workflows
-# are neutralized on the Gitea copy (else Gitea would also run ~20-30 GitHub workflows and clog the
-# single serial runner). See memory: gitea-primary-host.
+# Actions ARE enabled on Gitea and this is the authoritative primary CI (lint + verify).
+# There is no .github/workflows/ directory in this repo — GitHub Actions is out of credits and
+# GitHub serves only as a mirror; no workflow-duplication concern applies.
 on:
   workflow_dispatch:
   push:
