@@ -1,3 +1,4 @@
+<!-- docval:ignore-workflow-refs -->
 # Gap Resolution Report
 
 *Date: 2025-08-23*

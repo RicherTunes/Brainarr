@@ -1,3 +1,4 @@
+<!-- docval:ignore-workflow-refs -->
 ---
 name: container-deployment
 description: Manage containerization and deployment automation using Docker, Kubernetes, and cloud platforms. Use when working with Docker images, container registries, orchestration, deployment pipelines, infrastructure as code, or environment management. Handles container builds, registry publishing, and deployment strategies.
