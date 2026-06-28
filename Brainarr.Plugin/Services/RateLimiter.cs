@@ -62,6 +62,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
 
         /// <summary>
+        /// Initializes a new instance of the RateLimiter with an injectable TimeProvider.
+        /// For production use the single-arg ctor; this overload is for deterministic tests.
+        /// </summary>
+        /// <param name="logger">NLog Logger for diagnostic information</param>
+        /// <param name="timeProvider">Clock used by the token bucket for refill timing and Task.Delay waits.</param>
+        public RateLimiter(Logger logger, TimeProvider timeProvider)
+        {
+            var ilogger = logger != null ? NLogAdapterFactory.CreateILogger(logger) : null;
+            _innerLimiter = new CommonRateLimiter(ilogger, timeProvider);
+        }
+
+        /// <summary>
         /// Configures rate limiting for a specific resource.
         /// </summary>
         /// <param name="resource">Resource identifier (e.g., "openai", "musicbrainz")</param>
