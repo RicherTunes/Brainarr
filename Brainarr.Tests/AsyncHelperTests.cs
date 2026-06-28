@@ -168,8 +168,12 @@ namespace Brainarr.Tests
                 return "Completed";
             }
 
-            // Act
-            var result = SafeAsyncHelper.RunSyncWithTimeout(QuickTask(), 5000);
+            // Act — generous timeout: the task is ~10ms, so this only asserts the happy path returns the
+            // result. The budget must be large because under full-suite serial-CI thread-pool starvation the
+            // sync-over-async continuation can be delayed several seconds (a tight 5s budget flaked on
+            // unrelated PRs). A real "never completes" regression still fails at 30s. Matches the
+            // thread-pool-starvation timeout pattern used by the sibling concurrency/deadlock tests.
+            var result = SafeAsyncHelper.RunSyncWithTimeout(QuickTask(), 30000);
 
             // Assert
             Assert.Equal("Completed", result);
