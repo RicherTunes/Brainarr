@@ -5,6 +5,11 @@
     <TargetFramework>net8.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
+    <!-- Ship only invariant/English satellite resources. The ILRepack.Lib.MSBuild.Task build dep drags
+         Microsoft.CodeAnalysis, whose localized satellites (cs/de/es/.../Microsoft.CodeAnalysis.*.resources.dll)
+         otherwise leak into the published plugin zip — ~26 stray DLLs that fail packaging closure + bloat the
+         package. Build/packaging-only concern (CodeAnalysis is not a plugin runtime dependency). -->
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
     <!-- Scoped analyzer wiring (mirrors tidalarr/qobuzarr/applemusicarr): run ONLY the referenced
          Common LPC0003 analyzer during the build, not the SDK's full .NET (CA) analyzer suite.
          RunAnalyzersDuringBuild=true overrides the repo default (Directory.Build.props sets false) so

@@ -7,11 +7,15 @@
 
 [REQUIRED]
 Lidarr.Plugin.Brainarr.dll
-Lidarr.Plugin.Abstractions.dll
 plugin.json
 manifest.json
 
 [FORBIDDEN]
+# Common + Abstractions are ILRepack-MERGED + internalized into Lidarr.Plugin.Brainarr.dll (the
+# "0 external Lidarr.Plugin.* refs" rule + ecosystem standard post-ALC-fix), so they must NOT also
+# ship as sidecars — a sidecar reintroduces the COR_E_INVALIDOPERATION type-identity / ALC conflict.
+Lidarr.Plugin.Common.dll
+Lidarr.Plugin.Abstractions.dll
 # Host-provided contract assemblies -- including these causes type-identity conflicts
 FluentValidation.dll
 Microsoft.Extensions.DependencyInjection.Abstractions.dll

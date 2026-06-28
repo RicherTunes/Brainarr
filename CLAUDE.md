@@ -38,10 +38,16 @@ For Brainarr this is satisfied by `<AssemblyName>Lidarr.Plugin.Brainarr</Assembl
 ## Plugin Packaging Policy (CRITICAL)
 
 **The plugin package MUST contain:**
-- `Lidarr.Plugin.Brainarr.dll` - Main plugin
-- `Lidarr.Plugin.Abstractions.dll` - Required for plugin discovery (host does not ship it)
+- `Lidarr.Plugin.Brainarr.dll` - Main plugin (Common **and** Abstractions are ILRepack-MERGED +
+  internalized into this DLL — the "0 external `Lidarr.Plugin.*` refs" rule + the ecosystem
+  standard post-ALC-fix)
 - `plugin.json`
 - `manifest.json`
+
+`Lidarr.Plugin.Abstractions.dll` and `Lidarr.Plugin.Common.dll` MUST NOT ship as **sidecars** — they
+are merged into the main DLL; a stray sidecar reintroduces the COR_E_INVALIDOPERATION type-identity /
+ALC conflict (see `docs/dev-guide/ALC_MULTIPLUGIN_FIX.md` in Common). They are listed `[FORBIDDEN]` in
+`packaging/expected-contents.txt`.
 
 **The plugin package MUST NOT contain host-provided contract assemblies (type-identity conflicts):**
 - `FluentValidation.dll`
