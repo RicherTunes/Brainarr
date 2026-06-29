@@ -1,7 +1,6 @@
 # Brainarr Provider Matrix (v1.6.1)
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
-<!-- TODO(docval): providers.yaml is incomplete vs actual AIProvider enum in Brainarr.Plugin/Configuration/Enums.cs - missing ClaudeCodeCli, ZaiGlm, ZaiCoding -->
 <!-- PROVIDER_MATRIX_START -->
 | Provider | Type | Status | Notes |
 | --- | --- | --- | --- |
@@ -14,8 +13,11 @@
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Z.AI GLM | Cloud | ✅ Verified in v1.6.0 | OpenAI-compatible PaaS endpoint |
+| Claude Code CLI | CLI | ✅ Verified in v1.6.1 | Shells out to local `claude` CLI binary |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
 | OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
+| Z.AI Coding | Subscription | ✅ Verified in v1.6.0 | Anthropic-compatible Coding Plan endpoint |
 <!-- PROVIDER_MATRIX_END -->
 
 > Source of truth for README and wiki content. Updates must pass `Docs Consistency` CI checks.

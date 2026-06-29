@@ -5,7 +5,7 @@
 This guide covers deploying Brainarr to various environments including manual installation, Docker, and automated CI/CD pipelines.
 
 > Compatibility
-> Requires Lidarr plugins branch image `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913` or later (.NET 8). Ensure your Lidarr meets this before deploying the plugin.
+> Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch. The hotio plugins image `ghcr.io/hotio/lidarr:pr-plugins-3.1.2.4913` or later provides the required .NET 8 host.
 
 ## Table of Contents
 

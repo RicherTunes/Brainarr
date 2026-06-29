@@ -1,5 +1,5 @@
 <!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
-> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; publish the GitHub Wiki manually until automation exists.
 
 # Brainarr wiki home
 
@@ -48,8 +48,11 @@ You can install Brainarr directly from Lidarr without downloading a ZIP:
 | Groq | Cloud | ⚠️ Experimental | Low-latency batches |
 | DeepSeek | Cloud | ⚠️ Experimental | Budget-friendly option |
 | OpenRouter | Cloud | ⚠️ Experimental | Gateway to many models |
+| Z.AI GLM | Cloud | ✅ Verified in v1.6.0 | OpenAI-compatible PaaS endpoint |
+| Claude Code CLI | CLI | ✅ Verified in v1.6.1 | Shells out to local `claude` CLI binary |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
 | OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
+| Z.AI Coding | Subscription | ✅ Verified in v1.6.0 | Anthropic-compatible Coding Plan endpoint |
 <!-- PROVIDER_MATRIX_END -->
 
 If you need to expand a topic, update the repo docs first, then add a short pointer here.
@@ -67,4 +70,4 @@ If you need to expand a topic, update the repo docs first, then add a short poin
 - [Troubleshooting](Troubleshooting.md) — common issues and diagnostics.
 
 <!-- SYNCED_WIKI_PAGE: Do not edit in the GitHub Wiki UI. This page is synced from wiki-content/ in the repository. -->
-> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; CI auto-publishes to the Wiki.
+> Source of truth lives in README.md and docs/. Make changes via PRs to the repo; publish the GitHub Wiki manually until automation exists.

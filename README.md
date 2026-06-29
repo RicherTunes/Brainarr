@@ -56,7 +56,7 @@ Timeout and retry defaults
 
 - Test timeout: 10s (connection/model checks)
 - Retries: 3 attempts with backoff
-- Circuit breaker: opens for 1 minute on sustained failures (half-open requires 3 successes)
+- Circuit breaker: opens for 30 minutes on sustained auth failures (3 failures in 5 minutes)
 
 Provider call timeouts (defaults)
 
@@ -275,7 +275,7 @@ The wiki also provides focused guides:
 
 Use these focused guides when you need more than the README overview. Each link points at the canonical source so the README stays concise.
 
-> **Note:** The GitHub Wiki mirrors these docs from `wiki-content/` and the README. Please submit edits via PRs; CI auto-publishes the wiki.
+> **Note:** The GitHub Wiki mirrors these docs from `wiki-content/` and the README. Please submit edits via PRs; publish with the wiki sync scripts after the docs checks pass.
 
 ### Repo docs (`docs/`)
 
@@ -415,6 +415,8 @@ Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidar
 - `SmartCache<T>` — LRU-with-TTL cache backing recommendation plan storage
 
 **Ecosystem version contract:** Brainarr tracks `commonVersion: 1.18.0-dev`. The `ecosystem-parity-lint.ps1 -Check VersionContract` gate enforces that the plugin's `VERSION` file, `plugin.json`, and the Common submodule pin all agree. See [Common's ECOSYSTEM_VERSION_CONTRACT.md](https://github.com/RicherTunes/Lidarr.Plugin.Common/blob/main/docs/ECOSYSTEM_VERSION_CONTRACT.md) for details.
+
+**CI contract:** Gitea is the primary CI surface (`.gitea/workflows/ci.yml`). `CI / lint` runs Common's shared plugin lint runner; `CI / verify` runs `scripts/verify-local.ps1`, which delegates to `ext/Lidarr.Plugin.Common/scripts/local-ci.ps1`.
 
 ## Contributing
 

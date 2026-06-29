@@ -64,7 +64,11 @@ jobs:
       # the host assemblies via Docker).
       - name: Init Common submodule
         shell: bash
-        run: git submodule update --init ext/Lidarr.Plugin.Common
+        run: |
+          set -e
+          AUTH_HEADER="$(printf 'x-access-token:%s' '${{ secrets.GITHUB_TOKEN }}' | base64 | tr -d '\n')"
+          git -c "http.http://192.168.2.59:3001/.extraheader=AUTHORIZATION: basic $AUTH_HEADER" \
+            submodule update --init ext/Lidarr.Plugin.Common
       - name: Common submodule pin guard
         shell: bash
         run: bash ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --verify-only --path ext/Lidarr.Plugin.Common

@@ -27,9 +27,10 @@ This document is the canonical security note for Brainarr releases. It describes
 
 ## CI/CD Controls
 
-- CodeQL (C#) runs on PRs and on a weekly schedule.
-- The release workflow builds against real Lidarr assemblies extracted from `ghcr.io/hotio/lidarr:${{LIDARR_DOCKER_VERSION}}` (plugins branch) and attaches an SBOM to tagged releases.
-- Docs and manifests are checked for version consistency in CI.
+- Gitea is the authoritative CI surface (`.gitea/workflows/ci.yml`).
+- The `lint` job runs Common's shared plugin lint runner, including version-contract and docs consistency checks.
+- The `verify` job builds against real Lidarr assemblies extracted from the pinned plugins-branch Docker image and runs the deterministic test suite.
+- CodeQL, SBOM attachment, and Cosign signing are release/security enhancements to restore or run manually; they are not active PR gates in this repo's current Gitea-only workflow.
 
 ## Reporting & Scope
 
@@ -39,7 +40,7 @@ Out-of-scope: vulnerabilities in third-party AI providers or models; issues in L
 
 ## Release artifact verification (checksums + Cosign)
 
-Starting with v1.3.2, every release publishes:
+For releases that publish verification artifacts, use:
 
 - `Brainarr-<version>.zip` — plugin package
 - `Brainarr-<version>.zip.sha256` — SHA‑256 checksum
@@ -90,5 +91,5 @@ cosign verify-blob `
 
 Explanation
 
-- We use Sigstore “keyless” signing from GitHub Actions OIDC. Cosign validates against GitHub’s issuer and requires the certificate identity to match this repository.
+- Historical signed releases used Sigstore "keyless" signing from GitHub Actions OIDC. Cosign validates against GitHub's issuer and requires the certificate identity to match this repository.
 - No public keys to fetch or rotate; trust anchors are distributed by Sigstore/TUF and managed by Cosign.
