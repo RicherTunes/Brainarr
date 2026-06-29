@@ -43,10 +43,24 @@ try {
         # Lidarr.Plugin.Common/Abstractions refs and ValidatePackageClosure fails. local-ci.ps1 adds
         # PluginPackagingDisable=true to the TEST build itself (so test types resolve standalone).
         BuildFlags           = @('-p:LidarrPath={HOST_PATH}', '-m:1')
-        TestProjects         = @('Brainarr.Tests/Brainarr.Tests.csproj')
+        TestProjects         = @(
+            'Brainarr.Tests/Brainarr.Tests.csproj'
+            'tests/Brainarr.Parity.Tests/Brainarr.Parity.Tests.csproj'
+            'tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj'
+        )
         ExpectedContentsFile = 'packaging/expected-contents.txt'
         WarningBudget        = 80
         WarningBudgetEnforce = $false
+    }
+
+    # Dropout guard: fail if any *.Tests.csproj on disk is neither run nor skip-listed.
+    $guardScript = Join-Path $config.CommonPath 'scripts/ci/verify-test-projects-gated.ps1'
+    if (Test-Path -LiteralPath $guardScript) {
+        & $guardScript -RepoRoot $repoRoot -RunProjects $config.TestProjects -CI
+        if ($LASTEXITCODE -ne 0) {
+            Write-Host "ERROR: test-project dropout guard failed — a *.Tests.csproj is neither run nor skip-listed." -ForegroundColor Red
+            exit 1
+        }
     }
 
     $runner = Join-Path $config.CommonPath 'scripts/local-ci.ps1'
