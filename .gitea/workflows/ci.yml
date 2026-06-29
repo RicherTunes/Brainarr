@@ -33,6 +33,14 @@ jobs:
           tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
           chmod +x /opt/pwsh/pwsh
           echo "/opt/pwsh" >> "$GITHUB_PATH"
+      # The plugin contract tests (scripts/tests/*.ps1) are Pester-based; Pester is not
+      # bundled with the self-contained PowerShell tarball, so install it from PSGallery.
+      # Pinned to a known-good 5.x release to avoid accidental major-version drift.
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -RequiredVersion 5.6.1 -Force -SkipPublisherCheck
       - name: Shared plugin lint gates
         shell: pwsh
         run: ./ext/Lidarr.Plugin.Common/scripts/ci/run-plugin-lint-gates.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
