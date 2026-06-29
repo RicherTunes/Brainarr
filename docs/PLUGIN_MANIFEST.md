@@ -233,7 +233,7 @@ Here's a fully-featured manifest with all optional fields:
 - [ ] `version` - Current version (semantic)
 - [ ] `description` - Brief description
 - [ ] `author` - Author name/team
-- [ ] `minimumVersion` - Minimum Lidarr version
+- [ ] `minHostVersion` - Minimum Lidarr version
 - [ ] `entryPoint` - Main DLL file
 
 ### Common Issues
@@ -257,12 +257,12 @@ Here's a fully-featured manifest with all optional fields:
 ```json
 // Wrong - incompatible version format (example key renamed to avoid confusion)
 {
-  "minimumVersionExample": "2.14.1"  // Missing build number
+  "minHostVersionExample": "3.0.0"  // Missing build number
 }
 
 // Correct
 {
-  "minimumVersion": "2.14.2.4786"
+  "minHostVersion": "3.0.0.4855"
 }
 ```
 

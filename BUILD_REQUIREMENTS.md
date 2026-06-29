@@ -75,7 +75,7 @@ This is intentional! We want compilation to fail fast rather than runtime failur
 
 ## CI/CD Integration
 
-CI runs on **Gitea** (`.gitea/workflows/ci.yml`); GitHub Actions is out of credits, so the `.github/workflows/*` files are a mirror only. The Gitea `verify` job (via `scripts/verify-local.ps1`) extracts real Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`, then builds Brainarr against those binaries and runs tests. Jobs fail fast if assemblies are missing.
+CI runs on **Gitea** (`.gitea/workflows/ci.yml`). GitHub has no workflow directory in this repo, so Gitea is the sole authoritative CI surface. The Gitea `verify` job (via `scripts/verify-local.ps1`) extracts real Lidarr assemblies from Docker image `ghcr.io/hotio/lidarr:${LIDARR_DOCKER_VERSION}` into `ext/Lidarr-docker/_output/net8.0/`, then builds Brainarr against those binaries and runs tests. Jobs fail fast if assemblies are missing.
 
 See `.gitea/workflows/ci.yml` for the pipeline (`lint` + `verify` jobs). The Common submodule is re-pinned **manually** when Common's main advances — there is no scheduled auto-bump on the Gitea-primary copy.
 

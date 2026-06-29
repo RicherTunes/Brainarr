@@ -13,6 +13,22 @@ function Ok {
     Write-Host $Message -ForegroundColor Green
 }
 
+function Get-JsonString {
+    param(
+        [Parameter(Mandatory = $true)]$Object,
+        [Parameter(Mandatory = $true)][string[]]$Names
+    )
+
+    foreach ($name in $Names) {
+        $property = $Object.PSObject.Properties[$name]
+        if ($null -ne $property -and -not [string]::IsNullOrWhiteSpace([string]$property.Value)) {
+            return [string]$property.Value
+        }
+    }
+
+    return $null
+}
+
 $root = Resolve-Path (Join-Path $PSScriptRoot '..')
 Set-Location $root
 
@@ -23,21 +39,21 @@ try {
     Fail 'Unable to parse plugin.json or manifest.json'
 }
 
-$pluginVersion = $plugin.version
-$pluginMinVersion = $plugin.minimumVersion
-$manifestVersion = $manifest.version
-$manifestMinVersion = $manifest.minimumVersion
+$pluginVersion = Get-JsonString -Object $plugin -Names @('version')
+$pluginMinVersion = Get-JsonString -Object $plugin -Names @('minHostVersion', 'minimumVersion')
+$manifestVersion = Get-JsonString -Object $manifest -Names @('version')
+$manifestMinVersion = Get-JsonString -Object $manifest -Names @('minHostVersion', 'minimumVersion')
 
 if ([string]::IsNullOrWhiteSpace($pluginVersion)) { Fail 'Could not read plugin version from plugin.json' }
-if ([string]::IsNullOrWhiteSpace($pluginMinVersion)) { Fail 'Could not read minimumVersion from plugin.json' }
+if ([string]::IsNullOrWhiteSpace($pluginMinVersion)) { Fail 'Could not read minHostVersion/minimumVersion from plugin.json' }
 if ([string]::IsNullOrWhiteSpace($manifestVersion)) { Fail 'Could not read version from manifest.json' }
-if ([string]::IsNullOrWhiteSpace($manifestMinVersion)) { Fail 'Could not read minimumVersion from manifest.json' }
+if ([string]::IsNullOrWhiteSpace($manifestMinVersion)) { Fail 'Could not read minHostVersion/minimumVersion from manifest.json' }
 
 if ($manifestVersion -ne $pluginVersion) {
     Fail "manifest.json version ($manifestVersion) != plugin.json version ($pluginVersion)"
 }
 if ($manifestMinVersion -ne $pluginMinVersion) {
-    Fail "manifest.json minimumVersion ($manifestMinVersion) != plugin.json minimumVersion ($pluginMinVersion)"
+    Fail "manifest.json host version ($manifestMinVersion) != plugin.json host version ($pluginMinVersion)"
 }
 
 $readmeMatch = Select-String -Path 'README.md' -Pattern 'version-([0-9]+\.[0-9]+\.[0-9]+)' -List | Select-Object -First 1
@@ -47,13 +63,19 @@ if ($readmeVersion -ne $pluginVersion) {
     Fail "README badge version ($readmeVersion) != plugin.json version ($pluginVersion)"
 }
 
-$docVersions = [System.Collections.Generic.HashSet[string]]::new()
-foreach ($match in [regex]::Matches((Get-Content 'docs/PLUGIN_MANIFEST.md' -Raw), '"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"')) {
-    $docVersions.Add($match.Groups[1].Value) | Out-Null
+$manifestDoc = Get-Content 'docs/PLUGIN_MANIFEST.md' -Raw
+$currentManifestBlock = [regex]::Match(
+    $manifestDoc,
+    '## Current Manifest\s*```json\s*(?<json>.*?)\s*```',
+    [System.Text.RegularExpressions.RegexOptions]::Singleline)
+if (-not $currentManifestBlock.Success) {
+    Fail 'Could not find Current Manifest JSON block in docs/PLUGIN_MANIFEST.md'
 }
-foreach ($v in $docVersions) {
-    if ($v -ne $pluginVersion) {
-        Fail "docs/PLUGIN_MANIFEST.md version example ($v) does not match plugin.json ($pluginVersion)"
+
+foreach ($match in [regex]::Matches($currentManifestBlock.Groups['json'].Value, '"version":\s*"([0-9]+\.[0-9]+\.[0-9]+)"')) {
+    $docVersion = $match.Groups[1].Value
+    if ($docVersion -ne $pluginVersion) {
+        Fail "docs/PLUGIN_MANIFEST.md Current Manifest version ($docVersion) does not match plugin.json ($pluginVersion)"
     }
 }
 
@@ -63,13 +85,13 @@ Get-ChildItem 'docs' -Recurse -File |
     ForEach-Object {
         $content = Get-Content $_.FullName -Raw -ErrorAction SilentlyContinue
         if ($null -eq $content) { $content = '' }
-        foreach ($match in [regex]::Matches($content, '"minimumVersion":\s*"([^"\r\n]+)"')) {
+        foreach ($match in [regex]::Matches($content, '"(?:minHostVersion|minimumVersion)":\s*"([^"\r\n]+)"')) {
             $minMentions.Add($match.Groups[1].Value.Trim()) | Out-Null
         }
     }
 foreach ($mv in $minMentions) {
     if ($mv -ne $pluginMinVersion) {
-        Fail "docs minimumVersion mention ($mv) != plugin.json minimumVersion ($pluginMinVersion)"
+        Fail "docs host-version mention ($mv) != plugin.json minHostVersion ($pluginMinVersion)"
     }
 }
 
@@ -135,4 +157,4 @@ if (-not (Select-String -Path 'docs/PROVIDER_MATRIX.md' -Pattern "Brainarr Provi
     Fail "docs/PROVIDER_MATRIX.md header not updated for v$pluginVersion"
 }
 
-Ok "Docs consistency checks passed (version=$pluginVersion, minimumVersion=$pluginMinVersion)"
+Ok "Docs consistency checks passed (version=$pluginVersion, minHostVersion=$pluginMinVersion)"
