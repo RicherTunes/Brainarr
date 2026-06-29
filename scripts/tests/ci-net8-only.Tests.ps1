@@ -10,7 +10,7 @@ Describe 'CI matrix: net8.0 only' {
     BeforeAll {
         # Resolve repo root: scripts/tests/ -> scripts/ -> repo root
         $script:repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-        $script:WorkflowDir = Join-Path $script:repoRoot '.github' 'workflows'
+        $script:WorkflowDir = Join-Path $script:repoRoot '.gitea' 'workflows'
         if (Test-Path $script:WorkflowDir) {
             $script:WorkflowFiles = @(Get-ChildItem -Path $script:WorkflowDir -Filter '*.yml')
         } else {

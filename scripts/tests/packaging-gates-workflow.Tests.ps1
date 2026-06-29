@@ -2,48 +2,40 @@
 
 <#
 .SYNOPSIS
-    Phase 1.5 — TDD gate: .github/workflows/packaging-gates.yml must delegate to
-    Common's reusable workflow and must pin that workflow to a specific commit SHA
-    (not @main).
+    TDD gate: Gitea CI must run Brainarr's local packaging/closure verification.
 
 .DESCRIPTION
-    Asserts three properties of the workflow file:
-    1. The file exists.
-    2. It contains a `uses:` reference to Common's reusable packaging-gates workflow.
-    3. The SHA pin is present (i.e. the @ref is a 40-hex-character commit SHA, NOT "@main",
-       "@master", or a semver tag without a SHA).
+    Brainarr is Gitea-primary and intentionally has no .github/workflows directory.
+    The packaging gate now lives in scripts/verify-local.ps1, which the Gitea verify job runs.
 #>
 
 BeforeAll {
-    $script:WorkflowPath = Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) `
-        '.github\workflows\packaging-gates.yml'
+    $script:RepoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
+    $script:WorkflowPath = Join-Path $script:RepoRoot '.gitea\workflows\ci.yml'
+    $script:VerifyLocalPath = Join-Path $script:RepoRoot 'scripts\verify-local.ps1'
 }
 
-Describe 'brainarr — .github/workflows/packaging-gates.yml' {
+Describe 'brainarr — Gitea packaging verification' {
 
-    It 'exists' {
+    It '.gitea/workflows/ci.yml exists' {
         Test-Path $script:WorkflowPath | Should -BeTrue -Because `
-            'packaging-gates.yml must be present so Common CI gates apply to this repo'
+            'Gitea is the primary CI workflow host'
     }
 
-    It 'delegates to the Common reusable packaging-gates workflow via uses:' {
-        $content = Get-Content $script:WorkflowPath -Raw
-        $content | Should -Match 'uses:\s*RicherTunes/Lidarr\.Plugin\.Common/\.github/workflows/packaging-gates\.yml' `
-            -Because 'the workflow must call Common''s reusable workflow, not duplicate its logic'
+    It 'scripts/verify-local.ps1 exists' {
+        Test-Path $script:VerifyLocalPath | Should -BeTrue -Because `
+            'verify-local.ps1 owns build, package, closure, and deterministic test verification'
     }
 
-    It 'pins the Common workflow to a commit SHA (no @main / @master / bare tag)' {
+    It 'Gitea verify job runs verify-local.ps1' {
         $content = Get-Content $script:WorkflowPath -Raw
+        $content | Should -Match 'scripts/verify-local\.ps1' `
+            -Because 'Gitea CI must run the same local verification path developers run before merge'
+    }
 
-        # Extract the @ref part of the uses: line.
-        if ($content -match 'packaging-gates\.yml@([^\s]+)') {
-            $ref = $Matches[1]
-            # A valid commit SHA is exactly 40 hex characters.
-            $ref | Should -Match '^[0-9a-f]{40}$' `
-                -Because "the workflow must be pinned to a commit SHA for supply-chain safety, got '@$ref'"
-        }
-        else {
-            Set-ItResult -Skipped -Because 'uses: line not found — covered by the previous test'
-        }
+    It 'Gitea verify job runs after lint' {
+        $content = Get-Content $script:WorkflowPath -Raw
+        $content | Should -Match 'needs:\s*lint' `
+            -Because 'packaging verification should not start after lint has already found a policy violation'
     }
 }
