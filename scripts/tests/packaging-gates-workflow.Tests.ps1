@@ -33,9 +33,9 @@ Describe 'brainarr — Gitea packaging verification' {
             -Because 'Gitea CI must run the same local verification path developers run before merge'
     }
 
-    It 'Gitea verify job runs after lint' {
+    It 'Gitea verify job runs after lint and secret-scan' {
         $content = Get-Content $script:WorkflowPath -Raw
-        $content | Should -Match 'needs:\s*lint' `
-            -Because 'packaging verification should not start after lint has already found a policy violation'
+        $content | Should -Match 'needs:\s*\[\s*lint\s*,\s*secret-scan\s*\]' `
+            -Because 'packaging verification should not start after lint or secret-scan has already found a policy violation'
     }
 }
