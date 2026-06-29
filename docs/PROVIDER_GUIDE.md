@@ -1,6 +1,6 @@
 # Brainarr AI Provider Guide
 
-Brainarr supports eleven AI providers across local, cloud, subscription, and CLI modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
+Brainarr supports fourteen AI providers across local, cloud, subscription, and CLI modes. This guide helps you choose the right mix without duplicating the canonical reference tables.
 
 - **Provider status, verification notes, and default models** are generated from `docs/providers.yaml` into [README ▸ Provider status](../README.md#provider-status) and `docs/PROVIDER_MATRIX.md`.
 - **Deep dives and setup walkthroughs** live in the wiki: [Local Providers](https://github.com/RicherTunes/Brainarr/wiki/Local-Providers) and [Cloud Providers](https://github.com/RicherTunes/Brainarr/wiki/Cloud-Providers).
@@ -21,15 +21,18 @@ Brainarr uses UI-friendly labels that map to actual API model IDs. Select models
 | --- | --- | --- |
 | **Ollama** | Auto-detected from your local instance | `qwen2.5:latest` |
 | **LM Studio** | Auto-detected from your local instance | `local-model` |
-| **OpenAI** | GPT41, GPT41_Mini, GPT41_Nano, GPT4o, GPT4o_Mini, O4_Mini | `GPT41_Mini` |
-| **Anthropic** | ClaudeSonnet4, Claude37_Sonnet, Claude35_Haiku, Claude3_Opus | `ClaudeSonnet4` |
-| **Google Gemini** | Gemini_25_Pro, Gemini_25_Flash, Gemini_25_Flash_Lite, Gemini_20_Flash, Gemini_15_Flash, Gemini_15_Flash_8B, Gemini_15_Pro | `Gemini_25_Flash` |
+| **OpenAI** | GPT5, GPT5_Mini, GPT41, GPT41_Mini, GPT41_Nano, GPT4o, GPT4o_Mini, O4_Mini | `GPT5_Mini` |
+| **Anthropic** | ClaudeSonnet46, ClaudeSonnet4, Claude37_Sonnet, Claude35_Haiku, Claude3_Opus | `ClaudeSonnet46` |
+| **Google Gemini** | Gemini_3_Flash, Gemini_25_Pro, Gemini_25_Flash, Gemini_25_Flash_Lite, Gemini_20_Flash, Gemini_15_Flash, Gemini_15_Flash_8B, Gemini_15_Pro | `Gemini_3_Flash` |
 | **Groq** | Llama33_70B_Versatile, Llama33_70B_SpecDec, DeepSeek_R1_Distill_L70B, Llama31_8B_Instant | `Llama33_70B_Versatile` |
-| **DeepSeek** | DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_Chat` |
+| **DeepSeek** | DeepSeek_V4_Flash, DeepSeek_Chat, DeepSeek_Reasoner, DeepSeek_R1, DeepSeek_Search | `DeepSeek_V4_Flash` |
 | **Perplexity** | Sonar_Pro, Sonar_Reasoning_Pro, Sonar_Reasoning, Sonar | `Sonar_Pro` |
 | **OpenRouter** | Auto, ClaudeSonnet4, GPT41_Mini, Gemini25_Flash, Llama33_70B, DeepSeekV3 | `Auto` |
 | **Claude Code** | ClaudeSonnet46, ClaudeOpus47, ClaudeHaiku45 | `ClaudeSonnet46` |
 | **OpenAI Codex** | GPT5, GPT5_Mini, GPT41_Mini | `GPT5_Mini` |
+| **Z.AI GLM** | GLM_4_5_Air, GLM_5_1 and sibling GLM catalog entries | `GLM_4_5_Air` |
+| **Z.AI Coding** | GLM_5_1, GLM_4_5_Air and coding-plan GLM catalog entries | `GLM_5_1` |
+| **Claude Code CLI** | Detected from the local `claude` binary | `claude-cli` |
 
 **Advanced:** Use the **Manual Model ID** field in Advanced Settings to specify an exact API model ID (e.g., `gpt-4.1-mini`, `claude-sonnet-4-20250514`) when you need a model not in the dropdown.
 
@@ -79,8 +82,8 @@ Estimated monthly cost for typical Brainarr usage (~50 recommendation requests/m
 |------|---------------------------|-----|
 | 100% privacy / offline | **Ollama** or **LM Studio** | Zero-cost, no data leaves your network, great for pilots. |
 | Lowest cloud spend | **DeepSeek** | Budget-friendly with strong quality; pair with free Gemini for overflow. |
-| "It just works" managed cloud | **Gemini** (`Gemini_25_Flash`) | Generous free tier, excellent context window, easy onboarding. |
-| Highest quality | **Anthropic** (`ClaudeSonnet4`) or via **OpenRouter** | Premium reasoning. Budget a fallback such as GPT41_Mini. |
+| "It just works" managed cloud | **Gemini** (`Gemini_3_Flash`) | Generous free tier, excellent context window, easy onboarding. |
+| Highest quality | **Anthropic** (`ClaudeSonnet46`) or via **OpenRouter** | Premium reasoning. Budget a fallback such as GPT5_Mini. |
 | Fastest responses | **Groq** (`Llama33_70B_Versatile`) | Ultra-low latency for interactive playlists. |
 
 Use the flowchart above or follow the wiki guides for detailed setup walkthroughs.
@@ -90,9 +93,9 @@ Use the flowchart above or follow the wiki guides for detailed setup walkthrough
 These chains balance cost, stability, and performance. Configure them in Brainarr's provider settings using the UI labels shown in the matrix.
 
 1. **Privacy First:** Ollama → LM Studio (ensure both run locally).
-2. **Cost Effective:** DeepSeek (`DeepSeek_Chat`) → Gemini (`Gemini_25_Flash`) → OpenAI (`GPT41_Mini`) for overflow.
-3. **Quality First:** Anthropic (`ClaudeSonnet4`) → OpenAI (`GPT41_Mini`) → DeepSeek (`DeepSeek_Chat`).
-4. **Exploration:** OpenRouter (`Auto`) → Gemini (`Gemini_25_Flash`) → Groq (`Llama33_70B_Versatile`) for fast retries.
+2. **Cost Effective:** DeepSeek (`DeepSeek_V4_Flash`) → Gemini (`Gemini_3_Flash`) → OpenAI (`GPT5_Mini`) for overflow.
+3. **Quality First:** Anthropic (`ClaudeSonnet46`) → OpenAI (`GPT5_Mini`) → DeepSeek (`DeepSeek_V4_Flash`).
+4. **Exploration:** OpenRouter (`Auto`) → Gemini (`Gemini_3_Flash`) → Groq (`Llama33_70B_Versatile`) for fast retries.
 
 Test your fallback chain using the **Test** button after configuring each provider.
 

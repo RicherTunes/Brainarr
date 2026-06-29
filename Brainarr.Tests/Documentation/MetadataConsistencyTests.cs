@@ -3,6 +3,7 @@ using System.IO;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using FluentAssertions;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using Xunit;
 
 namespace Brainarr.Tests.Documentation
@@ -24,6 +25,35 @@ namespace Brainarr.Tests.Documentation
 
             manifestVersion.Should().Be(readmeVersion, "manifest minimumVersion should match README");
             pluginVersion.Should().Be(readmeVersion, "plugin minimumVersion should match README");
+        }
+
+        [Fact]
+        public void ProviderDefaultTables_Use_Current_Code_Defaults()
+        {
+            var root = FindRepositoryRoot();
+            var readme = File.ReadAllText(Path.Combine(root, "README.md"));
+            var providerGuide = File.ReadAllText(Path.Combine(root, "docs", "PROVIDER_GUIDE.md"));
+
+            AssertDocumentedDefault(readme, "OpenAI", BrainarrConstants.DefaultOpenAIModel);
+            AssertDocumentedDefault(readme, "Anthropic", BrainarrConstants.DefaultAnthropicModel);
+            AssertDocumentedDefault(readme, "Gemini", BrainarrConstants.DefaultGeminiModel);
+            AssertDocumentedDefault(readme, "DeepSeek", BrainarrConstants.DefaultDeepSeekModel);
+
+            AssertDocumentedDefault(providerGuide, "OpenAI", BrainarrConstants.DefaultOpenAIModel);
+            AssertDocumentedDefault(providerGuide, "Anthropic", BrainarrConstants.DefaultAnthropicModel);
+            AssertDocumentedDefault(providerGuide, "Google Gemini", BrainarrConstants.DefaultGeminiModel);
+            AssertDocumentedDefault(providerGuide, "DeepSeek", BrainarrConstants.DefaultDeepSeekModel);
+        }
+
+        private static void AssertDocumentedDefault(string markdown, string provider, string expectedDefault)
+        {
+            markdown.Should().Contain($"| **{provider}** |", $"the {provider} row must exist");
+
+            var rowPattern = $@"\|\s*\*\*{Regex.Escape(provider)}\*\*\s*\|(?<cells>.*)\|";
+            var match = Regex.Match(markdown, rowPattern);
+            match.Success.Should().BeTrue($"the {provider} row must be parseable");
+            match.Value.Should().Contain($"`{expectedDefault}`",
+                $"{provider} docs should track BrainarrConstants rather than stale release-era defaults");
         }
 
         private static string ReadJsonVersion(string path)
