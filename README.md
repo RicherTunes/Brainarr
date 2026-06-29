@@ -372,11 +372,11 @@ For per-provider model lists, defaults, and subscription setup, see [docs/PROVID
 | --- | --- | --- |
 | **Ollama** | `qwen2.5:latest` | Auto-detected from local instance |
 | **LM Studio** | `local-model` | Auto-detected from local instance |
-| **OpenAI** | `GPT41_Mini` | GPT-4.1 series available |
-| **Anthropic** | `ClaudeSonnet4` | Claude 4 Sonnet |
-| **Gemini** | `Gemini_25_Flash` | Gemini 2.5 Flash |
+| **OpenAI** | `GPT5_Mini` | GPT-5 series default |
+| **Anthropic** | `ClaudeSonnet46` | Claude Sonnet 4.6 |
+| **Gemini** | `Gemini_3_Flash` | Gemini 3 Flash |
 | **Groq** | `Llama33_70B_Versatile` | Low-latency inference |
-| **DeepSeek** | `DeepSeek_Chat` | Budget-friendly |
+| **DeepSeek** | `DeepSeek_V4_Flash` | Budget-friendly V4 Flash |
 | **Perplexity** | `Sonar_Pro` | Web-augmented |
 | **OpenRouter** | `Auto` | Gateway to many models |
 | **Z.AI GLM** | `GLM_4_5_Air` | GLM-4.5-Air default (106B params) |
