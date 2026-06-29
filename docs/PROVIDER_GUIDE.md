@@ -7,7 +7,7 @@ Brainarr supports eleven AI providers across local, cloud, subscription, and CLI
 - **Troubleshooting** per provider is centralised in `docs/troubleshooting.md` and the wiki **Observability & Metrics** page.
 
 > Compatibility
-> Requires Lidarr 2.14.2.4786+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
+> Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch (Settings > General > Updates > Branch = nightly). See the README Compatibility notice for the canonical requirement before enabling Brainarr.
 
 ## Offline mode
 
