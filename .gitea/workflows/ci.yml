@@ -1,6 +1,6 @@
 name: CI
 # Gitea-primary CI (GitHub Actions is out of credits). Two jobs:
-#   * lint   -- fast ecosystem gates (date-parsing, sync-over-async, ecosystem-parity); pwsh-only.
+#   * lint   -- shared Common plugin lint gates; pwsh-only.
 #   * verify -- full build + ILRepack package + packaging-closure + deterministic tests via
 #     scripts/verify-local.ps1. The act_runner mounts the Docker socket (so verify-local can extract
 #     the Lidarr plugins-branch host assemblies); the node image lacks the docker CLI, so the job
@@ -33,26 +33,15 @@ jobs:
           tar -xzf /tmp/pwsh.tgz -C /opt/pwsh
           chmod +x /opt/pwsh/pwsh
           echo "/opt/pwsh" >> "$GITHUB_PATH"
-      - name: Date-parsing gate (culture-safety + epoch guard)
+      - name: Shared plugin lint gates
         shell: pwsh
-        run: ./ext/Lidarr.Plugin.Common/scripts/lint-date-parsing.ps1 -Path . -Mode ci
-      - name: Sync-over-async gate
-        shell: pwsh
-        run: ./ext/Lidarr.Plugin.Common/scripts/lint-sync-over-async.ps1 -Path . -Mode ci
-      - name: Ecosystem parity gate
-        shell: pwsh
-        run: ./ext/Lidarr.Plugin.Common/scripts/ecosystem-parity-lint.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
-      - name: Doc script/workflow-ref gate (self-test)
-        shell: pwsh
-        run: ./ext/Lidarr.Plugin.Common/scripts/lint-doc-script-refs.ps1 -RepoRoot . -SelfTest -CI
-      - name: Doc script/workflow-ref gate
-        shell: pwsh
-        run: ./ext/Lidarr.Plugin.Common/scripts/lint-doc-script-refs.ps1 -RepoRoot . -CI
+        run: ./ext/Lidarr.Plugin.Common/scripts/ci/run-plugin-lint-gates.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
 
   # Full build + ILRepack package + packaging-closure + deterministic tests via verify-local.
   # verify-local extracts the Lidarr host assemblies from Docker; the act_runner mounts the Docker
   # socket but the node image lacks the docker CLI, so install it. Mirrors tidal/amazon/qobuz/apple.
   verify:
+    needs: lint
     runs-on: ubuntu-latest
     timeout-minutes: 90
     env:
