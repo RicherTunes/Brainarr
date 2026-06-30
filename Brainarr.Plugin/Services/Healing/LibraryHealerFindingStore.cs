@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Hosting;
 using Lidarr.Plugin.Common.Services.Storage;
@@ -23,15 +22,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
     private const string FileName = "library_healer_findings.json";
     private const int MaxEntries = 5000;
     private const int MaxRecentLimit = 500;
-    private static readonly Regex UncPathPattern = new(
-        @"\\\\[^\s\\/\r\n\t""<>|:]+\\[^\\/\r\n\t""<>|:]+(?:\\[^\\/\r\n\t""<>|:]+)+",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex RelativeWindowsPathPattern = new(
-        @"(?<![A-Za-z0-9_.~$()'-])(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?)\\(?:[^\\/\r\n\t""<>|:]+\\)*[^\\/\r\n\t""<>|:]*?\.[A-Za-z0-9]{1,8}",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
-    private static readonly Regex RelativePosixPathPattern = new(
-        @"(?<![A-Za-z0-9_.~$()'./-])(?:(?:\./)(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?/)+|(?:[A-Za-z0-9_.~$()'-]+/)(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?/)*)[^\\/\r\n\t""<>|:]*?\.[A-Za-z0-9]{1,8}",
-        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private const string PathContainingMessageRedaction = "<path-containing message redacted>";
 
     private readonly JsonFileStore<string, LibraryHealerFinding> _store;
 
@@ -124,7 +115,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             ? finding.File
             : finding.File with { RedactedPath = redactedPath };
 
-        var tagReaderMessage = SanitizeMessage(finding.TagReader.ErrorMessage, originalPathMaterial);
+        var tagReaderMessage = SanitizeMessage(finding.TagReader.ErrorMessage);
         var tagReader = string.Equals(tagReaderMessage, finding.TagReader.ErrorMessage, StringComparison.Ordinal)
             ? finding.TagReader
             : finding.TagReader with { ErrorMessage = tagReaderMessage };
@@ -132,7 +123,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         var probe = finding.Probe;
         if (probe is not null)
         {
-            var probeMessage = SanitizeMessage(probe.ErrorMessage, originalPathMaterial);
+            var probeMessage = SanitizeMessage(probe.ErrorMessage);
             if (!string.Equals(probeMessage, probe.ErrorMessage, StringComparison.Ordinal))
             {
                 probe = probe with { ErrorMessage = probeMessage };
@@ -158,25 +149,11 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         return id;
     }
 
-    private static string? SanitizeMessage(string? message, string? knownPath)
+    private static string? SanitizeMessage(string? message)
     {
-        var redacted = RedactPathSegments(message);
-        redacted = ContainsLikelyPath(redacted)
-            ? PathPrivacy.RedactMessage(redacted, ShouldRedactPathMaterial(knownPath) ? knownPath : null)
-            : redacted;
-        return RedactPathSegments(redacted);
-    }
-
-    private static string? RedactPathSegments(string? message)
-    {
-        if (string.IsNullOrWhiteSpace(message))
-        {
-            return message;
-        }
-
-        var redacted = UncPathPattern.Replace(message, static match => PathPrivacy.Redact(match.Value));
-        redacted = RelativeWindowsPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
-        return RelativePosixPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
+        return ContainsLikelyPath(message)
+            ? PathContainingMessageRedaction
+            : message;
     }
 
     private static bool ShouldRedactPathMaterial(string? value)

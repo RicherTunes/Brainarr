@@ -146,6 +146,75 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldReplacePathContainingEvidenceMessagesWithGenericRedaction()
+    {
+        var store = CreateStore();
+        const string safeMessage = "Tag reader failed because metadata duration was empty.";
+        const string genericRedaction = "<path-containing message redacted>";
+        var start = new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc);
+        var findings = new[]
+        {
+            CreateFinding(
+                id: "very-private-relative",
+                redactedPath: "track01.flac#abcdef123456",
+                pathHash: "callerhash001",
+                tagReaderErrorMessage: @"TagLib failed reading Very Private Artist\Album\track01.flac",
+                observedAtUtc: start),
+            CreateFinding(
+                id: "artist-friend-relative",
+                redactedPath: "track02.flac#abcdef123457",
+                pathHash: "callerhash002",
+                tagReaderErrorMessage: @"TagLib failed reading Artist & Friend\Album\track01.flac",
+                observedAtUtc: start.AddMinutes(1)),
+            CreateFinding(
+                id: "unicode-posix-relative",
+                redactedPath: "a.flac#abcdef123458",
+                pathHash: "callerhash003",
+                probeErrorMessage: "ffprobe failed opening música/Très Private Artist/Album/a.flac",
+                observedAtUtc: start.AddMinutes(2)),
+            CreateFinding(
+                id: "parent-posix-relative",
+                redactedPath: "a.flac#abcdef123459",
+                pathHash: "callerhash004",
+                probeErrorMessage: "ffprobe failed opening ../Private Artist/Album/a.flac",
+                observedAtUtc: start.AddMinutes(3)),
+            CreateFinding(
+                id: "safe-message",
+                redactedPath: "track03.flac#abcdef123460",
+                pathHash: "callerhash005",
+                tagReaderErrorMessage: safeMessage,
+                observedAtUtc: start.AddMinutes(4)),
+        };
+
+        store.SaveBatch(findings);
+
+        var persisted = CreateStore().GetRecent(10);
+        persisted.Should().HaveCount(5);
+        persisted.Single(finding => finding.Id == "very-private-relative")
+            .TagReader.ErrorMessage.Should().Be(genericRedaction);
+        persisted.Single(finding => finding.Id == "artist-friend-relative")
+            .TagReader.ErrorMessage.Should().Be(genericRedaction);
+        persisted.Single(finding => finding.Id == "unicode-posix-relative")
+            .Probe!.ErrorMessage.Should().Be(genericRedaction);
+        persisted.Single(finding => finding.Id == "parent-posix-relative")
+            .Probe!.ErrorMessage.Should().Be(genericRedaction);
+        persisted.Single(finding => finding.Id == "safe-message")
+            .TagReader.ErrorMessage.Should().Be(safeMessage);
+        persisted.Single(finding => finding.Id == "very-private-relative")
+            .File.PathHash.Should().Be("callerhash001");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain("path-containing message redacted");
+        json.Should().Contain(safeMessage);
+        AssertNoGenericRedactionPrivatePathFragments(json);
+        foreach (var finding in persisted)
+        {
+            AssertNoGenericRedactionPrivatePathFragments(finding.TagReader.ErrorMessage);
+            AssertNoGenericRedactionPrivatePathFragments(finding.Probe?.ErrorMessage);
+        }
+    }
+
+    [Fact]
     public void SaveBatch_ShouldSanitizePathLikeFindingId()
     {
         var store = CreateStore();
@@ -245,6 +314,21 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         value.Should().NotContain("music/Private Artist/Album/a.flac");
         value.Should().NotContain("./Private Artist/Album/a.flac");
         value.Should().NotContain("Private Artist/Album/a.flac");
+    }
+
+    private static void AssertNoGenericRedactionPrivatePathFragments(string? value)
+    {
+        value.Should().NotContain("Very Private Artist");
+        value.Should().NotContain("Very");
+        value.Should().NotContain("Artist & Friend");
+        value.Should().NotContain("Artist &");
+        value.Should().NotContain("Friend");
+        value.Should().NotContain("música");
+        value.Should().NotContain("Très Private Artist");
+        value.Should().NotContain("../Private Artist");
+        value.Should().NotContain(@"Very Private Artist\Album");
+        value.Should().NotContain(@"Artist & Friend\Album");
+        value.Should().NotContain("música/Très Private Artist");
     }
 
     private static LibraryHealerFinding CreateFinding(
