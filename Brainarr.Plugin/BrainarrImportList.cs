@@ -14,6 +14,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Configuration;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Music;
 using NzbDrone.Common.Http;
@@ -48,6 +49,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         private readonly IHttpClient _httpClient;
         private readonly IArtistService _artistService;
         private readonly IAlbumService _albumService;
+        private readonly IMediaFileService _mediaFileService;
+        private readonly IAudioTagService _audioTagService;
         private readonly IBrainarrOrchestrator _orchestrator;
         private readonly IServiceProvider? _serviceProvider;
         private ImportListDefinition? _definition;
@@ -69,8 +72,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
+            IMediaFileService mediaFileService,
+            IAudioTagService audioTagService,
             Logger logger)
-            : this(httpClient, importListStatusService, configService, parsingService, artistService, albumService, logger, orchestratorOverride: null)
+            : this(httpClient, importListStatusService, configService, parsingService, artistService, albumService, mediaFileService, audioTagService, logger, orchestratorOverride: null)
         {
         }
 
@@ -81,6 +86,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             IParsingService parsingService,
             IArtistService artistService,
             IAlbumService albumService,
+            IMediaFileService mediaFileService,
+            IAudioTagService audioTagService,
             Logger logger,
             IBrainarrOrchestrator? orchestratorOverride)
             : base(importListStatusService, configService, parsingService, logger)
@@ -88,6 +95,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
             _albumService = albumService ?? throw new ArgumentNullException(nameof(albumService));
+            _mediaFileService = mediaFileService ?? throw new ArgumentNullException(nameof(mediaFileService));
+            _audioTagService = audioTagService ?? throw new ArgumentNullException(nameof(audioTagService));
 
             var module = new BrainarrModule();
             _serviceProvider = module.BuildServiceProvider(services =>
@@ -96,6 +105,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 services.AddSingleton(_httpClient);
                 services.AddSingleton(_artistService);
                 services.AddSingleton(_albumService);
+                services.AddSingleton(_mediaFileService);
+                services.AddSingleton(_audioTagService);
             });
 
             _orchestrator = orchestratorOverride ?? _serviceProvider.GetRequiredService<IBrainarrOrchestrator>();

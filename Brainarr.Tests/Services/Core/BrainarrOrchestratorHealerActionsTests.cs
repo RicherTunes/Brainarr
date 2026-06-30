@@ -480,7 +480,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             });
         var handler = new LibraryHealerActionHandler(scanRunner.Object, store);
 
-        var scan = Task.Run(() => handler.Handle("healer/scan", new Dictionary<string, string>()));
+        var scan = RunOnDedicatedThread(() => handler.Handle("healer/scan", new Dictionary<string, string>()));
         entered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         var clear = handler.Handle("healer/clearfindings", new Dictionary<string, string>());
         release.Set();
@@ -507,7 +507,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             });
         var handler = new LibraryHealerActionHandler(scanRunner.Object, new FakeFindingStore());
 
-        var first = Task.Run(() => handler.Handle("healer/scan", new Dictionary<string, string>()));
+        var first = RunOnDedicatedThread(() => handler.Handle("healer/scan", new Dictionary<string, string>()));
         entered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         var second = handler.Handle("healer/scan", new Dictionary<string, string>());
         release.Set();
@@ -562,6 +562,29 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             new TagReaderEvidence(true, true, 0, null, null),
             null,
             new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+    }
+
+    private static Task<object> RunOnDedicatedThread(Func<object> action)
+    {
+        var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var thread = new Thread(() =>
+        {
+            try
+            {
+                completion.SetResult(action());
+            }
+            catch (Exception ex)
+            {
+                completion.SetException(ex);
+            }
+        })
+        {
+            IsBackground = true,
+            Name = "BrainarrHealerActionTest",
+        };
+
+        thread.Start();
+        return completion.Task;
     }
 
     private sealed class FakeFindingStore : ILibraryHealerFindingStore

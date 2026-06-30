@@ -15,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -41,6 +42,8 @@ namespace Brainarr.Tests.Observability
             var parser = new Mock<IParsingService>();
             var artists = new Mock<IArtistService>();
             var albums = new Mock<IAlbumService>();
+            var mediaFiles = new Mock<IMediaFileService>();
+            var audioTags = new Mock<IAudioTagService>();
             Logger logger = TestLogger.CreateNullLogger("ObsTestLogger");
 
             return new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
@@ -50,6 +53,8 @@ namespace Brainarr.Tests.Observability
                 parser.Object,
                 artists.Object,
                 albums.Object,
+                mediaFiles.Object,
+                audioTags.Object,
                 logger,
                 orchestrator);
         }

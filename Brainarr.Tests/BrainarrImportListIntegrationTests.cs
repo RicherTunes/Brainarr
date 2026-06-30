@@ -16,6 +16,7 @@ using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -32,6 +33,8 @@ namespace Brainarr.Tests
         private readonly Mock<IParsingService> _parsingServiceMock;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
+        private readonly Mock<IMediaFileService> _mediaFileServiceMock;
+        private readonly Mock<IAudioTagService> _audioTagServiceMock;
         private readonly Mock<IBrainarrOrchestrator> _orchestratorMock;
         private readonly Logger _logger;
         private readonly NzbDrone.Core.ImportLists.Brainarr.Brainarr _brainarrImportList;
@@ -44,6 +47,8 @@ namespace Brainarr.Tests
             _parsingServiceMock = new Mock<IParsingService>();
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
+            _mediaFileServiceMock = new Mock<IMediaFileService>();
+            _audioTagServiceMock = new Mock<IAudioTagService>();
             _orchestratorMock = new Mock<IBrainarrOrchestrator>();
             _logger = TestLogger.CreateNullLogger();
 
@@ -63,6 +68,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger,
                 _orchestratorMock.Object);
         }
@@ -90,6 +97,8 @@ namespace Brainarr.Tests
                     _parsingServiceMock.Object,
                     _artistServiceMock.Object,
                     _albumServiceMock.Object,
+                    _mediaFileServiceMock.Object,
+                    _audioTagServiceMock.Object,
                     _logger));
         }
 
@@ -105,6 +114,8 @@ namespace Brainarr.Tests
                     _parsingServiceMock.Object,
                     null,
                     _albumServiceMock.Object,
+                    _mediaFileServiceMock.Object,
+                    _audioTagServiceMock.Object,
                     _logger));
         }
 
