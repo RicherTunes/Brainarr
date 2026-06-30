@@ -1,6 +1,6 @@
 # Release Checklist (Pre‑Release Validation)
 
-Use this list to confirm the release is ready **before** running `./.github/scripts/tag-release.sh <version>`.
+Use this list to confirm the release is ready **before** running `pwsh ./scripts/new-release.ps1` or `bash ./scripts/new-release.sh`.
 
 ## 1. Versioning & Notes
 
@@ -11,8 +11,9 @@ Use this list to confirm the release is ready **before** running `./.github/scri
 ## 2. Build & Test
 
 - [ ] `pwsh ./build.ps1 --setup --test` (or `./build.sh --setup --test`) passes locally.
+- [ ] `pwsh ./scripts/verify-local.ps1` (or `bash ./scripts/verify-local.sh`) passes and matches the Gitea `CI / verify` gate.
 - [ ] Any quarantined tests have been reviewed; new skips are documented with TODO links.
-- [ ] CI on `main` (or release branch) is green. <!-- TODO(docval): feat/roadmap-1.3.0 branch reference outdated -->
+- [ ] CI on `main` (or the branch you plan to tag) is green in Gitea for `CI / secret-scan`, `CI / lint`, and `CI / verify`.
 
 ## 3. Manual Smoke (once per release line)
 
@@ -33,8 +34,8 @@ Use this list to confirm the release is ready **before** running `./.github/scri
 
 ## 6. Tag & Publish
 
-- [ ] Run `./.github/scripts/tag-release.sh <version>`.
-- [ ] Verify the workflow run completes in GitHub Actions.
-- [ ] Review the generated GitHub release draft (notes, assets, version numbers) before announcing.
+- [ ] Run `pwsh ./scripts/new-release.ps1` or `bash ./scripts/new-release.sh` from a clean tree.
+- [ ] Confirm the tag push starts the release automation and the published release page has the expected notes and assets.
+- [ ] Review the generated release page before announcing.
 
 Keep this checklist in sync with [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md); add new items here instead of cloning instructions elsewhere.
