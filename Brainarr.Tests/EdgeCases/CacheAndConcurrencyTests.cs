@@ -20,6 +20,7 @@ using Xunit;
 
 namespace Brainarr.Tests.EdgeCases
 {
+    [Collection("RateLimiterTests")]
     public class CacheAndConcurrencyTests
     {
         private readonly Logger _logger;

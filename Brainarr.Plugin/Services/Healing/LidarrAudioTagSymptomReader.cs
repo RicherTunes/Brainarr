@@ -35,17 +35,21 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
                 return TimeoutEvidence();
             }
 
-            var readTask = Task.Run(() =>
-            {
-                try
+            var readTask = Task.Factory.StartNew(
+                () =>
                 {
-                    return _audioTagService.ReadTags(path);
-                }
-                finally
-                {
-                    _readGate.Release();
-                }
-            });
+                    try
+                    {
+                        return _audioTagService.ReadTags(path);
+                    }
+                    finally
+                    {
+                        _readGate.Release();
+                    }
+                },
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
 
             var parsed = readTask
                 .WaitAsync(_timeout, cancellationToken)

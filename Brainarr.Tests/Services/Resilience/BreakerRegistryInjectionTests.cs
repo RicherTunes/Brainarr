@@ -6,6 +6,7 @@ using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Music;
 using Xunit;
 
@@ -27,6 +28,8 @@ namespace Brainarr.Tests.Services.Resilience
             services.AddSingleton(Mock.Of<IHttpClient>());
             services.AddSingleton(Mock.Of<IArtistService>());
             services.AddSingleton(Mock.Of<IAlbumService>());
+            services.AddSingleton(Mock.Of<IMediaFileService>());
+            services.AddSingleton(Mock.Of<IAudioTagService>());
 
             // Act
             BrainarrOrchestratorFactory.ConfigureServices(services);
@@ -54,6 +57,8 @@ namespace Brainarr.Tests.Services.Resilience
             services.AddSingleton(Mock.Of<IHttpClient>());
             services.AddSingleton(Mock.Of<IArtistService>());
             services.AddSingleton(Mock.Of<IAlbumService>());
+            services.AddSingleton(Mock.Of<IMediaFileService>());
+            services.AddSingleton(Mock.Of<IAudioTagService>());
 
             // Replace default registry with mock
             services.AddSingleton<IBreakerRegistry>(mockRegistry.Object);
@@ -81,6 +86,8 @@ namespace Brainarr.Tests.Services.Resilience
             services.AddSingleton(Mock.Of<IHttpClient>());
             services.AddSingleton(Mock.Of<IArtistService>());
             services.AddSingleton(Mock.Of<IAlbumService>());
+            services.AddSingleton(Mock.Of<IMediaFileService>());
+            services.AddSingleton(Mock.Of<IAudioTagService>());
 
             BrainarrOrchestratorFactory.ConfigureServices(services);
             var provider = services.BuildServiceProvider();
