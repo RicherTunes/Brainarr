@@ -279,19 +279,189 @@ public sealed class LibraryHealerScanRunnerTests
         act.Should().Throw<OperationCanceledException>();
     }
 
+    [Fact]
+    public void Scan_ShouldSanitizeThrownCancellationMessages_FromMediaFileService()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var store = new RecordingFindingStore();
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Throws(new OperationCanceledException(@"Canceled scanning D:\Music\Private Artist\track01.m4a"));
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, store: store)
+            .Scan();
+
+        var exception = act.Should().Throw<OperationCanceledException>().Which;
+        exception.Message.Should().Be("Library healer scan was canceled");
+        store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldSanitizeThrownCancellationMessages_FromTagReader()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = PathFor(1);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path) });
+        tagReader.ThrowForPath[path] = new OperationCanceledException(@"Canceled reading D:\Music\Private Artist\track01.m4a");
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan();
+
+        var exception = act.Should().Throw<OperationCanceledException>().Which;
+        exception.Message.Should().Be("Library healer scan was canceled");
+        fingerprints.Paths.Should().BeEmpty();
+        store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldThrowAndNotPersist_WhenTagReaderReturnsCancellationEvidence()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = PathFor(1);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path) });
+        tagReader.Responses[path] = new TagReaderEvidence(
+            true,
+            false,
+            null,
+            nameof(OperationCanceledException),
+            @"Canceled reading D:\Music\Private Artist\track01.m4a");
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan();
+
+        var exception = act.Should().Throw<OperationCanceledException>().Which;
+        exception.Message.Should().NotContain("Private Artist");
+        exception.Message.Should().NotContain(@"D:\Music");
+        exception.Message.Should().NotContain("track01.m4a");
+        fingerprints.Paths.Should().BeEmpty();
+        store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldThrowAndNotFingerprint_WhenCancellationIsRequestedAfterTagRead()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = PathFor(1);
+        using var cancellation = new CancellationTokenSource();
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.AfterRead = () => cancellation.Cancel();
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(cancellationToken: cancellation.Token);
+
+        act.Should().Throw<OperationCanceledException>();
+        fingerprints.Paths.Should().BeEmpty();
+        store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldThrowAndNotPersist_WhenCancellationIsRequestedAfterFingerprint()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = PathFor(1);
+        using var cancellation = new CancellationTokenSource();
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+        fingerprints.AfterRead = () => cancellation.Cancel();
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(cancellationToken: cancellation.Token);
+
+        act.Should().Throw<OperationCanceledException>();
+        fingerprints.Paths.Should().Equal(path);
+        store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldScanAtLeastOneCandidate_WhenTimeBudgetExpiresBeforeFirstScan()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var elapsed = TimeSpan.Zero;
+        var firstPath = PathFor(1);
+        var secondPath = PathFor(2);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 }, new() { Id = 2 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Callback(() => elapsed = TimeSpan.FromSeconds(2))
+            .Returns(new List<TrackFile> { TrackFile(2, secondPath) });
+        mediaFileService.Setup(x => x.GetFilesByArtist(2))
+            .Returns(new List<TrackFile> { TrackFile(1, firstPath) });
+        tagReader.Responses[firstPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[secondPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var result = CreateRunner(
+                artistService,
+                mediaFileService,
+                tagReader,
+                elapsedProvider: () => elapsed)
+            .Scan(new LibraryHealerScanRequest(MaxSeconds: 1));
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.TotalArtists.Should().Be(2);
+        result.AvailableTrackFiles.Should().Be(2);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.Truncated.Should().BeTrue();
+        result.NextAfterTrackFileId.Should().Be(1);
+        mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
+        mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Once);
+        tagReader.Paths.Should().Equal(firstPath);
+    }
+
     private static ILibraryHealerScanRunner CreateRunner(
         Mock<IArtistService> artistService,
         Mock<IMediaFileService> mediaFileService,
         RecordingTagReader tagReader,
         IFileFingerprintService? fingerprints = null,
-        RecordingFindingStore? store = null)
+        RecordingFindingStore? store = null,
+        Func<TimeSpan>? elapsedProvider = null)
     {
         return new LibraryHealerScanRunner(
             artistService.Object,
             mediaFileService.Object,
             tagReader,
             fingerprints ?? new RecordingFingerprintService(),
-            store ?? new RecordingFindingStore());
+            store ?? new RecordingFindingStore(),
+            elapsedProvider);
     }
 
     private static TrackFile TrackFile(
@@ -320,11 +490,15 @@ public sealed class LibraryHealerScanRunnerTests
     {
         public Dictionary<string, TagReaderEvidence> Responses { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public Dictionary<string, Exception> ThrowForPath { get; } = new(StringComparer.OrdinalIgnoreCase);
+
         public List<string> Paths { get; } = new();
 
         public List<CancellationToken> Tokens { get; } = new();
 
         public bool ThrowWhenCancellationRequested { get; init; }
+
+        public Action? AfterRead { get; set; }
 
         public TagReaderEvidence Read(string path, CancellationToken cancellationToken)
         {
@@ -335,9 +509,16 @@ public sealed class LibraryHealerScanRunnerTests
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            return Responses.TryGetValue(path, out var evidence)
+            if (ThrowForPath.TryGetValue(path, out var exception))
+            {
+                throw exception;
+            }
+
+            var result = Responses.TryGetValue(path, out var evidence)
                 ? evidence
                 : new TagReaderEvidence(true, true, 0, null, null);
+            AfterRead?.Invoke();
+            return result;
         }
     }
 
@@ -345,11 +526,18 @@ public sealed class LibraryHealerScanRunnerTests
     {
         public Dictionary<string, FileFingerprint> Responses { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public List<string> Paths { get; } = new();
+
+        public Action? AfterRead { get; set; }
+
         public FileFingerprint Read(string path)
         {
-            return Responses.TryGetValue(path, out var fingerprint)
+            Paths.Add(path);
+            var result = Responses.TryGetValue(path, out var fingerprint)
                 ? fingerprint
                 : new FileFingerprint(false, null, null);
+            AfterRead?.Invoke();
+            return result;
         }
     }
 
