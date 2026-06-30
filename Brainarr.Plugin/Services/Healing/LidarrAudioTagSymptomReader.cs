@@ -7,6 +7,7 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IAudioTagService _audioTagService;
+    private readonly SemaphoreSlim _readGate = new(1, 1);
     private readonly TimeSpan _timeout;
 
     public LidarrAudioTagSymptomReader(IAudioTagService audioTagService, TimeSpan? timeout = null)
@@ -29,7 +30,24 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
 
         try
         {
-            var parsed = Task.Run(() => _audioTagService.ReadTags(path))
+            if (!_readGate.Wait(_timeout, cancellationToken))
+            {
+                return TimeoutEvidence();
+            }
+
+            var readTask = Task.Run(() =>
+            {
+                try
+                {
+                    return _audioTagService.ReadTags(path);
+                }
+                finally
+                {
+                    _readGate.Release();
+                }
+            });
+
+            var parsed = readTask
                 .WaitAsync(_timeout, cancellationToken)
                 .GetAwaiter()
                 .GetResult();
@@ -38,12 +56,7 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
         }
         catch (TimeoutException)
         {
-            return new TagReaderEvidence(
-                true,
-                false,
-                null,
-                nameof(TimeoutException),
-                "Timed out reading audio tags");
+            return TimeoutEvidence();
         }
         catch (OperationCanceledException)
         {
@@ -63,5 +76,15 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
                 ex.GetType().Name,
                 PathPrivacy.RedactMessage(ex.Message, path));
         }
+    }
+
+    private static TagReaderEvidence TimeoutEvidence()
+    {
+        return new TagReaderEvidence(
+            true,
+            false,
+            null,
+            nameof(TimeoutException),
+            "Timed out waiting for Lidarr audio tag reader");
     }
 }
