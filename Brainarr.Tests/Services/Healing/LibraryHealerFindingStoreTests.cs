@@ -86,6 +86,68 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldSanitizeUncAndRelativeWindowsPathsInEvidenceMessages()
+    {
+        var store = CreateStore();
+        var rawUncPath = @"\\server\share\Private Artist\Album\track01.flac";
+        var rawRelativePath = @"Music\Private Artist\Album\track02.flac";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            tagReaderErrorMessage: "TagLib failed reading " + rawUncPath,
+            probeErrorMessage: "ffprobe failed opening " + rawRelativePath,
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.TagReader.ErrorMessage.Should().NotContain("Private Artist");
+        persisted.TagReader.ErrorMessage.Should().NotContain(@"\\server\share");
+        persisted.TagReader.ErrorMessage.Should().NotContain("server");
+        persisted.Probe.Should().NotBeNull();
+        persisted.Probe!.ErrorMessage.Should().NotContain("Private Artist");
+        persisted.Probe.ErrorMessage.Should().NotContain(@"Music\Private Artist");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"\\server\share");
+        json.Should().NotContain(@"\\\\server\\share");
+        json.Should().NotContain(@"Music\Private Artist");
+        json.Should().NotContain(@"Music\\Private Artist");
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldSanitizePathLikeFindingId()
+    {
+        var store = CreateStore();
+        var rawId = @"D:\Music\Private Artist\Album\track01.flac";
+        var expectedId = "finding-" + PathPrivacy.HashPath(rawId);
+        var finding = CreateFinding(
+            id: rawId,
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.Id.Should().Be(expectedId);
+        persisted.Id.Should().NotContain("Private Artist");
+        persisted.Id.Should().NotContain(@"\");
+        persisted.Id.Should().NotContain("/");
+        persisted.Id.Should().NotContain(":");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain(expectedId);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain(@"D:\\Music");
+        json.Should().NotContain(@"\Album\");
+        json.Should().NotContain(@"\\Album\\");
+    }
+
+    [Fact]
     public void GetRecent_ShouldReturnNewestFirstAndRespectLimit()
     {
         var store = CreateStore();

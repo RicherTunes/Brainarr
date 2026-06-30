@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Hosting;
 using Lidarr.Plugin.Common.Services.Storage;
@@ -22,6 +23,12 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
     private const string FileName = "library_healer_findings.json";
     private const int MaxEntries = 5000;
     private const int MaxRecentLimit = 500;
+    private static readonly Regex UncPathPattern = new(
+        @"\\\\[^\s\\/\r\n\t""<>|:]+\\[^\\/\r\n\t""<>|:]+(?:\\[^\\/\r\n\t""<>|:]+)+",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex RelativeWindowsPathPattern = new(
+        @"(?<![A-Za-z0-9_.-])[A-Za-z0-9_.~$()-]+\\[^\\/\r\n\t""<>|:]+\\[^\\/\r\n\t""<>|:]+(?:\\[^\\/\r\n\t""<>|:]+)*",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly JsonFileStore<string, LibraryHealerFinding> _store;
 
@@ -131,17 +138,40 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
         return finding with
         {
+            Id = SanitizeFindingId(finding.Id),
             File = file,
             TagReader = tagReader,
             Probe = probe,
         };
     }
 
+    private static string SanitizeFindingId(string? id)
+    {
+        if (string.IsNullOrWhiteSpace(id) || ShouldRedactPathMaterial(id))
+        {
+            return "finding-" + PathPrivacy.HashPath(id);
+        }
+
+        return id;
+    }
+
     private static string? SanitizeMessage(string? message, string? knownPath)
     {
-        return ContainsLikelyPath(message)
+        var redacted = ContainsLikelyPath(message)
             ? PathPrivacy.RedactMessage(message, ShouldRedactPathMaterial(knownPath) ? knownPath : null)
             : message;
+        return RedactWindowsPathSegments(redacted);
+    }
+
+    private static string? RedactWindowsPathSegments(string? message)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return message;
+        }
+
+        var redacted = UncPathPattern.Replace(message, static match => PathPrivacy.Redact(match.Value));
+        return RelativeWindowsPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
     }
 
     private static bool ShouldRedactPathMaterial(string? value)
