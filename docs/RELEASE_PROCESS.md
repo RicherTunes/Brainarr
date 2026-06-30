@@ -1,14 +1,14 @@
 # Release Process Overview
 
-Brainarr releases are automated through scripts and GitHub Actions. This page collects the entry points so you can follow the single source of truth instead of re-copying every command.
+Brainarr releases are driven by local scripts and the Gitea-primary CI gate. This page collects the entry points so you can follow the single source of truth instead of re-copying every command.
 
 ## Canonical entry points
 
-- `./.github/scripts/tag-release.sh <version>` — primary path. Creates the tag, bumps manifests, runs the full build/test/package workflow, and publishes the GitHub release.
-- `./.github/scripts/quick-release.sh` — interactive helper that calls the tag script after letting you pick the version bump.
-- `gh workflow run release.yml -f version=vX.Y.Z` — manual trigger when you need to retry the pipeline or run from automation.
+- `pwsh ./scripts/verify-local.ps1` or `bash ./scripts/verify-local.sh` — primary pre-release gate. This mirrors Gitea `CI / verify` and runs the full local build/test/package path.
+- `pwsh ./scripts/new-release.ps1` or `bash ./scripts/new-release.sh` — interactive release helper. It checks prerequisites, runs tests, creates the tag, pushes it, and lets the repository's release automation take over.
+- `gh run list --event push --limit 3` — optional way to inspect the tag-triggered automation after the push lands.
 
-Each script writes detailed progress to the console; see the script files themselves in `.github/scripts/` for implementation notes. <!-- TODO(docval): scripts/README-release.md referenced in earlier versions does not exist; scripts are the authoritative source -->
+Each script writes detailed progress to the console; see the script files themselves in `scripts/` for implementation notes.
 
 ## Release checklist
 
@@ -24,10 +24,10 @@ Validation steps (tests, manual smoke, provider verification) now live in [`docs
 
 | Scenario | Recommended path |
 |----------|------------------|
-| Standard release day | `./.github/scripts/tag-release.sh <version>` |
-| Need to preview bump options or pre-release suffixes | `./.github/scripts/quick-release.sh` |
-| Re-run a failed publish without touching local tree | `gh workflow run release.yml -f version=vX.Y.Z` |
-| Emergency manual hotfix | Follow the checklist, then use the tag script with the new version |
+| Standard release day | `pwsh ./scripts/new-release.ps1` or `bash ./scripts/new-release.sh` |
+| Need to validate the package before tagging | `pwsh ./scripts/verify-local.ps1` or `bash ./scripts/verify-local.sh` |
+| Re-run or inspect the tag-triggered automation | `gh run list --event push --limit 3` |
+| Emergency manual hotfix | Follow the checklist, then run the release helper from a clean tree |
 
 ## What the automation performs
 
