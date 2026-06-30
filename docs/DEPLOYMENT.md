@@ -260,75 +260,15 @@ echo "Deployment complete!"
 
 ## CI/CD Pipelines
 
-### GitHub Actions
+### Gitea Primary CI
 
-```yaml
-name: Build and Deploy
+Brainarr's authoritative merge gate is `.gitea/workflows/ci.yml`:
 
-on:
-  push:
-    tags:
-      - 'v*'
-  workflow_dispatch:
+- `CI / secret-scan` runs Gitleaks with checksum verification.
+- `CI / lint` runs Common's shared plugin lint runner.
+- `CI / verify` runs `scripts/verify-local.ps1`, which restores host assemblies, builds, packages, checks package closure, and runs deterministic tests.
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v3
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Restore dependencies
-      run: dotnet restore
-
-    - name: Build
-      run: dotnet build -c Release --no-restore
-
-    - name: Test
-      run: dotnet test --no-build --verbosity normal
-
-    - name: Publish
-      run: dotnet publish -c Release -o dist/
-
-    - name: Create Release Package
-      run: |
-        cd dist
-        zip -r ../Brainarr-${{ github.ref_name }}.zip .
-        cd ..
-
-    - name: Create GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: Brainarr-${{ github.ref_name }}.zip
-        generate_release_notes: true
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-
-    steps:
-    - name: Deploy to Production
-      uses: appleboy/ssh-action@v0.1.5
-      with:
-        host: ${{ secrets.PROD_HOST }}
-        username: ${{ secrets.PROD_USER }}
-        key: ${{ secrets.PROD_SSH_KEY }}
-        script: |
-          cd /opt/lidarr-plugins
-          wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/Brainarr-${{ github.ref_name }}.zip
-          unzip -o Brainarr-${{ github.ref_name }}.zip -d /var/lib/lidarr/plugins/RicherTunes/Brainarr/
-          systemctl restart lidarr
-```
+GitHub is a mirror for this repo and has no active workflow files. Use `pwsh ./scripts/verify-local.ps1` locally before pushing release metadata or deployment changes.
 
 ### GitLab CI/CD
 

@@ -35,7 +35,7 @@ Use this list to confirm the release is ready **before** running `pwsh ./scripts
 ## 6. Tag & Publish
 
 - [ ] Run `pwsh ./scripts/new-release.ps1` or `bash ./scripts/new-release.sh` from a clean tree.
-- [ ] Confirm the tag push starts the release automation and the published release page has the expected notes and assets.
-- [ ] Review the generated release page before announcing.
+- [ ] Confirm the tag exists on the remote and manually publish/update the release page with the expected notes and assets.
+- [ ] Review the published release page before announcing.
 
 Keep this checklist in sync with [`docs/RELEASE_PROCESS.md`](RELEASE_PROCESS.md); add new items here instead of cloning instructions elsewhere.

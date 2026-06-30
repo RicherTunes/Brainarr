@@ -525,41 +525,15 @@ public class TestWithOutput
 
 ## CI/CD Integration
 
-### GitHub Actions
+### Gitea CI
 
-```yaml
-name: Tests
+The authoritative CI path is `.gitea/workflows/ci.yml`. Its `verify` job runs the same local command developers should use before pushing:
 
-on: [push, pull_request]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v2
-
-    - name: Setup .NET
-      uses: actions/setup-dotnet@v1
-      with:
-        dotnet-version: '8.0.x'
-
-    - name: Restore
-      run: dotnet restore
-
-    - name: Build
-      run: dotnet build --no-restore
-
-    - name: Test
-      run: dotnet test --no-build --verbosity normal \
-        --collect:"XPlat Code Coverage" \
-        --filter "Category!=LongRunning"
-
-    - name: Upload coverage
-      uses: codecov/codecov-action@v2
-      with:
-        files: '**/coverage.cobertura.xml'
+```powershell
+pwsh ./scripts/verify-local.ps1
 ```
+
+Use targeted `dotnet test --filter ...` commands for fast iteration, but treat `verify-local.ps1` as the merge-equivalent gate because it also checks packaging and closure.
 
 ## Troubleshooting
 
