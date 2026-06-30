@@ -227,50 +227,31 @@ $commits
 
 🤖 Generated with Brainarr Release Manager"
 
-Write-Host "📤 Pushing tag to trigger release automation..." -ForegroundColor Blue
+Write-Host "📤 Pushing tag to origin..." -ForegroundColor Blue
 git push origin $Version
 
 Write-Host ""
 Write-Host "🎉 Release $Version created successfully!" -ForegroundColor Green
 Write-Host ""
-Write-Host "🚀 Automation Status:" -ForegroundColor Blue
-Write-Host "  ✅ Tag pushed to GitHub"
-Write-Host "  🔄 GitHub Actions building release..."
-Write-Host "  📚 Wiki will auto-update with new version"
-Write-Host "  📦 Release packages building automatically"
+Write-Host "📦 Release Status:" -ForegroundColor Blue
+Write-Host "  ✅ Tag pushed to origin"
+Write-Host "  ✅ Local package/checksum generation completed before tagging"
+Write-Host "  ℹ️  Brainarr has no GitHub mirror workflow or tag-triggered release workflow"
+Write-Host "  📌 Publish/update release notes and assets manually from the local artifacts"
 Write-Host ""
 
-# Monitor progress
-Write-Host "📊 Monitoring release progress..." -ForegroundColor Blue
+# Publish guidance
+Write-Host "📊 Manual publish guidance:" -ForegroundColor Blue
 Write-Host "🔗 Release URL: https://github.com/RicherTunes/Brainarr/releases/tag/$Version"
-Write-Host "🔗 Actions: https://github.com/RicherTunes/Brainarr/actions"
 Write-Host ""
-
-# Wait for GitHub to register the tag
-Start-Sleep 3
-
-# Check if workflows started
-$runningWorkflows = gh run list --event push --limit 3 --json status 2>$null | ConvertFrom-Json
-$hasRunning = $runningWorkflows | Where-Object { $_.status -eq "in_progress" -or $_.status -eq "queued" }
-
-if ($hasRunning) {
-    Write-Host "✅ Release automation started!" -ForegroundColor Green
-    Write-Host ""
-    Write-Host "📋 What happens next:"
-    Write-Host "  1. 🔨 Plugin builds on 6 platform combinations"
-    Write-Host "  2. 🧪 Test suite runs (485 tests)"
-    Write-Host "  3. 🔒 Security scan completes"
-    Write-Host "  4. 📦 Release packages are created"
-    Write-Host "  5. 📚 Wiki updates with new version"
-    Write-Host "  6. 🎁 GitHub release published"
-    Write-Host ""
-    Write-Host "⏱️  Total time: ~5-10 minutes"
-} else {
-    Write-Host "⏳ Release automation may take a moment to start..." -ForegroundColor Yellow
-}
+Write-Host "📋 Next steps:"
+Write-Host "  1. Confirm the remote tag is visible."
+Write-Host "  2. Upload the locally generated package and checksum artifacts."
+Write-Host "  3. Copy release notes from CHANGELOG.md."
+Write-Host "  4. Run/confirm the Gitea main CI gate after merging any release metadata changes."
 
 Write-Host ""
 Write-Host "🎯 Release $Version initiated!" -ForegroundColor Green
-Write-Host "📖 Check progress at: https://github.com/RicherTunes/Brainarr/actions" -ForegroundColor Blue
+Write-Host "📖 Finish publishing at: https://github.com/RicherTunes/Brainarr/releases/tag/$Version" -ForegroundColor Blue
 Write-Host ""
 Write-Host "🎵 Happy music discovering! 🎵"
