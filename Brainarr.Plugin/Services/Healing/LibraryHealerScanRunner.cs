@@ -34,6 +34,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
     private readonly ITagLibSymptomReader _tagReader;
     private readonly IFileFingerprintService _fingerprints;
     private readonly ILibraryHealerFindingStore _findingStore;
+    private readonly Func<TimeSpan>? _elapsedProvider;
 
     public LibraryHealerScanRunner(
         IArtistService artistService,
@@ -41,12 +42,24 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         ITagLibSymptomReader tagReader,
         IFileFingerprintService fingerprints,
         ILibraryHealerFindingStore findingStore)
+        : this(artistService, mediaFileService, tagReader, fingerprints, findingStore, null)
+    {
+    }
+
+    internal LibraryHealerScanRunner(
+        IArtistService artistService,
+        IMediaFileService mediaFileService,
+        ITagLibSymptomReader tagReader,
+        IFileFingerprintService fingerprints,
+        ILibraryHealerFindingStore findingStore,
+        Func<TimeSpan>? elapsedProvider)
     {
         _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
         _mediaFileService = mediaFileService ?? throw new ArgumentNullException(nameof(mediaFileService));
         _tagReader = tagReader ?? throw new ArgumentNullException(nameof(tagReader));
         _fingerprints = fingerprints ?? throw new ArgumentNullException(nameof(fingerprints));
         _findingStore = findingStore ?? throw new ArgumentNullException(nameof(findingStore));
+        _elapsedProvider = elapsedProvider;
     }
 
     public LibraryHealerScanResult Scan(
@@ -58,6 +71,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var maxSeconds = Math.Clamp(scanRequest.MaxSeconds, 1, 30);
         var maxElapsed = TimeSpan.FromSeconds(maxSeconds);
         var stopwatch = Stopwatch.StartNew();
+        TimeSpan Elapsed() => _elapsedProvider?.Invoke() ?? stopwatch.Elapsed;
         var totalArtists = 0;
         var availableTrackFiles = 0;
         var scannedTrackFiles = 0;
@@ -87,7 +101,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                     break;
                 }
 
-                if (scannedTrackFiles > 0 && stopwatch.Elapsed >= maxElapsed)
+                if (scannedTrackFiles > 0 && Elapsed() >= maxElapsed)
                 {
                     break;
                 }
@@ -103,6 +117,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
 
             if (findings.Count > 0)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 _findingStore.SaveBatch(findings);
                 persistedFindings = findings.Count;
             }
@@ -120,7 +135,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         }
         catch (OperationCanceledException)
         {
-            throw;
+            throw new OperationCanceledException("Library healer scan was canceled");
         }
         catch (Exception ex)
         {
@@ -169,12 +184,19 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var trackFile = candidate.TrackFile;
         var path = trackFile.Path ?? string.Empty;
         var tagReader = _tagReader.Read(path, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (IsCancellationEvidence(tagReader))
+        {
+            throw new OperationCanceledException("Canceled reading audio tags");
+        }
+
         var classification = LibraryHealerClassifier.Classify(tagReader, null);
         if (classification.Label == LibraryHealerLabel.FalsePositive)
         {
             return null;
         }
 
+        cancellationToken.ThrowIfCancellationRequested();
         var fingerprint = _fingerprints.Read(path);
         var pathHash = PathPrivacy.HashPath(path);
         return new LibraryHealerFinding(
@@ -192,6 +214,20 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             tagReader,
             null,
             DateTime.UtcNow);
+    }
+
+    private static bool IsCancellationEvidence(TagReaderEvidence tagReader)
+    {
+        return IsCancellationType(tagReader.ErrorType, nameof(OperationCanceledException))
+            || IsCancellationType(tagReader.ErrorType, typeof(OperationCanceledException).FullName)
+            || IsCancellationType(tagReader.ErrorType, nameof(TaskCanceledException))
+            || IsCancellationType(tagReader.ErrorType, typeof(TaskCanceledException).FullName);
+    }
+
+    private static bool IsCancellationType(string? actual, string? expected)
+    {
+        return !string.IsNullOrWhiteSpace(expected)
+            && string.Equals(actual, expected, StringComparison.Ordinal);
     }
 
     private sealed record Candidate(int ArtistId, TrackFile TrackFile);
