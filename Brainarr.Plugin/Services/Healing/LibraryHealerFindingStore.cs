@@ -27,7 +27,10 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         @"\\\\[^\s\\/\r\n\t""<>|:]+\\[^\\/\r\n\t""<>|:]+(?:\\[^\\/\r\n\t""<>|:]+)+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
     private static readonly Regex RelativeWindowsPathPattern = new(
-        @"(?<![A-Za-z0-9_.-])[A-Za-z0-9_.~$()-]+\\[^\\/\r\n\t""<>|:]+\\[^\\/\r\n\t""<>|:]+(?:\\[^\\/\r\n\t""<>|:]+)*",
+        @"(?<![A-Za-z0-9_.~$()'-])(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?)\\(?:[^\\/\r\n\t""<>|:]+\\)*[^\\/\r\n\t""<>|:]*?\.[A-Za-z0-9]{1,8}",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant);
+    private static readonly Regex RelativePosixPathPattern = new(
+        @"(?<![A-Za-z0-9_.~$()'./-])(?:(?:\./)(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?/)+|(?:[A-Za-z0-9_.~$()'-]+/)(?:[A-Za-z0-9_.~$()'-]+(?: [A-Za-z0-9_.~$()'-]+)?/)*)[^\\/\r\n\t""<>|:]*?\.[A-Za-z0-9]{1,8}",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
     private readonly JsonFileStore<string, LibraryHealerFinding> _store;
@@ -157,13 +160,14 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
     private static string? SanitizeMessage(string? message, string? knownPath)
     {
-        var redacted = ContainsLikelyPath(message)
-            ? PathPrivacy.RedactMessage(message, ShouldRedactPathMaterial(knownPath) ? knownPath : null)
-            : message;
-        return RedactWindowsPathSegments(redacted);
+        var redacted = RedactPathSegments(message);
+        redacted = ContainsLikelyPath(redacted)
+            ? PathPrivacy.RedactMessage(redacted, ShouldRedactPathMaterial(knownPath) ? knownPath : null)
+            : redacted;
+        return RedactPathSegments(redacted);
     }
 
-    private static string? RedactWindowsPathSegments(string? message)
+    private static string? RedactPathSegments(string? message)
     {
         if (string.IsNullOrWhiteSpace(message))
         {
@@ -171,7 +175,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         }
 
         var redacted = UncPathPattern.Replace(message, static match => PathPrivacy.Redact(match.Value));
-        return RelativeWindowsPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
+        redacted = RelativeWindowsPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
+        return RelativePosixPathPattern.Replace(redacted, static match => PathPrivacy.Redact(match.Value));
     }
 
     private static bool ShouldRedactPathMaterial(string? value)
@@ -193,7 +198,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         }
 
         return HasWindowsRoot(value)
-            || value.Contains(@"\\", StringComparison.Ordinal)
+            || value.Contains('\\', StringComparison.Ordinal)
+            || value.Contains('/', StringComparison.Ordinal)
             || HasUnixRoot(value);
     }
 

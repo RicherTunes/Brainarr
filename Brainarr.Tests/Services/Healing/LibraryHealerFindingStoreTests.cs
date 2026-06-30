@@ -118,6 +118,34 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldSanitizeShortWindowsAndRelativePosixPathsInEvidenceMessages()
+    {
+        var store = CreateStore();
+        var finding = CreateFinding(
+            id: "safe-relative-path-finding",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            tagReaderErrorMessage: @"TagLib failed reading Private Artist\Album\track01.flac and Artist\track01.flac",
+            probeErrorMessage: "ffprobe failed opening music/Private Artist/Album/a.flac and ./Private Artist/Album/a.flac",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.Id.Should().Be("safe-relative-path-finding");
+        persisted.File.RedactedPath.Should().Be("track01.flac#abcdef123456");
+        persisted.File.PathHash.Should().Be("callerhash001");
+        persisted.TagReader.ErrorMessage.Should().NotBeNull();
+        AssertNoRelativePrivatePathFragments(persisted.TagReader.ErrorMessage!);
+        persisted.Probe.Should().NotBeNull();
+        persisted.Probe!.ErrorMessage.Should().NotBeNull();
+        AssertNoRelativePrivatePathFragments(persisted.Probe.ErrorMessage!);
+
+        var json = File.ReadAllText(StorePath);
+        AssertNoRelativePrivatePathFragments(json);
+    }
+
+    [Fact]
     public void SaveBatch_ShouldSanitizePathLikeFindingId()
     {
         var store = CreateStore();
@@ -205,6 +233,18 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     private LibraryHealerFindingStore CreateStore()
     {
         return new LibraryHealerFindingStore(_tempRoot);
+    }
+
+    private static void AssertNoRelativePrivatePathFragments(string value)
+    {
+        value.Should().NotContain("Private Artist");
+        value.Should().NotContain(@"Private Artist\Album\track01.flac");
+        value.Should().NotContain(@"Private Artist\\Album\\track01.flac");
+        value.Should().NotContain(@"Artist\track01.flac");
+        value.Should().NotContain(@"Artist\\track01.flac");
+        value.Should().NotContain("music/Private Artist/Album/a.flac");
+        value.Should().NotContain("./Private Artist/Album/a.flac");
+        value.Should().NotContain("Private Artist/Album/a.flac");
     }
 
     private static LibraryHealerFinding CreateFinding(
