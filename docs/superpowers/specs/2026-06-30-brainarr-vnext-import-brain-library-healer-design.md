@@ -96,6 +96,23 @@ Expected Lidarr services and commands to verify:
 
 Scheduled-task caveat: Lidarr's scheduled task set is host-owned and seeded by its task manager. The design must not assume a plugin can add a first-class scheduled task to Lidarr's task UI/history. If periodic scanning is needed, use a plugin-owned timer only to request a bounded Brainarr-owned scan runner, and dispose that timer through plugin unload/shutdown hooks. Do not run scans inline from the timer.
 
+### Prior `music-helper` PoC Lessons
+
+The earlier `D:\Alex\music\music-helper` proof of concept is useful for Brainarr, but mostly as design pressure, fixture material, and safety invariants rather than direct plugin code.
+
+Port now or keep as A2/A3 prerequisites:
+
+- Keep reader-tagged evidence. The dominant failure class can be "TagLib reads zero/unreadable while ffmpeg decodes cleanly", so ffmpeg success alone is not proof the Lidarr/Navidrome symptom is fixed.
+- Add an action-eligibility concept before any mutating phase. A classifier label and permission to repair/reacquire are separate facts. Sibling-median or weak external-duration suspicion must remain non-destructive.
+- Use the PoC's ffprobe/decode parsing model for future probe phases: split fatal errors, truncation hints, and recoverable warnings. Recoverable warnings are never decisive by themselves.
+- Use the PoC's fixture-gate pattern. Real fixture files must prove that intact-audio cases are never routed to destructive actions and that malformed/truncated cases are classified conservatively under the pinned toolchain.
+- Use the PoC's repair-in-place safety ordering for A3: same-directory temp file, complete verification before swap, journal `APPLYING` before moving the source, backup-first rename, same-mount proof, post-move reverify, startup reconciliation, and backup purge only after confirmation.
+- Do not preserve old mtimes after a successful file migration; old mtimes made repaired files invisible to incremental scans in the PoC.
+- Treat `tools/taglibprobe` as a parity oracle for Navidrome go-taglib during experiments, not as a runtime dependency of the Lidarr plugin. The plugin's live symptom reader remains Lidarr's in-process TagLib path.
+- Keep the script's Navidrome SQLite reader, path mapper, REST client, and Docker deploy notes as companion-service reference only. They should not leak back into the in-process Lidarr A1 architecture.
+
+Before enabling any repair-in-place or reacquire milestone, rerun an adversarial review over the C# port of these invariants, with special attention to filesystem state transitions, backup lifecycle, reader divergence, and album-wide Lidarr replacement behavior.
+
 ### Phase A1: Detect and Report Only
 
 This is the first build target.
@@ -358,9 +375,12 @@ Required fixture matrix:
 - Missing path.
 - File with tags and cover art to prove preservation later.
 
+The fixture gate must include the `music-helper` invariant: no intact-audio fixture may ever be classified as eligible for a destructive action. A separate truth-table should record, per fixture, Lidarr TagLib duration/read result, optional Navidrome go-taglib result, ffprobe declared duration, full-decode duration/errors, and final classification.
+
 Required test categories:
 
 - Pure classifier unit tests.
+- Action-eligibility tests proving labels do not automatically authorize mutation.
 - Path/fingerprint staleness tests.
 - Tag reader adapter tests behind fixtures.
 - Probe parser tests with captured `ffprobe` JSON.
