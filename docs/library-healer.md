@@ -64,3 +64,5 @@ A2 is planned as a read-only triage and evidence-planning layer. It should add a
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
 A4 may add reacquire orchestration for genuinely unrecoverable files only after decode evidence, album-wide scope disclosure, recycle-bin configuration, and Lidarr search dry-run behavior are tested. A4 must also define a separate execution authorization contract.
+
+The longer-term scored backlog lives in `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`. The highest-ROI next pulls are read-only hardening tools: finding revalidation, redacted evidence exports, triage queues, read-only probe collection, fixture truth tables, and storage/root health audits.
