@@ -121,6 +121,47 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
+    public void Scan_ShouldPersistPositiveDurationFilesWithMissingTagMetadata()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\untagged.flac";
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(50, path, albumId: 500) });
+        tagReader.Responses[path] = new TagReaderEvidence(
+            true,
+            true,
+            245.2,
+            null,
+            null,
+            new TagMetadataEvidence(
+                TitlePresent: false,
+                ArtistPresent: true,
+                AlbumPresent: false,
+                AnyMusicBrainzIdPresent: false,
+                MissingFields: new[] { "title", "album", "musicBrainzId" }));
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        fingerprints.Paths.Should().Equal(path);
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.TagMetadataIssue);
+        finding.InternalReasonCodes.Should().Contain("TAG_METADATA_MISSING");
+        finding.TagReader.Metadata.Should().NotBeNull();
+        finding.TagReader.Metadata!.MissingFields.Should().Equal("title", "album", "musicBrainzId");
+    }
+
+    [Fact]
     public void Scan_ShouldRecordTimedOutPathProbeForHumanReviewWithoutCallingTagReader()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);

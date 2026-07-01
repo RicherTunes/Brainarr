@@ -6,6 +6,7 @@ using NzbDrone.Core.Parser.Model;
 
 namespace Brainarr.Tests.Services.Healing;
 
+[Collection("ThreadSensitive")]
 public class LidarrAudioTagSymptomReaderTests
 {
     [Fact]
@@ -15,7 +16,11 @@ public class LidarrAudioTagSymptomReaderTests
         audio.Setup(x => x.ReadTags("song.flac"))
             .Returns(new ParsedTrackInfo
             {
-                Duration = TimeSpan.FromSeconds(245)
+                Duration = TimeSpan.FromSeconds(245),
+                Title = "Song",
+                ArtistTitle = "Private Artist",
+                AlbumTitle = "Album",
+                ReleaseMBId = "release-id",
             });
 
         var result = new LidarrAudioTagSymptomReader(audio.Object).Read("song.flac", CancellationToken.None);
@@ -25,6 +30,36 @@ public class LidarrAudioTagSymptomReaderTests
         result.DurationSeconds.Should().Be(245);
         result.ErrorType.Should().BeNull();
         result.ErrorMessage.Should().BeNull();
+    }
+
+    [Fact]
+    public void Read_ShouldCaptureMetadataCompletenessWithoutRawTagValues()
+    {
+        var audio = new Mock<IAudioTagService>();
+        audio.Setup(x => x.ReadTags("missing-tags.flac"))
+            .Returns(new ParsedTrackInfo
+            {
+                Duration = TimeSpan.FromSeconds(245),
+                Title = "   ",
+                ArtistTitle = "Private Artist",
+                AlbumTitle = null,
+                ReleaseMBId = "",
+                RecordingMBId = null,
+                TrackMBId = null,
+                ArtistMBId = null,
+                AlbumMBId = null,
+            });
+
+        var result = new LidarrAudioTagSymptomReader(audio.Object)
+            .Read("missing-tags.flac", CancellationToken.None);
+
+        result.Metadata.Should().NotBeNull();
+        result.Metadata!.TitlePresent.Should().BeFalse();
+        result.Metadata.ArtistPresent.Should().BeTrue();
+        result.Metadata.AlbumPresent.Should().BeFalse();
+        result.Metadata.AnyMusicBrainzIdPresent.Should().BeFalse();
+        result.Metadata.MissingFields.Should().Equal("title", "album", "musicBrainzId");
+        result.Metadata.ToString().Should().NotContain("Private Artist");
     }
 
     [Fact]

@@ -50,6 +50,12 @@ public static class LibraryHealerClassifier
         else if (tagReader.DurationSeconds.GetValueOrDefault() > 0)
         {
             reasons.Add("TAG_READER_DURATION_POSITIVE");
+            AddTagMetadataReasons(tagReader.Metadata, reasons);
+            if (GetMissingFields(tagReader.Metadata).Count > 0)
+            {
+                return new LibraryHealerClassification(LibraryHealerLabel.TagMetadataIssue, reasons);
+            }
+
             return new LibraryHealerClassification(LibraryHealerLabel.FalsePositive, reasons);
         }
         else
@@ -97,5 +103,26 @@ public static class LibraryHealerClassifier
     private static bool Contains(string? value, string token)
     {
         return value?.IndexOf(token, StringComparison.OrdinalIgnoreCase) >= 0;
+    }
+
+    private static void AddTagMetadataReasons(TagMetadataEvidence? metadata, List<string> reasons)
+    {
+        var missingFields = GetMissingFields(metadata);
+        if (missingFields.Count > 0)
+        {
+            reasons.Add("TAG_METADATA_MISSING");
+            foreach (var missingField in missingFields)
+            {
+                if (!string.IsNullOrWhiteSpace(missingField))
+                {
+                    reasons.Add("TAG_MISSING_" + missingField.Trim().ToUpperInvariant());
+                }
+            }
+        }
+    }
+
+    private static IReadOnlyList<string> GetMissingFields(TagMetadataEvidence? metadata)
+    {
+        return TagMetadataFields.GetMissingFields(metadata);
     }
 }
