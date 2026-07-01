@@ -630,7 +630,8 @@ Reviewers must challenge the design and implementation with these questions:
 
 7. Milestone A2.5: read-only hardening and operator tooling
    - Pull from `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`.
-   - Prioritize finding revalidation, redacted evidence export, triage queues, read-only probe collection, fixture truth tables, storage/root health audit, and batch policy simulation.
+   - Start only after A2 projection conformance is complete.
+   - Prioritize finding revalidation, schema migration/corruption handling, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, basic storage/root audit, host/API conformance, redaction verification, local diagnostic export, basic triage filters, read-only probe collection, targeted decode-on-finding verification, fixture truth tables, and scan-cost metrics.
    - Keep all tools read-only over media files and Lidarr state unless a later milestone explicitly defines execution authorization.
 
 8. Milestone A3: repair dry-run then opt-in repair

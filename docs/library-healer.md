@@ -65,4 +65,4 @@ A3 may add repair dry-runs and verified repair-in-place only after a separate de
 
 A4 may add reacquire orchestration for genuinely unrecoverable files only after decode evidence, album-wide scope disclosure, recycle-bin configuration, and Lidarr search dry-run behavior are tested. A4 must also define a separate execution authorization contract.
 
-The longer-term scored backlog lives in `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`. The highest-ROI next pulls are read-only hardening tools: finding revalidation, redacted evidence exports, triage queues, read-only probe collection, fixture truth tables, and storage/root health audits.
+The longer-term scored backlog lives in `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`. The next pulls should finish A2 projection conformance first, then add read-only hardening tools such as revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, state diffing, storage/root health audits, host conformance, redaction verification, triage filters, probe collection, targeted decode verification, and fixture truth tables.
