@@ -210,7 +210,27 @@ These ideas are useful once the evidence layer can explain library state consist
 | Release migration delta explainer | Turn future release-migration assistant output into an operator-readable diff of track slots, tags, files, and monitored state under candidate MusicBrainz release remaps. | 4 | 3 | 4 | C1/B | Explanation layer only; migration remains blocked until Lidarr release-remap semantics, rollback, and operator approval are proven. |
 | Operator-facing remediation run history | Show what was diagnosed, manually fixed, verified, waived, reacquired, or still blocked across time per album, root, source, and workflow. | 5 | 3 | 5 | C1/A3/A4 | History must preserve auditability without storing raw private paths, tags, or AI prompts. |
 
-Highest-ROI additions to consider pulling forward after A2 projection conformance: evidence contract golden packs, field sensitivity annotations, classifier replay benches, root outage coalescing, container/codec mismatch signatures, library inventory snapshots, backup-manifest checksum audits, FLAC STREAMINFO MD5 verification, recycle-bin and backup readiness, known-bad signatures, import rejection explanations, privacy/AI prompt preflight, append-only fact storage, cross-tool contention detection, manual repair intake verification after fresh-state gates exist, machine-checkable gate proofs, and mutation chaos drills. These improve later repair/reacquire safety without requiring media writes in the near term.
+## Additional Operational QoL and Governance Ideas
+
+These ideas focus on making a large library manageable day to day. They are intentionally framed as prioritization, policy, review, and explanation layers; none of them converts advisory evidence into permission to mutate files or Lidarr state.
+
+| Feature | Purpose | Usefulness | Complexity | ROI | Likely milestone | Safety caveat |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| Risk-prioritized operator queue | Sort review work by risk, blast radius, freshness, recurrence, root health, backup readiness, and user impact. | 5 | 3 | 5 | A2.5/C1 | Priority affects review order only; it must not hide findings or authorize actions. |
+| High-risk notification rules | Notify operators about new high-risk findings, root outage storms, stale evidence, backup-readiness failures, or recurring import failures. | 4 | 3 | 4 | A2.5/C1 | Opt-in, redacted, rate-limited, and advisory; notifications cannot enqueue commands. |
+| Lidarr configuration conformance inspector | Audit naming, root folders, recycle-bin configuration, quality profiles, metadata settings, permissions, and import behavior that affect healing safety. | 5 | 3 | 5 | A2.5/A3/A4 | Audit-only; unsafe configuration blocks later dry-runs but is never changed automatically. |
+| Edition and variant protected-scope extension | Extend the protected-scope model so operators can mark releases, editions, media types, or albums as preserve-only before repair, import, tag, or reacquire features exist. | 5 | 3 | 5 | C1/A3/A4/B | Protection can only block or escalate a plan; it cannot choose a replacement or downgrade evidence gates. |
+| Upgrade, downgrade, and edition drift guard | Compare candidate imports, reacquires, and release remaps against current quality, edition, release, medium, and monitored state. | 5 | 4 | 4 | C1/A4/B | Any drift fails closed to review; it never decides deletion, replacement, or upgrade eligibility by itself. |
+| Review workload planner | Estimate review effort by cohort, album, root, source, workflow, and missing evidence so users can clear the safest/highest-impact queues first. | 4 | 2 | 4 | A2.5/C1 | Planning is informational; it cannot batch-approve or batch-suppress findings. |
+| Library ownership boundary map | Distinguish Lidarr-managed files from external, Spotify-derived, manually managed, unmanaged, and player-only content. | 5 | 3 | 5 | C1/D | External or player state can explain symptoms, but only Lidarr-owned evidence can feed Lidarr mutation gates. |
+| Source-of-truth policy simulator | Simulate operator preferences for conflicts between Lidarr DB state, MusicBrainz data, file tags, folder names, and local policy. | 4 | 4 | 4 | C1/B | Policies are versioned simulations until separate write contracts exist; AI may explain conflicts only, while deterministic policy and explicit operator choices set precedence. |
+| Release availability scout | For decode-proven unrecoverable files, preview whether Lidarr search candidates likely exist before an operator spends time on repair. | 4 | 4 | 3 | A4 | Read-only search/availability evidence only; no grabs, queue pushes, deletes, or replacements. |
+| Folder hygiene and path-collision audit | Detect path length risks, reserved names, case/accent collisions, duplicate artist folders, and normalization drift such as ampersands, apostrophes, dashes, and accents. | 4 | 2 | 4 | C1 | Report-only; renames and path rewrites require separate simulation, approval, and rollback contracts. |
+| Review packet bulk-labeling UX | Add saved filters, keyboard-friendly labels, same-root annotations, and bulk "same cause" review metadata. | 4 | 3 | 4 | C1 | Bulk labels are review context only; suppression, waiver, or approval requires a separate fingerprint-bound, expiring, audited artifact. |
+| Post-automation reconciliation checklist | After operator-approved or separately execution-authorized repair, reacquire, tag, or Lidarr-orchestrated work, verify ledger state, backup state, TrackFile mapping, TagLib read, evidence closure, and optional downstream visibility. | 5 | 3 | 5 | A3/A4/C2 | Checklist results are fresh evidence for that operation only; they do not cover manual fixes or grant future automatic repair permission. |
+| AI provider policy guardrail | Define no-AI, local-only, cloud-allowed, redaction-required, token-budget, and adversarial-check policies for future AI-assisted review tools. | 4 | 3 | 4 | B/C | AI policy can only restrict, redact, or require review; it cannot authorize mutation or certify safety. |
+
+Highest-ROI additions to consider pulling forward after A2 projection conformance: evidence contract golden packs, field sensitivity annotations, classifier replay benches, root outage coalescing, container/codec mismatch signatures, library inventory snapshots, backup-manifest checksum audits, FLAC STREAMINFO MD5 verification, recycle-bin and backup readiness, known-bad signatures, import rejection explanations, privacy/AI prompt preflight, risk-prioritized queues, Lidarr configuration conformance, edition/variant protected scopes, ownership boundary mapping, post-automation reconciliation, append-only fact storage, cross-tool contention detection, manual repair intake verification after fresh-state gates exist, machine-checkable gate proofs, and mutation chaos drills. These improve later repair/reacquire safety without requiring media writes in the near term.
 
 ## Recommended Next Pulls
 
@@ -249,6 +269,11 @@ The best near-term sequence is intentionally smaller than the full A2.5/C/A3 bac
 31. Recycle-bin and backup readiness doctor.
 32. Mutation safety drill on synthetic files plus dummy restore rehearsal.
 33. Operation ledger state machine and machine-checkable gate proof bundle.
+34. Risk-prioritized operator queue, review workload planner, and high-risk notification rules.
+35. Lidarr configuration conformance inspector.
+36. Protected scope list with edition/variant semantics plus upgrade/downgrade drift guard.
+37. Library ownership boundary map and folder hygiene/path-collision audit.
+38. Post-automation reconciliation checklist.
 
 This sequence improves trust, debuggability, scale, privacy, and evidence quality without introducing media writes through A2.5. It also reduces A3/A4 risk by proving contract stability, field sensitivity, freshness, state migration, probe behavior, fixture behavior, redaction, root containment, backup readiness, host semantics, and synthetic recovery before repair or reacquire exists.
 
@@ -286,14 +311,17 @@ A2 should finish the projection contract before the roadmap pulls any A2.5 work.
 - redaction verification and leak-scanner fixtures;
 - local diagnostic export;
 - triage filters, with initial workflow/risk/blocked-reason/authorization filtering before freshness and review-lifecycle expansion;
+- risk-prioritized queues, workload planning, and redacted high-risk notifications;
 - probe collection and container/codec signatures;
 - targeted decode verification and FLAC STREAMINFO MD5 checks;
 - fixture truth-table work, local fixture health checks, and toolchain reproducibility;
 - metrics/cardinality and scan-cost budgets;
 - evidence change explanations and album-level finding packets;
+- Lidarr configuration conformance, edition/variant protected scopes, and upgrade/downgrade drift guards;
 - library inventory snapshots and backup-manifest checksum audits;
 - playlist/collection impact analysis and remediation cost forecasts;
 - AI prompt privacy preflight before any model-assisted review notes;
+- library ownership boundaries and folder hygiene/path-collision audits;
 - append-only fact storage;
 - cross-tool contention detection;
 - manual repair intake verification after fresh-state and contention gates.

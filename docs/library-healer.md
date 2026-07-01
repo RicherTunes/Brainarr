@@ -71,7 +71,7 @@ A2.5 begins with read-only triage filtering on `healer/getfindings`. The first f
 
 ## Next Milestones
 
-A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, and fixture truth tables.
+A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
