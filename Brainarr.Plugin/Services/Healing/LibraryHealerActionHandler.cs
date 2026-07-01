@@ -114,8 +114,8 @@ public sealed class LibraryHealerActionHandler
             pathHash = SanitizeTokenString(finding.File.PathHash),
             size = finding.File.Size,
             modifiedUtc = finding.File.ModifiedUtc,
-            label = finding.Label.ToString(),
-            reasons = finding.InternalReasonCodes.Select(SanitizeTokenString).ToList(),
+            label = LibraryHealerReasonCodes.NormalizeLabel(finding.Label, finding.TagReader.Metadata).ToString(),
+            reasons = LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, finding.TagReader.Metadata),
             observedAtUtc = finding.ObservedAtUtc,
             tagReader = ProjectTagReader(finding.TagReader),
             probe = finding.Probe is null ? null : ProjectProbe(finding.Probe),
@@ -129,7 +129,21 @@ public sealed class LibraryHealerActionHandler
             evidence.ReadSucceeded,
             evidence.DurationSeconds,
             SanitizeTokenString(evidence.ErrorType),
-            SanitizeMessageString(evidence.ErrorMessage));
+            SanitizeMessageString(evidence.ErrorMessage),
+            ProjectMetadata(evidence.Metadata));
+    }
+
+    private static TagMetadataEvidence? ProjectMetadata(TagMetadataEvidence? evidence)
+    {
+        if (evidence is null)
+        {
+            return null;
+        }
+
+        return evidence with
+        {
+            MissingFields = TagMetadataFields.GetMissingFields(evidence),
+        };
     }
 
     private static ProbeEvidence ProjectProbe(ProbeEvidence evidence)
@@ -205,7 +219,8 @@ public sealed class LibraryHealerActionHandler
 
         return ContainsLikelyPath(value)
             || HasDriveDesignator(value)
-            || ContainsMediaExtension(value);
+            || ContainsMediaExtension(value)
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value);
     }
 
     private static bool HasWindowsRoot(string value)

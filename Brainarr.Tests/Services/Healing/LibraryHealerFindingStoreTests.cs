@@ -398,6 +398,162 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldAllowListTagMetadataMissingFields()
+    {
+        var store = CreateStore();
+        var rawMetadataValue = "PrivateArtist";
+        var rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            tagMetadata: new TagMetadataEvidence(
+                TitlePresent: false,
+                ArtistPresent: false,
+                AlbumPresent: true,
+                AnyMusicBrainzIdPresent: false,
+                MissingFields: new[]
+                {
+                    "title",
+                    rawMetadataValue,
+                    rawMusicBrainzLikeValue,
+                    "musicBrainzId",
+                }),
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.TagReader.Metadata.Should().NotBeNull();
+        persisted.TagReader.Metadata!.MissingFields.Should().Equal("title", "artist", "musicBrainzId");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain("musicBrainzId");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldAllowListTagMetadataReasonCodes()
+    {
+        var store = CreateStore();
+        var rawMetadataValue = "PrivateArtist";
+        var rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            label: LibraryHealerLabel.TagMetadataIssue,
+            internalReasonCodes: new[]
+            {
+                "TAG_READER_DURATION_POSITIVE",
+                "TAG_METADATA_MISSING",
+                "TAG_MISSING_TITLE",
+                "TAG_MISSING_" + rawMetadataValue,
+                "TAG_MISSING_" + rawMusicBrainzLikeValue,
+                rawMusicBrainzLikeValue,
+            },
+            tagMetadata: new TagMetadataEvidence(
+                TitlePresent: false,
+                ArtistPresent: false,
+                AlbumPresent: true,
+                AnyMusicBrainzIdPresent: false,
+                MissingFields: new[]
+                {
+                    "title",
+                    rawMetadataValue,
+                    rawMusicBrainzLikeValue,
+                    "musicBrainzId",
+                }),
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.InternalReasonCodes.Should().Equal(
+            "TAG_READER_DURATION_POSITIVE",
+            "TAG_METADATA_MISSING",
+            "TAG_MISSING_TITLE",
+            "TAG_MISSING_ARTIST",
+            "TAG_MISSING_MUSICBRAINZID");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain("TAG_MISSING_ARTIST");
+        json.Should().Contain("TAG_MISSING_MUSICBRAINZID");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldDropStaleTagMetadataReasonCodes_WhenMetadataBooleansAreComplete()
+    {
+        var store = CreateStore();
+        var rawMetadataValue = "PrivateArtist";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            label: LibraryHealerLabel.TagMetadataIssue,
+            internalReasonCodes: new[]
+            {
+                "TAG_READER_DURATION_POSITIVE",
+                "TAG_METADATA_MISSING",
+                "TAG_MISSING_TITLE",
+                "TAG_MISSING_" + rawMetadataValue,
+            },
+            tagMetadata: new TagMetadataEvidence(
+                TitlePresent: true,
+                ArtistPresent: true,
+                AlbumPresent: true,
+                AnyMusicBrainzIdPresent: true,
+                MissingFields: new[] { "title", rawMetadataValue }),
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.Label.Should().Be(LibraryHealerLabel.FalsePositive);
+        persisted.InternalReasonCodes.Should().Equal("TAG_READER_DURATION_POSITIVE");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain("\"label\": 0");
+        json.Should().NotContain("\"label\": 5");
+        json.Should().Contain("TAG_READER_DURATION_POSITIVE");
+        json.Should().NotContain("TAG_METADATA_MISSING");
+        json.Should().NotContain("TAG_MISSING_TITLE");
+        json.Should().NotContain(rawMetadataValue);
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldRedactMetadataIdentifiersInErrorMessages()
+    {
+        var store = CreateStore();
+        const string rawMetadataValue = "PrivateArtist";
+        const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            internalReasonCodes: new[] { "TAG_READER_FAILED" },
+            tagReaderErrorMessage: $"Artist tag {rawMetadataValue} has MusicBrainz id {rawMusicBrainzLikeValue}",
+            label: LibraryHealerLabel.TagReaderSymptom,
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.TagReader.ErrorMessage.Should().NotContain(rawMetadataValue);
+        persisted.TagReader.ErrorMessage.Should().NotContain(rawMusicBrainzLikeValue);
+        persisted.TagReader.ErrorMessage.Should().NotContain("MusicBrainz id");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().Contain("TAG_READER_FAILED");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+        json.Should().NotContain("MusicBrainz id");
+    }
+
+    [Fact]
     public void GetRecent_ShouldReturnNewestFirstAndRespectLimit()
     {
         var store = CreateStore();
@@ -495,7 +651,9 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         string? tagReaderErrorType = null,
         string? probeContainer = null,
         string? probeAudioCodec = null,
-        string? probeErrorType = null)
+        string? probeErrorType = null,
+        TagMetadataEvidence? tagMetadata = null,
+        LibraryHealerLabel label = LibraryHealerLabel.ProbeEvidence)
     {
         return new LibraryHealerFinding(
             id,
@@ -507,14 +665,15 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
                 PathHash: pathHash,
                 Size: 12345,
                 ModifiedUtc: observedAtUtc.AddDays(-1)),
-            LibraryHealerLabel.ProbeEvidence,
+            label,
             internalReasonCodes ?? new[] { "TAG_READER_ZERO_DURATION", "PROBE_DURATION_POSITIVE" },
             new TagReaderEvidence(
                 ReadAttempted: true,
                 ReadSucceeded: tagReaderErrorMessage is null && tagReaderErrorType is null,
                 DurationSeconds: tagReaderErrorMessage is null ? 0 : null,
                 ErrorType: tagReaderErrorType ?? (tagReaderErrorMessage is null ? null : "ReadError"),
-                ErrorMessage: tagReaderErrorMessage),
+                ErrorMessage: tagReaderErrorMessage,
+                Metadata: tagMetadata),
             new ProbeEvidence(
                 ProbeAttempted: true,
                 ProbeSucceeded: probeErrorMessage is null && probeErrorType is null,

@@ -3,6 +3,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
 namespace Brainarr.Tests.Services.Healing;
 
+[Collection("ThreadSensitive")]
 public sealed class FileFingerprintServiceTests
 {
     [Fact]
