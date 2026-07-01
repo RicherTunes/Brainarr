@@ -323,7 +323,11 @@ public sealed class LibraryHealerActionHandler
         return finding.File is null
             || finding.TagReader is null
             || !Enum.IsDefined(finding.Label)
-            || IsMalformedFileIdentity(finding.File);
+            || IsMalformedFileIdentity(finding.File)
+            // A TagMetadataIssue with absent metadata is unclassifiable: GetMissingFields(null) returns
+            // empty, which NormalizeLabel would otherwise treat as "all tags present" and silently
+            // downgrade to FalsePositive (a false-negative). Fail closed -> NeedsHumanReview.
+            || (finding.Label == LibraryHealerLabel.TagMetadataIssue && finding.TagReader.Metadata is null);
     }
 
     private static bool IsMalformedFileIdentity(LibraryHealerFileIdentity? file)
