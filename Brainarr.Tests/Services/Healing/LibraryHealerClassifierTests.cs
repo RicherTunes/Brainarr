@@ -18,6 +18,117 @@ public class LibraryHealerClassifierTests
     }
 
     [Fact]
+    public void Classify_ShouldReturnTagMetadataIssue_WhenPositiveDurationHasMissingRequiredTags()
+    {
+        var result = LibraryHealerClassifier.Classify(
+            new TagReaderEvidence(
+                true,
+                true,
+                245.2,
+                null,
+                null,
+                new TagMetadataEvidence(
+                    TitlePresent: false,
+                    ArtistPresent: true,
+                    AlbumPresent: false,
+                    AnyMusicBrainzIdPresent: false,
+                    MissingFields: new[] { "title", "album", "musicBrainzId" })),
+            null);
+
+        result.Label.Should().Be(LibraryHealerLabel.TagMetadataIssue);
+        result.InternalReasonCodes.Should().Contain("TAG_READER_DURATION_POSITIVE");
+        result.InternalReasonCodes.Should().Contain("TAG_METADATA_MISSING");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_TITLE");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_ALBUM");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_MUSICBRAINZID");
+    }
+
+    [Fact]
+    public void Classify_ShouldTreatNullMetadataMissingFieldsAsComplete()
+    {
+        var result = LibraryHealerClassifier.Classify(
+            new TagReaderEvidence(
+                true,
+                true,
+                245.2,
+                null,
+                null,
+                new TagMetadataEvidence(
+                    TitlePresent: true,
+                    ArtistPresent: true,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: true,
+                    MissingFields: null!)),
+            null);
+
+        result.Label.Should().Be(LibraryHealerLabel.FalsePositive);
+        result.InternalReasonCodes.Should().Contain("TAG_READER_DURATION_POSITIVE");
+        result.InternalReasonCodes.Should().NotContain("TAG_METADATA_MISSING");
+    }
+
+    [Fact]
+    public void Classify_ShouldAllowListTagMetadataMissingFieldReasonCodes()
+    {
+        var result = LibraryHealerClassifier.Classify(
+            new TagReaderEvidence(
+                true,
+                true,
+                245.2,
+                null,
+                null,
+                new TagMetadataEvidence(
+                    TitlePresent: false,
+                    ArtistPresent: false,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: false,
+                    MissingFields: new[]
+                    {
+                        "title",
+                        "PrivateArtist",
+                        "550e8400-e29b-41d4-a716-446655440000",
+                        "musicBrainzId",
+                    })),
+            null);
+
+        result.Label.Should().Be(LibraryHealerLabel.TagMetadataIssue);
+        result.InternalReasonCodes.Should().Contain("TAG_METADATA_MISSING");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_TITLE");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_ARTIST");
+        result.InternalReasonCodes.Should().Contain("TAG_MISSING_MUSICBRAINZID");
+        result.InternalReasonCodes.Should().OnlyContain(reason => !reason.Contains("PrivateArtist", StringComparison.Ordinal));
+        result.InternalReasonCodes.Should().OnlyContain(reason => !reason.Contains("550e8400", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Classify_ShouldDeriveTagMetadataMissingFieldsFromBooleansOnly()
+    {
+        var result = LibraryHealerClassifier.Classify(
+            new TagReaderEvidence(
+                true,
+                true,
+                245.2,
+                null,
+                null,
+                new TagMetadataEvidence(
+                    TitlePresent: true,
+                    ArtistPresent: true,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: true,
+                    MissingFields: new[]
+                    {
+                        "title",
+                        "artist",
+                        "album",
+                        "musicBrainzId",
+                    })),
+            null);
+
+        result.Label.Should().Be(LibraryHealerLabel.FalsePositive);
+        result.InternalReasonCodes.Should().Contain("TAG_READER_DURATION_POSITIVE");
+        result.InternalReasonCodes.Should().NotContain("TAG_METADATA_MISSING");
+    }
+
+    [Fact]
     public void Classify_ShouldReturnTagReaderSymptom_WhenTagReaderReportsZeroAndNoProbeExists()
     {
         var result = LibraryHealerClassifier.Classify(

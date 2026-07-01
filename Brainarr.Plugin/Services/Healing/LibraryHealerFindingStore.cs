@@ -120,6 +120,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         {
             ErrorType = SanitizePathLikeToken(finding.TagReader.ErrorType, "tag-error-"),
             ErrorMessage = tagReaderMessage,
+            Metadata = SanitizeMetadata(finding.TagReader.Metadata),
         };
 
         var probe = finding.Probe;
@@ -139,7 +140,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         {
             Id = SanitizeFindingId(finding.Id),
             File = file,
-            InternalReasonCodes = SanitizePathLikeTokens(finding.InternalReasonCodes, "reason-"),
+            Label = LibraryHealerReasonCodes.NormalizeLabel(finding.Label, tagReader.Metadata),
+            InternalReasonCodes = LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, tagReader.Metadata),
             TagReader = tagReader,
             Probe = probe,
         };
@@ -194,6 +196,19 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             : message;
     }
 
+    private static TagMetadataEvidence? SanitizeMetadata(TagMetadataEvidence? metadata)
+    {
+        if (metadata is null)
+        {
+            return null;
+        }
+
+        return metadata with
+        {
+            MissingFields = TagMetadataFields.GetMissingFields(metadata),
+        };
+    }
+
     private static bool ShouldRedactPathMaterial(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -241,7 +256,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
         return ContainsLikelyPath(value)
             || HasDriveDesignator(value)
-            || ContainsMediaExtension(value);
+            || ContainsMediaExtension(value)
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value);
     }
 
     private static bool HasWindowsRoot(string value)
