@@ -26,9 +26,11 @@ namespace Brainarr.Tests.Documentation
             doc.Should().Contain("read-only diagnostic");
             doc.Should().Contain("healer/scan");
             doc.Should().Contain("healer/getfindings");
+            doc.Should().Contain("healer/getfieldcatalog");
             doc.Should().Contain("healer/clearfindings");
             doc.Should().Contain("basename#hash");
             doc.Should().Contain("first 12 hex characters");
+            doc.Should().Contain("field-sensitivity catalog");
 
             doc.Should().Contain("A1 cannot:");
             doc.Should().Contain("- repair files;");

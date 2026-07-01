@@ -43,6 +43,29 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldRouteHealerGetFieldCatalogWithoutProviderPipeline()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore());
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction(
+            "healer/getfieldcatalog",
+            new Dictionary<string, string>(),
+            new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("\"fields\"");
+        json.Should().Contain("items[].path");
+        json.Should().Contain("redacted_path_identifier");
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void HandleAction_ShouldIncludeTreatmentPlan_ForEveryFinding()
     {
         var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);

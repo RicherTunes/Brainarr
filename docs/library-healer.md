@@ -29,6 +29,7 @@ A1 cannot:
 
 - `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
 - `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans. It supports optional read-only triage filters: `workflow`, `risk`, `blockedReason`, and `authorized`. `workflow`, `risk`, and `blockedReason` accept comma-separated, case-insensitive values. Unknown treatment filter values are ignored; if no supplied values are recognized, that filter is not applied. `authorized` accepts `true` or `false`; malformed boolean values are ignored. Recognized filters apply before the output `limit`, and the `summary` describes only the returned filtered findings.
+- `healer/getfieldcatalog`: returns static field-sensitivity metadata for the `healer/getfindings` output contract. It is read-only and does not scan files, read findings, mutate Lidarr, or contact providers.
 - `healer/clearfindings`: clears Brainarr-owned findings.
 
 ## Safety Model
@@ -71,9 +72,11 @@ A2.5 begins with read-only triage filtering on `healer/getfindings`. The first f
 
 The first evidence contract golden pack snapshots the sanitized `healer/getfindings` projection and the treatment vocabulary. It covers representative repair candidates, tag-repair candidates, privacy redaction, summary counts, and malformed finding fail-closed behavior so later UI, export, AI review, and execution planning work must make any reinterpretation of A2 advisory fields visible during contract review.
 
+The first field-sensitivity catalog is available through `healer/getfieldcatalog`. It is static, read-only metadata for the `healer/getfindings` response and does not scan files, read findings, mutate Lidarr, or contact providers. Each known output field is annotated with a sensitivity class plus local diagnostic export, shareable support export, and AI prompt booleans. Non-public fields such as redacted paths, stable path hashes, Lidarr-local identifiers, file size/duration/timestamps, and diagnostic error tokens are blocked from shareable support export and AI prompts by default.
+
 ## Next Milestones
 
-A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, field sensitivity annotations, classifier replay benches, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
+A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, field-sensitivity expansion for future exports and AI packets, classifier replay benches, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
