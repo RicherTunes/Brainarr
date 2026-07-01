@@ -81,7 +81,7 @@ namespace Brainarr.Tests
             // This test simulates the deadlock scenario that occurs in UI/ASP.NET contexts
             // when using .GetAwaiter().GetResult() directly
 
-            var tcs = new TaskCompletionSource<bool>();
+            var tcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             Exception caughtException = null;
 
             // Create a thread with a SynchronizationContext (simulating UI/ASP.NET)
@@ -110,6 +110,8 @@ namespace Brainarr.Tests
                 }
             });
 
+            thread.IsBackground = true;
+
             // Only set apartment state on Windows platform
             if (System.Runtime.InteropServices.RuntimeInformation.IsOSPlatform(System.Runtime.InteropServices.OSPlatform.Windows))
             {
@@ -117,12 +119,13 @@ namespace Brainarr.Tests
             }
             thread.Start();
 
-            // Wait for test to complete (with timeout to prevent hanging)
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            // Wait for test to complete (with timeout to prevent hanging). The CI runner can be
+            // heavily thread-starved while the full suite is running, so keep this budget aligned
+            // with the other AsyncHelper starvation-resistant tests.
             try
             {
-                var completed = await tcs.Task.WaitAsync(cts.Token);
-                Assert.True(completed);
+                var completed = await tcs.Task.WaitAsync(TimeSpan.FromSeconds(30));
+                Assert.True(completed, caughtException?.ToString() ?? "UI-context simulation failed");
             }
             catch (TimeoutException)
             {
@@ -130,6 +133,7 @@ namespace Brainarr.Tests
             }
 
             // Assert
+            Assert.True(thread.Join(TimeSpan.FromSeconds(5)), "UI-context simulation thread did not exit cleanly.");
             Assert.Null(caughtException);
         }
 
