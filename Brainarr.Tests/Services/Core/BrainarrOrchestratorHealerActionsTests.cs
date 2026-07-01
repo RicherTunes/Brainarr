@@ -397,6 +397,46 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldFailClosed_WhenTagMetadataIssueHasNullMetadata()
+    {
+        // A TagMetadataIssue finding whose TagReader.Metadata is null (tainted / hand-edited / a future
+        // write path that omits it) must NOT be silently downgraded to FalsePositive. GetMissingFields(null)
+        // returns empty, which NormalizeLabel would treat as "all tags present" and reclassify to
+        // FalsePositive (confidence 1.0, workflow none) — a silent false-negative that defeats the
+        // tainted-input guarantee in docs/library-healer.md. It must surface as NeedsHumanReview +
+        // MALFORMED_FINDING_RECORD.
+        var malformed = new LibraryHealerFinding(
+            "null-metadata",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 42,
+                ArtistId: 7,
+                AlbumId: 3,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[] { "TAG_METADATA_MISSING", "TAG_MISSING_TITLE" },
+            new TagReaderEvidence(true, true, 1.0, null, null), // Metadata defaults to null
+            Probe: null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new FakeFindingStore(new[] { malformed }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("label").GetString().Should().Be(LibraryHealerLabel.NeedsHumanReview.ToString());
+        JsonStrings(item.GetProperty("reasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+        var plan = item.GetProperty("treatmentPlan");
+        plan.GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.Review);
+        plan.GetProperty("executionAuthorization").GetProperty("authorized").GetBoolean().Should().BeFalse();
+    }
+
+    [Fact]
     public void HandleAction_ShouldRedactSensitiveTokensAndGenericExceptionTextInTreatmentProjection()
     {
         const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";

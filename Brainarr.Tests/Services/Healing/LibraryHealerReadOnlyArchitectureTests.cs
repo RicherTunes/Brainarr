@@ -25,6 +25,7 @@ public class LibraryHealerReadOnlyArchitectureTests
         "SyncTags(",
         "RemoveMusicBrainzTags(",
         ".UpdateMediaInfo(",
+        ".Update(",
         ".DeleteMany(",
         ".Delete(",
         "IManageCommandQueue",

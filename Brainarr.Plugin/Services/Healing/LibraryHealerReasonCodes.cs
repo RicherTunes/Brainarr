@@ -56,7 +56,12 @@ internal static class LibraryHealerReasonCodes
 
     public static LibraryHealerLabel NormalizeLabel(LibraryHealerLabel label, TagMetadataEvidence? metadata)
     {
+        // Only downgrade to FalsePositive when metadata is actually PRESENT and every field is set.
+        // A null metadata is NOT evidence of "all tags present" (GetMissingFields(null) returns empty),
+        // so downgrading on it would hide a real TagMetadataIssue as a false-negative. Leave the label
+        // as-is; the malformed-record gate surfaces the absent-metadata case as NeedsHumanReview.
         if (label == LibraryHealerLabel.TagMetadataIssue
+            && metadata is not null
             && TagMetadataFields.GetMissingFields(metadata).Count == 0)
         {
             return LibraryHealerLabel.FalsePositive;
