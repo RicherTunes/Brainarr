@@ -480,42 +480,57 @@ namespace Brainarr.Tests.Services
         public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
             // Arrange
+            const int operationCount = 5;
             var startedTasks = 0;
             var cancelledTasks = 0;
-            var lockObj = new object();
+            var cancellationSources = Enumerable
+                .Range(0, operationCount)
+                .Select(_ => new CancellationTokenSource())
+                .ToArray();
 
-            // Act - Start multiple operations with timeout
-            var tasks = new List<Task>();
-            for (int i = 0; i < 5; i++)
+            try
             {
-                tasks.Add(Task.Run(async () =>
+                var operations = cancellationSources.Select(cts => Task.Run(async () =>
                 {
-                    try
-                    {
-                        using (var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(25)))
-                        {
-                            var asyncTask = Task.Run(async () =>
-                            {
-                                lock (lockObj) { startedTasks++; }
-                                await Task.Delay(100, cts.Token); // Longer delay to ensure cancellation
-                                return "result";
-                            }, cts.Token);
+                    Interlocked.Increment(ref startedTasks);
+                    await Task.Delay(Timeout.InfiniteTimeSpan, cts.Token);
+                })).ToArray();
 
-                            await asyncTask;
-                        }
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        lock (lockObj) { cancelledTasks++; }
-                    }
-                }));
+                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
+                while (Volatile.Read(ref startedTasks) < operationCount && DateTime.UtcNow < deadline)
+                {
+                    await Task.Delay(10);
+                }
+
+                Volatile.Read(ref startedTasks).Should().Be(operationCount);
+
+                foreach (var cts in cancellationSources)
+                {
+                    cts.Cancel();
+                }
+
+                var bridgeTasks = operations.Select(operation => Task.Run(() =>
+                {
+                    var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                        () => operation,
+                        timeoutMs: 5000);
+                    act.Should().Throw<OperationCanceledException>();
+                    Interlocked.Increment(ref cancelledTasks);
+                })).ToArray();
+
+                await Task.WhenAll(bridgeTasks).WaitAsync(TimeSpan.FromSeconds(10));
+            }
+            finally
+            {
+                foreach (var cts in cancellationSources)
+                {
+                    cts.Dispose();
+                }
             }
 
-            await Task.WhenAll(tasks.ToArray());
-
             // Assert
-            startedTasks.Should().Be(5);
-            cancelledTasks.Should().BeGreaterThan(0); // At least some should be cancelled
+            Volatile.Read(ref startedTasks).Should().Be(operationCount);
+            Volatile.Read(ref cancelledTasks).Should().Be(operationCount);
         }
     }
 }
