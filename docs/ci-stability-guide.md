@@ -1,16 +1,16 @@
 # CI Stability Guide
 
-This document outlines best practices and guidelines to ensure the GitHub Actions CI pipeline remains stable and reliable.
+This document outlines best practices and guidelines to ensure Brainarr's Gitea-primary CI pipeline remains stable and reliable.
 
 ## ✅ Current CI Status
 
-The CI pipeline is now **stable and passing** across all environments:
+The CI pipeline is expected to stay stable through the same gates used before merge:
 
-- ✅ Ubuntu, Windows, macOS (latest versions)
-- ✅ .NET 8.0.x (target framework)
-- ✅ All tests passing with optimized timing
-- ✅ Security scans completing successfully
-- ✅ Zero build warnings
+- ✅ Gitea `CI / secret-scan` using Gitleaks with checksum verification
+- ✅ Gitea `CI / lint` using Common's shared plugin lint runner
+- ✅ Gitea `CI / verify` running `scripts/verify-local.ps1`
+- ✅ .NET 8.0.x target framework
+- ✅ Deterministic tests and package-closure checks passing locally and in Gitea
 
 ## 🎯 Key Stability Measures
 
@@ -75,13 +75,9 @@ Before pushing changes that might affect CI:
 - **Individual test timeout**: 30 seconds (recommended)
 - **Build timeout**: 10 minutes
 
-### Matrix Strategy
+### Runner Strategy
 
-```yaml
-matrix:
-  os: [ubuntu-latest, windows-latest, macos-latest]
-  dotnet-version: ['8.0.x']
-```
+Brainarr's primary CI currently runs on the Gitea act_runner Linux environment. There is no active GitHub workflow matrix in this repo; GitHub is a mirror only.
 
 ### Assembly Extraction Strategy (Preferred)
 
@@ -148,7 +144,7 @@ dotnet build --verbosity normal
 
 - [ ] **Weekly**: Review CI run times and success rates
 - [ ] **Monthly**: Update Lidarr fallback version if needed
-- [ ] **Quarterly**: Review and update GitHub Actions versions
+- [ ] **Quarterly**: Review and update pinned CI tool versions in `.gitea/workflows/ci.yml`
 
 ### Performance Targets
 
@@ -182,7 +178,7 @@ If CI issues persist:
 1. Check this guide first
 2. Review recent commits for breaking changes
 3. Compare with last successful run
-4. Check GitHub Actions status page
+4. Check Gitea runner status and the latest `CI / secret-scan`, `CI / lint`, and `CI / verify` logs
 5. File issue with detailed logs
 
 **Remember**: A stable CI pipeline is crucial for team productivity and release confidence!

@@ -203,75 +203,31 @@ $commits
 
 🤖 Generated with Brainarr Release Manager"
 
-echo -e "${BLUE}📤 Pushing tag to trigger release automation...${NC}"
+echo -e "${BLUE}📤 Pushing tag to origin...${NC}"
 git push origin "$new_version"
 
 echo ""
 echo -e "${GREEN}🎉 Release $new_version created successfully!${NC}"
 echo ""
-echo -e "${BLUE}🚀 Automation Status:${NC}"
-echo "  ✅ Tag pushed to GitHub"
-echo "  🔄 GitHub Actions building release..."
-echo "  📚 Wiki will auto-update with new version"
-echo "  📦 Release packages will be built automatically"
+echo -e "${BLUE}📦 Release Status:${NC}"
+echo "  ✅ Tag pushed to origin"
+echo "  ✅ Local package/checksum generation completed before tagging"
+echo "  ℹ️  Brainarr has no GitHub mirror workflow or tag-triggered release workflow"
+echo "  📌 Publish/update release notes and assets manually from the local artifacts"
 echo ""
 
-# Monitor release progress
-echo -e "${BLUE}📊 Monitoring release progress...${NC}"
+# Publish guidance
+echo -e "${BLUE}📊 Manual publish guidance:${NC}"
 echo "🔗 Release URL: https://github.com/RicherTunes/Brainarr/releases/tag/$new_version"
-echo "🔗 Actions: https://github.com/RicherTunes/Brainarr/actions"
 echo ""
-
-# Wait a moment for GitHub to register the tag
-sleep 3
-
-# Check if release workflow started
-echo "⏳ Checking for running workflows..."
-if gh run list --event push --limit 3 --json status,name,createdAt | grep -q "in_progress\|queued"; then
-    echo -e "${GREEN}✅ Release automation started!${NC}"
-    echo ""
-    echo "📋 What happens next:"
-    echo "  1. 🔨 Plugin builds on 6 platform combinations"
-    echo "  2. 🧪 Test suite runs (485 tests)"
-    echo "  3. 🔒 Security scan completes"
-    echo "  4. 📦 Release packages are created"
-    echo "  5. 📚 Wiki updates with new version"
-    echo "  6. 🎁 GitHub release published"
-    echo ""
-    echo "⏱️  Total time: ~5-10 minutes"
-    echo ""
-
-    # Optional: Wait for completion
-    read -p "Monitor release progress? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        echo "👀 Monitoring release progress (Ctrl+C to exit)..."
-        while true; do
-            status=$(gh run list --event push --limit 1 --json status,conclusion,name | jq -r '.[0] | "\(.status) - \(.name)"' 2>/dev/null || echo "checking...")
-            echo "📊 Status: $status"
-
-            if [[ "$status" == *"completed"* ]]; then
-                conclusion=$(gh run list --event push --limit 1 --json conclusion | jq -r '.[0].conclusion' 2>/dev/null)
-                if [[ "$conclusion" == "success" ]]; then
-                    echo -e "${GREEN}🎉 Release $new_version completed successfully!${NC}"
-                    echo "🔗 View release: https://github.com/RicherTunes/Brainarr/releases/tag/$new_version"
-                    break
-                else
-                    echo -e "${RED}❌ Release failed with status: $conclusion${NC}"
-                    echo "🔗 Check logs: https://github.com/RicherTunes/Brainarr/actions"
-                    break
-                fi
-            fi
-
-            sleep 10
-        done
-    fi
-else
-    echo -e "${YELLOW}⏳ Release automation may take a moment to start...${NC}"
-fi
+echo "📋 Next steps:"
+echo "  1. Confirm the remote tag is visible."
+echo "  2. Upload the locally generated package and checksum artifacts."
+echo "  3. Copy release notes from CHANGELOG.md."
+echo "  4. Run/confirm the Gitea main CI gate after merging any release metadata changes."
 
 echo ""
 echo -e "${GREEN}🎯 Release $new_version initiated!${NC}"
-echo -e "${BLUE}📖 Check progress at: https://github.com/RicherTunes/Brainarr/actions${NC}"
+echo -e "${BLUE}📖 Finish publishing at: https://github.com/RicherTunes/Brainarr/releases/tag/$new_version${NC}"
 echo ""
 echo "🎵 Happy music discovering! 🎵"
