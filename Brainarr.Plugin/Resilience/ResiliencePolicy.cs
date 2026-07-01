@@ -41,23 +41,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             _adaptiveLimiter = limiter ?? throw new ArgumentNullException(nameof(limiter));
         }
 
-        // Intentional: WithResilienceAsync delegates to the now-obsolete RunWithRetriesAsync to
-        // preserve its distinct parameter set (origin, timeoutSeconds). Both are superseded by
-        // RetryPolicyFactory.CreateForLocalProviders for new call sites (Wave 16C).
-#pragma warning disable CS0618
-        public static Task<T> WithResilienceAsync<T>(
-            Func<CancellationToken, Task<T>> operation,
-            string origin,
-            Logger logger,
-            CancellationToken cancellationToken,
-            int timeoutSeconds = 30,
-            int maxRetries = 3)
-        {
-            var initialDelay = TimeSpan.FromMilliseconds(Configuration.BrainarrConstants.InitialRetryDelayMs);
-            return RunWithRetriesAsync(operation, logger, $"{origin}.http", maxRetries, initialDelay, cancellationToken);
-        }
-#pragma warning restore CS0618
-
         /// <summary>
         /// Resilient executor for HTTP requests built on Lidarr.Plugin.Common's GenericResilienceExecutor.
         /// </summary>
@@ -273,66 +256,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Resilience
             var p = o.Substring(0, idx);
             var m = o.Substring(idx + 1);
             return (string.IsNullOrWhiteSpace(p) ? "unknown" : p, string.IsNullOrWhiteSpace(m) ? "default" : m);
-        }
-
-        /// <summary>
-        /// Legacy retry helper with inline exponential backoff. Retained for compatibility.
-        /// </summary>
-        [Obsolete("Migrated to Lidarr.Plugin.Common.Services.Resilience.RetryPolicyFactory.CreateForLocalProviders. Will be removed in v2.0.")]
-        public static async Task<T> RunWithRetriesAsync<T>(
-            Func<CancellationToken, Task<T>> operation,
-            Logger logger,
-            string operationName,
-            int maxAttempts,
-            TimeSpan initialDelay,
-            CancellationToken cancellationToken)
-        {
-            if (operation == null) throw new ArgumentNullException(nameof(operation));
-            if (logger == null) throw new ArgumentNullException(nameof(logger));
-            if (maxAttempts < 1) throw new ArgumentOutOfRangeException(nameof(maxAttempts));
-
-            var attempt = 0;
-            var delay = initialDelay;
-            // Use Random.Shared — same thundering-herd-prevention rationale as wave 37.
-            Exception lastError = null;
-
-            while (attempt < maxAttempts)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                attempt++;
-
-                try
-                {
-                    var result = await operation(cancellationToken).ConfigureAwait(false);
-                    if (attempt > 1)
-                    {
-                        logger.Debug($"{operationName} succeeded on retry #{attempt}");
-                    }
-                    return result;
-                }
-                catch (OperationCanceledException)
-                {
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    lastError = ex;
-                    logger.Warn(ex, $"{operationName} failed on attempt {attempt}/{maxAttempts}");
-                }
-
-                if (attempt < maxAttempts)
-                {
-                    var sleepMs = (int)(delay.TotalMilliseconds * Random.Shared.NextDouble());
-                    await Task.Delay(sleepMs, cancellationToken).ConfigureAwait(false);
-                    delay = TimeSpan.FromMilliseconds(Math.Min(delay.TotalMilliseconds * 2, 2000));
-                }
-            }
-
-            if (lastError != null)
-            {
-                logger.Error(lastError, $"{operationName} failed after {maxAttempts} attempts");
-            }
-            return default;
         }
     }
 }
