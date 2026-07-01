@@ -56,7 +56,7 @@ The roadmap is intentionally conservative after review:
 | 12 | Redaction policy verifier for all stores | Scan findings, treatment plans, exports, logs, metrics, ledgers, and AI review notes for private data leaks. | 5 | 3 | 5 | A2.5 | Prefer false-positive blocking over leaking paths, tag values, prompts, or exception text. |
 | 13 | Local diagnostic evidence export | Export operator-local diagnostic bundles for debugging on the same host. | 4 | 2 | 4 | A2.5 | Local export still redacts raw paths by default; it is not a shareable support bundle. |
 | 14 | Shareable support export plus leak scanner | Produce shareable sanitized bundles with leak scanning and per-export salted identifiers. | 5 | 4 | 4 | A2.5 | No global stable hashes, raw paths, tag values, MBIDs, provider prompts, or exception text. |
-| 15 | Basic triage filters/API | Filter findings by workflow, risk, freshness, blocked reason, and authorization state. | 4 | 2 | 4 | A2.5 | Review state stays separate from execution authorization. |
+| 15 | Basic triage filters/API | Filter findings by workflow, risk, blocked reason, and authorization state; freshness and review-lifecycle filters remain future expansion. | 4 | 2 | 4 | A2.5 | Review state stays separate from execution authorization. |
 | 16 | Full triage dashboard/work queues | Add operator queues, review state, suppression, lifecycle, protected scopes, and packet generation. | 4 | 4 | 3 | A2.5/C1 | Waits for lifecycle, suppression, and protected-scope foundations. |
 | 17 | Read-only probe collector | Add `ffprobe` stream/container evidence for better candidate planning. | 5 | 4 | 4 | A2.5 | Structured arguments, timeouts, stdout/stderr caps, no network inputs. |
 | 18 | Targeted decode-on-finding verifier | Run decode only where the result changes workflow eligibility or risk. | 5 | 3 | 5 | A2.5/A5 | Explicit, bounded, resumable, and never a default whole-library sweep. |
@@ -231,7 +231,7 @@ The best near-term sequence is intentionally smaller than the full A2.5/C/A3 bac
 13. Lidarr host API conformance harness plus tool availability quick check.
 14. Redaction policy verifier for all stores plus export leak-scanner fixture corpus.
 15. Local diagnostic evidence export.
-16. Basic triage filters/API.
+16. Basic triage filters/API; initial `workflow`, `risk`, `blockedReason`, and `authorized` filters are in the first A2.5 slice.
 17. Read-only probe collector plus container/codec mismatch signatures.
 18. Targeted decode-on-finding verifier plus FLAC STREAMINFO MD5 verification.
 19. Fixture truth-table lab, local fixture health check, toolchain reproducibility runner, and synthetic fixture generator.
@@ -285,7 +285,7 @@ A2 should finish the projection contract before the roadmap pulls any A2.5 work.
 - host/API conformance and tool availability checks;
 - redaction verification and leak-scanner fixtures;
 - local diagnostic export;
-- triage filters;
+- triage filters, with initial workflow/risk/blocked-reason/authorization filtering before freshness and review-lifecycle expansion;
 - probe collection and container/codec signatures;
 - targeted decode verification and FLAC STREAMINFO MD5 checks;
 - fixture truth-table work, local fixture health checks, and toolchain reproducibility;

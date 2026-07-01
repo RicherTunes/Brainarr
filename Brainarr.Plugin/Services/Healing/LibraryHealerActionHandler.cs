@@ -4,6 +4,49 @@ public sealed class LibraryHealerActionHandler
 {
     private const string PathContainingValueRedaction = "<path-containing value redacted>";
     private const string EvidenceErrorMessageRedaction = "<evidence error message redacted>";
+    private static readonly string[] WorkflowFilterValues =
+    {
+        HealerTreatmentVocab.Workflow.None,
+        HealerTreatmentVocab.Workflow.Review,
+        HealerTreatmentVocab.Workflow.RepairDryRunCandidate,
+        HealerTreatmentVocab.Workflow.TagRepairCandidate,
+        HealerTreatmentVocab.Workflow.ReacquireCandidate,
+        HealerTreatmentVocab.Workflow.ReleaseReviewCandidate,
+    };
+    private static readonly string[] RiskFilterValues =
+    {
+        HealerTreatmentVocab.Risk.None,
+        HealerTreatmentVocab.Risk.Low,
+        HealerTreatmentVocab.Risk.Medium,
+        HealerTreatmentVocab.Risk.High,
+        HealerTreatmentVocab.Risk.Critical,
+    };
+    private static readonly string[] BlockedReasonFilterValues =
+    {
+        HealerTreatmentVocab.BlockedReason.None,
+        HealerTreatmentVocab.BlockedReason.A2ReadOnly,
+        HealerTreatmentVocab.BlockedReason.HumanReviewRequired,
+        HealerTreatmentVocab.BlockedReason.EvidenceFreshnessNotCurrent,
+        HealerTreatmentVocab.BlockedReason.IdentityFreshnessNotCurrent,
+        HealerTreatmentVocab.BlockedReason.PathStateStaleOrMissing,
+        HealerTreatmentVocab.BlockedReason.PathProbeInconclusive,
+        HealerTreatmentVocab.BlockedReason.ProbeEvidenceMissing,
+        HealerTreatmentVocab.BlockedReason.FullDecodeEvidenceMissing,
+        HealerTreatmentVocab.BlockedReason.TaglibRereadAfterRewrapMissing,
+        HealerTreatmentVocab.BlockedReason.EvidenceConflict,
+        HealerTreatmentVocab.BlockedReason.BackupPolicyMissing,
+        HealerTreatmentVocab.BlockedReason.JournalPolicyMissing,
+        HealerTreatmentVocab.BlockedReason.RollbackGuideMissing,
+        HealerTreatmentVocab.BlockedReason.CanonicalMetadataValidationMissing,
+        HealerTreatmentVocab.BlockedReason.TagWriteBackupPolicyMissing,
+        HealerTreatmentVocab.BlockedReason.TagRepairNotImplemented,
+        HealerTreatmentVocab.BlockedReason.RepairDryRunNotImplemented,
+        HealerTreatmentVocab.BlockedReason.RecycleBinPolicyMissing,
+        HealerTreatmentVocab.BlockedReason.AlbumWideScopeNotDisclosed,
+        HealerTreatmentVocab.BlockedReason.LidarrSearchDryRunNotImplemented,
+        HealerTreatmentVocab.BlockedReason.MalformedFindingRecord,
+        HealerTreatmentVocab.BlockedReason.UnknownFindingLabel,
+    };
     private readonly ILibraryHealerScanRunner _scanRunner;
     private readonly ILibraryHealerFindingStore _store;
     private int _scanInProgress;
@@ -73,14 +116,22 @@ public sealed class LibraryHealerActionHandler
     private object GetFindings(IDictionary<string, string> query)
     {
         var limit = Math.Clamp(TryParseQueryInt(query, "limit") ?? 100, 1, 500);
-        var projectedFindings = _store.GetRecent(limit)
+        var findings = HasActiveFindingFilters(query)
+            ? _store.GetAllRecent()
+            : _store.GetRecent(limit);
+        var projectedPlans = findings
             .Select(SanitizeFindingForProjection)
+            .Select(finding => new ProjectedPlan(
+                finding,
+                HealerTriageAdvisor.Advise(finding.Finding, finding.Freshness)))
+            .Where(plan => MatchesFindingFilters(query, plan.TreatmentPlan))
+            .Take(limit)
             .ToList();
-        var plans = projectedFindings
-            .Select(finding => HealerTriageAdvisor.Advise(finding.Finding, finding.Freshness))
+        var plans = projectedPlans
+            .Select(plan => plan.TreatmentPlan)
             .ToList();
-        var items = projectedFindings
-            .Zip(plans, (finding, plan) => ProjectFinding(finding.Finding, plan))
+        var items = projectedPlans
+            .Select(plan => ProjectFinding(plan.Finding.Finding, plan.TreatmentPlan))
             .ToList();
 
         return new
@@ -88,6 +139,87 @@ public sealed class LibraryHealerActionHandler
             items,
             summary = ProjectSummary(HealerTriageSummary.Create(plans)),
         };
+    }
+
+    private static bool HasActiveFindingFilters(IDictionary<string, string> query)
+    {
+        return ParseKnownFilterValues(query, "workflow", WorkflowFilterValues).Count > 0
+            || ParseKnownFilterValues(query, "risk", RiskFilterValues).Count > 0
+            || ParseKnownFilterValues(query, "blockedReason", BlockedReasonFilterValues).Count > 0
+            || TryParseQueryBool(query, "authorized") is not null;
+    }
+
+    private static bool MatchesFindingFilters(IDictionary<string, string> query, HealerTreatmentPlan plan)
+    {
+        if (!MatchesScalarFilter(query, "workflow", plan.CandidateWorkflow, WorkflowFilterValues))
+        {
+            return false;
+        }
+
+        if (!MatchesScalarFilter(query, "risk", plan.Risk, RiskFilterValues))
+        {
+            return false;
+        }
+
+        if (!MatchesListFilter(query, "blockedReason", plan.BlockedReasons, BlockedReasonFilterValues))
+        {
+            return false;
+        }
+
+        var authorized = TryParseQueryBool(query, "authorized");
+        return authorized is null || plan.ExecutionAuthorization.Authorized == authorized.Value;
+    }
+
+    private static bool MatchesScalarFilter(
+        IDictionary<string, string> query,
+        string key,
+        string value,
+        IReadOnlyList<string> allowedValues)
+    {
+        var filters = ParseKnownFilterValues(query, key, allowedValues);
+        return filters.Count == 0
+            || filters.Any(filter => string.Equals(filter, value, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static bool MatchesListFilter(
+        IDictionary<string, string> query,
+        string key,
+        IReadOnlyList<string> values,
+        IReadOnlyList<string> allowedValues)
+    {
+        var filters = ParseKnownFilterValues(query, key, allowedValues);
+        return filters.Count == 0
+            || values.Any(value => filters.Any(filter => string.Equals(filter, value, StringComparison.OrdinalIgnoreCase)));
+    }
+
+    private static IReadOnlyList<string> ParseKnownFilterValues(
+        IDictionary<string, string> query,
+        string key,
+        IReadOnlyList<string> allowedValues)
+    {
+        if (query == null || !query.TryGetValue(key, out var raw) || string.IsNullOrWhiteSpace(raw))
+        {
+            return Array.Empty<string>();
+        }
+
+        return raw.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(value => allowedValues.FirstOrDefault(allowed => string.Equals(allowed, value, StringComparison.OrdinalIgnoreCase)))
+            .Where(value => value != null)
+            .Select(value => value!)
+            .Distinct(StringComparer.Ordinal)
+            .ToArray();
+    }
+
+    private static bool? TryParseQueryBool(IDictionary<string, string> query, string key)
+    {
+        if (query != null
+            && query.TryGetValue(key, out var raw)
+            && bool.TryParse(raw?.Trim(), out var parsed))
+        {
+            return parsed;
+        }
+
+        return null;
     }
 
     private object ClearFindings()
@@ -497,4 +629,5 @@ public sealed class LibraryHealerActionHandler
     }
 
     private sealed record ProjectedFinding(LibraryHealerFinding Finding, HealerFindingFreshness Freshness);
+    private sealed record ProjectedPlan(ProjectedFinding Finding, HealerTreatmentPlan TreatmentPlan);
 }
