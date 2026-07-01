@@ -14,7 +14,15 @@ public sealed record TagReaderEvidence(
     bool ReadSucceeded,
     double? DurationSeconds,
     string? ErrorType,
-    string? ErrorMessage);
+    string? ErrorMessage,
+    TagMetadataEvidence? Metadata = null);
+
+public sealed record TagMetadataEvidence(
+    bool TitlePresent,
+    bool ArtistPresent,
+    bool AlbumPresent,
+    bool AnyMusicBrainzIdPresent,
+    IReadOnlyList<string> MissingFields);
 
 public sealed record ProbeEvidence(
     bool ProbeAttempted,

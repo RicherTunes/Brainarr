@@ -123,6 +123,7 @@ Inputs:
 - Managed track files for each artist.
 - Direct on-disk file path from each `TrackFile`.
 - TagLib-derived duration and tag-read success/failure.
+- TagLib-derived tag presence for title, artist, album, and MusicBrainz identifiers, stored only as booleans and generic missing-field names.
 - Optional `ffprobe` metadata where available.
 - Optional full-decode result only in explicit integrity-sweep mode.
 
@@ -218,6 +219,7 @@ Pure function over evidence. No IO.
 Classifications:
 
 - `FalsePositive`: evidence does not prove a user-visible problem.
+- `TagMetadataIssue`: Lidarr can read the file and duration, but core tags needed for reliable matching are missing or incomplete.
 - `TagReaderSymptom`: Lidarr's tag reader sees zero duration or fails, but audio integrity is not yet proven.
 - `ProbeEvidence`: optional probe/decode evidence attached to a finding without implying repair authorization.
 - `HeaderRepairCandidate`: hidden/internal until Phase A2; requires TagLib failure plus successful probe/decode evidence that suggests intact audio in a problematic container/header.
@@ -229,7 +231,11 @@ Rules:
 - Never classify `GenuinelyBad` from sibling medians alone.
 - Never classify corruption from stale stored metadata.
 - A TagLib symptom must be confirmed by fresh file read.
-- A1 user-facing labels are observational: `FalsePositive`, `TagReaderSymptom`, `ProbeEvidence`, and `NeedsHumanReview`.
+- A1 user-facing labels are observational: `FalsePositive`, `PathInconsistency`, `TagMetadataIssue`, `TagReaderSymptom`, `ProbeEvidence`, and `NeedsHumanReview`.
+- Tag metadata evidence must not persist raw artist names, album titles, track titles, or MusicBrainz values; it records only presence booleans and generic missing-field names.
+- Missing tag field names must be recomputed from the presence booleans only, with a fixed output vocabulary (`title`, `artist`, `album`, `musicBrainzId`) at classifier, persistence, and action-output boundaries instead of trusting stored or reader-provided strings.
+- Tag metadata reason codes must be recomputed from the same booleans and merged only with an allow-listed diagnostic reason vocabulary before persistence or action output.
+- Stale `TagMetadataIssue` labels must be downgraded when the sanitized booleans indicate complete metadata, and free-text errors containing tag-field terms or MusicBrainz-like identifiers must be fully redacted before persistence or action output.
 - `HeaderRepairCandidate` is not shown as an actionable label until A2 dry-run verification exists.
 - `HeaderRepairCandidate` requires successful full decode or equivalent structural proof from the repair dry-run.
 - `GenuinelyBad` requires decode verifier evidence; absent full decode, use `NeedsHumanReview`.

@@ -331,6 +331,262 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldTolerateStoredTagMetadataWithNullMissingFields()
+    {
+        var finding = new LibraryHealerFinding(
+            "safe-metadata-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[] { "TAG_METADATA_MISSING" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: true,
+                DurationSeconds: 245.2,
+                ErrorType: null,
+                ErrorMessage: null,
+                Metadata: new TagMetadataEvidence(
+                    TitlePresent: true,
+                    ArtistPresent: true,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: true,
+                    MissingFields: null!)),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("FalsePositive");
+        json.Should().NotContain("TagMetadataIssue");
+        json.Should().Contain("safe-metadata-finding");
+    }
+
+    [Fact]
+    public void HandleAction_ShouldAllowListStoredTagMetadataMissingFields()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawMetadataValue = "PrivateArtist";
+        const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = new LibraryHealerFinding(
+            "safe-metadata-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[] { "TAG_METADATA_MISSING" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: true,
+                DurationSeconds: 245.2,
+                ErrorType: null,
+                ErrorMessage: null,
+                Metadata: new TagMetadataEvidence(
+                    TitlePresent: false,
+                    ArtistPresent: false,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: false,
+                    MissingFields: new[]
+                    {
+                        "title",
+                        rawMetadataValue,
+                        rawMusicBrainzLikeValue,
+                        "musicBrainzId",
+                    })),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("TagMetadataIssue");
+        json.Should().Contain("musicBrainzId");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldAllowListStoredTagMetadataReasonCodes()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawMetadataValue = "PrivateArtist";
+        const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = new LibraryHealerFinding(
+            "safe-metadata-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[]
+            {
+                "TAG_READER_DURATION_POSITIVE",
+                "TAG_METADATA_MISSING",
+                "TAG_MISSING_TITLE",
+                "TAG_MISSING_" + rawMetadataValue,
+                "TAG_MISSING_" + rawMusicBrainzLikeValue,
+                rawMusicBrainzLikeValue,
+            },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: true,
+                DurationSeconds: 245.2,
+                ErrorType: null,
+                ErrorMessage: null,
+                Metadata: new TagMetadataEvidence(
+                    TitlePresent: false,
+                    ArtistPresent: false,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: false,
+                    MissingFields: new[]
+                    {
+                        "title",
+                        rawMetadataValue,
+                        rawMusicBrainzLikeValue,
+                        "musicBrainzId",
+                    })),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("TAG_MISSING_ARTIST");
+        json.Should().Contain("TAG_MISSING_MUSICBRAINZID");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldDropStaleTagMetadataReasonCodes_WhenMetadataBooleansAreComplete()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawMetadataValue = "PrivateArtist";
+        var finding = new LibraryHealerFinding(
+            "safe-metadata-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[]
+            {
+                "TAG_READER_DURATION_POSITIVE",
+                "TAG_METADATA_MISSING",
+                "TAG_MISSING_TITLE",
+                "TAG_MISSING_" + rawMetadataValue,
+            },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: true,
+                DurationSeconds: 245.2,
+                ErrorType: null,
+                ErrorMessage: null,
+                Metadata: new TagMetadataEvidence(
+                    TitlePresent: true,
+                    ArtistPresent: true,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: true,
+                    MissingFields: new[] { "title", rawMetadataValue })),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("TAG_READER_DURATION_POSITIVE");
+        json.Should().Contain("FalsePositive");
+        json.Should().NotContain("TagMetadataIssue");
+        json.Should().NotContain("TAG_METADATA_MISSING");
+        json.Should().NotContain("TAG_MISSING_TITLE");
+        json.Should().NotContain(rawMetadataValue);
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldRedactMetadataIdentifiersInStoredErrorMessages()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawMetadataValue = "PrivateArtist";
+        const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = new LibraryHealerFinding(
+            "safe-metadata-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_FAILED" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: "TagReadError",
+                ErrorMessage: $"Artist tag {rawMetadataValue} has MusicBrainz id {rawMusicBrainzLikeValue}"),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("TAG_READER_FAILED");
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+        json.Should().NotContain("MusicBrainz id");
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void HandleAction_ShouldRedactUntrustedStoredRelativeAndUncFindingPayloads()
     {
         var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);

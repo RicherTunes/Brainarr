@@ -6,7 +6,8 @@ public enum LibraryHealerLabel
     TagReaderSymptom = 1,
     ProbeEvidence = 2,
     NeedsHumanReview = 3,
-    PathInconsistency = 4
+    PathInconsistency = 4,
+    TagMetadataIssue = 5
 }
 
 public enum LibraryHealerEvidenceKind

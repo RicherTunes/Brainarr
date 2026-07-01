@@ -1,4 +1,5 @@
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
@@ -58,7 +59,13 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
                 .GetAwaiter()
                 .GetResult();
 
-            return new TagReaderEvidence(true, true, parsed?.Duration.TotalSeconds, null, null);
+            return new TagReaderEvidence(
+                true,
+                true,
+                parsed?.Duration.TotalSeconds,
+                null,
+                null,
+                BuildMetadataEvidence(parsed));
         }
         catch (TimeoutException)
         {
@@ -102,5 +109,51 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
             null,
             ReaderBusyErrorType,
             "Lidarr audio tag reader is busy with a prior timed-out read");
+    }
+
+    private static TagMetadataEvidence BuildMetadataEvidence(ParsedTrackInfo? parsed)
+    {
+        var titlePresent = HasValue(parsed?.Title);
+        var artistPresent = HasValue(parsed?.ArtistTitle);
+        var albumPresent = HasValue(parsed?.AlbumTitle);
+        var anyMusicBrainzIdPresent =
+            HasValue(parsed?.ArtistMBId)
+            || HasValue(parsed?.AlbumMBId)
+            || HasValue(parsed?.ReleaseMBId)
+            || HasValue(parsed?.RecordingMBId)
+            || HasValue(parsed?.TrackMBId);
+
+        var missing = new List<string>();
+        if (!titlePresent)
+        {
+            missing.Add(TagMetadataFields.Title);
+        }
+
+        if (!artistPresent)
+        {
+            missing.Add(TagMetadataFields.Artist);
+        }
+
+        if (!albumPresent)
+        {
+            missing.Add(TagMetadataFields.Album);
+        }
+
+        if (!anyMusicBrainzIdPresent)
+        {
+            missing.Add(TagMetadataFields.MusicBrainzId);
+        }
+
+        return new TagMetadataEvidence(
+            titlePresent,
+            artistPresent,
+            albumPresent,
+            anyMusicBrainzIdPresent,
+            missing);
+    }
+
+    private static bool HasValue(string? value)
+    {
+        return !string.IsNullOrWhiteSpace(value);
     }
 }
