@@ -4,6 +4,8 @@ Status: Draft backlog
 Date: 2026-07-01
 Owner: RicherTunes / Brainarr
 
+Current A2.5 read-only slices landed after A2 projection conformance: triage filters for `workflow`, `risk`, `blockedReason`, and `authorized`; golden snapshots for the sanitized `healer/getfindings` projection and treatment vocabulary; and a static `healer/getfieldcatalog` field-sensitivity catalog for export and AI-prompt policy gating.
+
 ## Purpose
 
 This backlog captures future Brainarr Library Doctor and track-management ideas beyond the committed A1/A2/A3/A4 path. It is intentionally ranked by usefulness, complexity, and ROI so each milestone can pull the next smallest high-value tool instead of jumping straight to destructive repair or AI-heavy automation.
@@ -238,7 +240,7 @@ The best near-term sequence is intentionally smaller than the full A2.5/C/A3 bac
 
 1. Finish A2 projection conformance: treatment plans and summary counts in `healer/getfindings`.
 2. Evidence contract golden pack; initial `healer/getfindings` projection and treatment-vocabulary snapshots are the first slice, and future slices should add fixtures as fields, workflows, exports, or AI review packets are introduced.
-3. Field sensitivity annotations.
+3. Field sensitivity annotations; initial `healer/getfieldcatalog` coverage for `healer/getfindings` is in place, and future export or AI-review fields must extend the catalog with tests.
 4. Finding revalidation loop.
 5. Classifier replay/regression bench.
 6. State schema migration/corruption harness plus legacy-state fixture corpus.
@@ -300,7 +302,7 @@ A2 should finish the projection contract before the roadmap pulls any A2.5 work.
 
 - revalidation;
 - evidence contract golden packs and classifier replay;
-- field sensitivity annotations;
+- field-sensitivity expansion for future export and AI-review packet fields;
 - schema migration and corruption handling;
 - provenance and TTL;
 - read-only kill switch, protected scopes, and approval authority model;

@@ -63,6 +63,7 @@ public sealed class LibraryHealerActionHandler
         {
             "healer/scan" => Scan(query),
             "healer/getfindings" => GetFindings(query),
+            "healer/getfieldcatalog" => LibraryHealerFieldSensitivityCatalog.Project(),
             "healer/clearfindings" => ClearFindings(),
             _ => throw new NotSupportedException($"Healer action '{action}' is not supported"),
         };
