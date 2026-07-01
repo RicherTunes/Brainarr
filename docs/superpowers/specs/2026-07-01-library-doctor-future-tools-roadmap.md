@@ -188,7 +188,29 @@ These ideas came from the follow-up healer/QoL brainstorm. They should be folded
 | Cross-tool contention detector | Detect concurrent Lidarr, manual, backup, tagger, or filesystem edits during diagnosis, dry-run, or future execution windows. | 5 | 3 | 5 | A2.5/A3/A4 | Any contention invalidates stale plans and fails closed to review. |
 | Format lifecycle planner | Produce a read-only plan for obsolete codecs, risky containers, archival policy, sample-rate drift, and future migration pressure. | 3 | 3 | 3 | C1 | No transcoding, replacement, or quality upgrade action belongs in this planner. |
 
-Highest-ROI additions to consider pulling forward after A2 projection conformance: evidence contract golden packs, field sensitivity annotations, classifier replay benches, root outage coalescing, container/codec mismatch signatures, FLAC STREAMINFO MD5 verification, recycle-bin and backup readiness, known-bad signatures, import rejection explanations, privacy/AI prompt preflight, append-only fact storage, machine-checkable gate proofs, cross-tool contention detection, and mutation chaos drills. These improve later repair/reacquire safety without requiring media writes in the near term.
+## Additional Track and Data Management Ideas
+
+These ideas are useful once the evidence layer can explain library state consistently. They should stay read-only first, even when their eventual value is repair, reacquire, or import automation.
+
+| Feature | Purpose | Usefulness | Complexity | ROI | Likely milestone | Safety caveat |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| Library inventory snapshot and diff export | Produce a bounded local manifest of artists, albums, TrackFiles, sizes, mtimes, tags-present booleans, evidence versions, and redacted path identities, then diff snapshots over time. | 5 | 3 | 4 | A2.5/C1 | Export remains local by default; stable redacted identities are privacy-bearing and need retention limits, salts, and leak scanning before sharing. |
+| Manual repair intake verifier | After a user manually fixes, replaces, or reacquires a file, verify that the finding closed, the track slot is still correct, and no new symptom appeared. | 5 | 3 | 5 | C1/A3/A4 | Requires fresh fingerprint, TrackFile, track-slot, and contention-invalidated evidence; it records outcomes only and never grants permission for future automatic fixes. |
+| Empty-slot local candidate finder | Find unmanaged on-disk files that may satisfy monitored empty track slots using deterministic IDs, normalized names, durations, and release topology. | 5 | 4 | 4 | C1/B | Review-only; no import, move, rename, delete, or replacement without the later Import Brain gates. |
+| Playlist and collection impact analyzer | Identify playlists, `.m3u` files, external collection exports, and player indexes that reference files affected by a planned repair, rename, release remap, or reacquire. | 4 | 3 | 4 | C1/A3/A4 | Impact analysis blocks risky plans but cannot update playlists or external apps by itself. |
+| Backup-manifest checksum auditor | Compare Brainarr/Lidarr-visible files to an operator-provided backup manifest or checksum inventory to detect unprotected, changed, or manifest-mismatched tracks. | 5 | 3 | 5 | C1/A3 | A manifest proves only manifest agreement; restore confidence also needs manifest provenance, freshness, hash privacy, and restore-drill status. |
+| Downstream visibility smoke verifier | Optionally check whether Navidrome, Plex, Jellyfin, or another player can see representative repaired/reacquired tracks after Lidarr reconciliation. | 4 | 4 | 3 | C1/D | Metadata-only by default; playback probes are external side-effect tests and require isolated accounts/endpoints, explicit opt-in, and no automatic rescans or deletes. |
+| Remediation cost and blast forecast | Estimate disk, CPU, time, network, provider-search, backup, and review costs for repair, reacquire, tag repair, or import candidates. | 4 | 3 | 4 | A2.5/A3/A4 | Forecasts explain cost and risk only; they cannot relax item-level safety gates. |
+| Quarantine candidate planner | Identify files that should be isolated from playback or automation because they are corrupt, ambiguous, or unsafe to mutate, and produce a review packet. | 4 | 3 | 3 | C1/A3 | Planning only; moving files into quarantine is a write-capable operation requiring its own journal and restore path. |
+| Rip-log, CUE, and AccurateRip audit | Read `.log`, `.cue`, and optional checksum evidence to catch bad CD rips, missing pregaps, disc-index mismatch, or track-boundary problems. | 3 | 4 | 3 | C1/A5 | Evidence is format-specific and often incomplete; never auto-repair from rip-log signals alone. |
+| Album continuity and gapless audit | Detect suspicious album-level continuity issues such as truncated endings, excessive leading silence, hidden-track layout, or broken gapless transitions. | 4 | 4 | 3 | A5/C1 | Slow optional analysis; content heuristics require human review and fresh decode evidence. |
+| Custom metadata policy linter | Let operators define read-only tag expectations for genres, sort fields, MusicBrainz IDs, replaygain, artwork size, and local naming conventions. | 4 | 3 | 4 | C1/C2 | Lints only; tag writes still require backup, diff, rollback, canonical ID proof, and approval. |
+| Source trust and provenance profile | Let operators classify sources or roots as suspicious, archival, transient, or external so findings can be prioritized and evidence requirements can be increased. | 4 | 3 | 4 | A2.5/C1 | Profiles can only raise scrutiny, priority, or required evidence; they never lower freshness, provenance, redaction, approval, or mutation gates. |
+| External-library correlation adapter | Optionally correlate Lidarr-managed tracks with Navidrome or other local-library databases to find playback-only symptoms, stale indexes, or files outside Lidarr's control. | 4 | 4 | 3 | D/C1 | Companion-style and read-only; external app state cannot become Lidarr mutation authority. |
+| Release migration delta explainer | Turn future release-migration assistant output into an operator-readable diff of track slots, tags, files, and monitored state under candidate MusicBrainz release remaps. | 4 | 3 | 4 | C1/B | Explanation layer only; migration remains blocked until Lidarr release-remap semantics, rollback, and operator approval are proven. |
+| Operator-facing remediation run history | Show what was diagnosed, manually fixed, verified, waived, reacquired, or still blocked across time per album, root, source, and workflow. | 5 | 3 | 5 | C1/A3/A4 | History must preserve auditability without storing raw private paths, tags, or AI prompts. |
+
+Highest-ROI additions to consider pulling forward after A2 projection conformance: evidence contract golden packs, field sensitivity annotations, classifier replay benches, root outage coalescing, container/codec mismatch signatures, library inventory snapshots, backup-manifest checksum audits, FLAC STREAMINFO MD5 verification, recycle-bin and backup readiness, known-bad signatures, import rejection explanations, privacy/AI prompt preflight, append-only fact storage, cross-tool contention detection, manual repair intake verification after fresh-state gates exist, machine-checkable gate proofs, and mutation chaos drills. These improve later repair/reacquire safety without requiring media writes in the near term.
 
 ## Recommended Next Pulls
 
@@ -215,13 +237,18 @@ The best near-term sequence is intentionally smaller than the full A2.5/C/A3 bac
 19. Fixture truth-table lab, local fixture health check, toolchain reproducibility runner, and synthetic fixture generator.
 20. Metrics/cardinality and scan-cost budget plus healer scan-cost report.
 21. Album-level finding packet aggregator and evidence change explainer.
-22. Privacy budget and AI prompt preflight for any later AI-assisted review note.
-23. Append-only library fact store.
-24. Cross-tool contention detector.
-25. Mutation-grade root containment proof plus root capability atlas.
-26. Recycle-bin and backup readiness doctor.
-27. Mutation safety drill on synthetic files plus dummy restore rehearsal.
-28. Operation ledger state machine and machine-checkable gate proof bundle.
+22. Library inventory snapshot/diff export.
+23. Backup-manifest checksum auditor.
+24. Playlist and collection impact analyzer.
+25. Remediation cost and blast forecast.
+26. Privacy budget and AI prompt preflight for any later AI-assisted review note.
+27. Append-only library fact store.
+28. Cross-tool contention detector.
+29. Manual repair intake verifier after fresh-state and contention gates.
+30. Mutation-grade root containment proof plus root capability atlas.
+31. Recycle-bin and backup readiness doctor.
+32. Mutation safety drill on synthetic files plus dummy restore rehearsal.
+33. Operation ledger state machine and machine-checkable gate proof bundle.
 
 This sequence improves trust, debuggability, scale, privacy, and evidence quality without introducing media writes through A2.5. It also reduces A3/A4 risk by proving contract stability, field sensitivity, freshness, state migration, probe behavior, fixture behavior, redaction, root containment, backup readiness, host semantics, and synthetic recovery before repair or reacquire exists.
 
@@ -264,12 +291,15 @@ A2 should finish the projection contract before the roadmap pulls any A2.5 work.
 - fixture truth-table work, local fixture health checks, and toolchain reproducibility;
 - metrics/cardinality and scan-cost budgets;
 - evidence change explanations and album-level finding packets;
+- library inventory snapshots and backup-manifest checksum audits;
+- playlist/collection impact analysis and remediation cost forecasts;
 - AI prompt privacy preflight before any model-assisted review notes;
 - append-only fact storage;
-- cross-tool contention detection.
+- cross-tool contention detection;
+- manual repair intake verification after fresh-state and contention gates.
 
 A3 should start only after A2.5 has enough fixture and live-read-only evidence to make repair dry-runs meaningful, after mutation-grade root containment and the root capability atlas are proven, after backup/recycle readiness is audited, and after synthetic mutation plus dummy-restore drills prove the journal/backup/rollback path outside the library. A4 should remain separate from A3 because reacquire is a Lidarr workflow with album-wide and recycle-bin risks, not a file repair workflow.
 
-The C-series data-management tools should be developed mostly read-only first. Track-slot coverage, deterministic slot indexes, release topology, queue/history diagnostics, import rejection explanations, source-of-truth conflict detection, duplicates, survivorship review, sidecars, artwork, ReplayGain, and tag canonicalization can deliver operator value before any write path exists.
+The C-series data-management tools should be developed mostly read-only first. Track-slot coverage, deterministic slot indexes, release topology, empty-slot local candidate discovery, queue/history diagnostics, import rejection explanations, source-of-truth conflict detection, duplicates, survivorship review, sidecars, playlists, external-library correlation, artwork, ReplayGain, metadata policy linting, inventory snapshots, backup manifests, and tag canonicalization can deliver operator value before any write path exists.
 
 AI-assisted tools should remain late and advisory. They may draft review notes, suggest missing evidence from an allowlist, explain deterministic policy decisions, challenge ambiguous identity/release decisions, or block suspicious privacy leaks, but model output is never evidence, never execution authorization, never a privacy certification, and never a source of filesystem paths or Lidarr commands.
