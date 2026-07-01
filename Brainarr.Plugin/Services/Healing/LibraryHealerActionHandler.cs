@@ -39,8 +39,7 @@ public sealed class LibraryHealerActionHandler
         try
         {
             var request = ParseScanRequest(query);
-            using var cancellation = new CancellationTokenSource(TimeSpan.FromSeconds(Math.Clamp(request.MaxSeconds, 1, 30)));
-            var result = _scanRunner.Scan(request, cancellation.Token);
+            var result = _scanRunner.Scan(request, CancellationToken.None);
             return new
             {
                 ok = result.Status == LibraryHealerScanStatus.Completed,

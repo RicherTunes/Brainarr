@@ -50,6 +50,8 @@ Scans are bounded and resumable. Whole-library scans enumerate all target artist
 
 Confirmed missing paths are recorded as `PathInconsistency` with `FILE_MISSING` evidence, redacted path identity, and Lidarr's last known file size and modified timestamp. Inconclusive path probes, including timeouts, access denied results, invalid paths, unavailable parents, and transient storage/import churn, are recorded as `NeedsHumanReview` with `PATH_PROBE_INCONCLUSIVE` plus the specific reason. A1 does not invoke TagLib or run a full file fingerprint read for confirmed missing or inconclusive path probes.
 
+The action's `maxSeconds` value is enforced through the runner's bounded operation timeouts, not by canceling the scan token. If the scan budget expires while a path probe is waiting, A1 records the probe as a timeout finding for human review; an external cancellation token remains an abort signal and does not persist partial findings.
+
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
 ## Next Milestones

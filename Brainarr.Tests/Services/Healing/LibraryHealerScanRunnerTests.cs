@@ -192,6 +192,45 @@ public sealed class LibraryHealerScanRunnerTests
         fingerprints.ExistenceTokens.Should().ContainSingle().Which.Should().Be(cancellation.Token);
         store.AllSaved.Should().BeEmpty();
     }
+
+    [Fact]
+    public void Scan_ShouldThrowAndNotPersist_WhenExternalCancellationPrecedesBudgetButProbeReturnsAfterBudget()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var slowPath = @"\\offline-nas\Music\Private Artist\external-cancel.flac";
+        using var cancellation = new CancellationTokenSource();
+        var elapsed = TimeSpan.Zero;
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(44, slowPath) });
+        fingerprints.OnCheckExists = () =>
+        {
+            cancellation.Cancel();
+            elapsed = TimeSpan.FromSeconds(1);
+        };
+        fingerprints.ExistenceResponses[slowPath] = new FileExistenceEvidence(
+            true,
+            false,
+            false,
+            nameof(OperationCanceledException),
+            "Canceled checking file existence");
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store, () => elapsed)
+            .Scan(new LibraryHealerScanRequest(MaxSeconds: 1), cancellation.Token);
+
+        act.Should().Throw<OperationCanceledException>()
+            .WithMessage("Library healer scan was canceled");
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.Paths.Should().BeEmpty();
+        store.AllSaved.Should().BeEmpty();
+    }
+
     [Fact]
     public void Scan_ShouldRecordInconclusivePathProbeForHumanReviewWithoutReadingTagsOrFingerprint()
     {
