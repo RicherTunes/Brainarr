@@ -69,9 +69,11 @@ A2 does not repair, retag, reacquire, rescan, delete, replace, import, run `ffmp
 
 A2.5 begins with read-only triage filtering on `healer/getfindings`. The first filter slice lets operators narrow returned findings by treatment workflow, risk, blocked reason, and authorization state without changing stored findings, Lidarr state, media files, treatment-plan authorization, or scan behavior.
 
+The first evidence contract golden pack snapshots the sanitized `healer/getfindings` projection and the treatment vocabulary. It covers representative repair candidates, tag-repair candidates, privacy redaction, summary counts, and malformed finding fail-closed behavior so later UI, export, AI review, and execution planning work must make any reinterpretation of A2 advisory fields visible during contract review.
+
 ## Next Milestones
 
-A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
+A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, field sensitivity annotations, classifier replay benches, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
