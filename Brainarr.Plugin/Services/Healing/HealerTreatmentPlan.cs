@@ -78,6 +78,7 @@ public static class HealerTreatmentVocab
     public static class BlockedReason
     {
         public const string None = "NONE";
+        public const string A2ReadOnly = "A2_READ_ONLY";
         public const string HumanReviewRequired = "HUMAN_REVIEW_REQUIRED";
         public const string EvidenceFreshnessNotCurrent = "EVIDENCE_FRESHNESS_NOT_CURRENT";
         public const string IdentityFreshnessNotCurrent = "IDENTITY_FRESHNESS_NOT_CURRENT";
