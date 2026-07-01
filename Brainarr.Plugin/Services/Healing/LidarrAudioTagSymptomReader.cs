@@ -4,6 +4,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
 public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
 {
+    public const string ReaderBusyErrorType = "TagReaderBusyException";
+
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(5);
 
     private readonly IAudioTagService _audioTagService;
@@ -32,7 +34,7 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
         {
             if (!_readGate.Wait(_timeout, cancellationToken))
             {
-                return TimeoutEvidence();
+                return BusyEvidence();
             }
 
             var readTask = Task.Factory.StartNew(
@@ -90,5 +92,15 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
             null,
             nameof(TimeoutException),
             "Timed out waiting for Lidarr audio tag reader");
+    }
+
+    private static TagReaderEvidence BusyEvidence()
+    {
+        return new TagReaderEvidence(
+            true,
+            false,
+            null,
+            ReaderBusyErrorType,
+            "Lidarr audio tag reader is busy with a prior timed-out read");
     }
 }

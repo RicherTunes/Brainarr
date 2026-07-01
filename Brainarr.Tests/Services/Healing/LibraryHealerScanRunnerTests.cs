@@ -113,6 +113,89 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
+    public void Scan_ShouldStopEnumeratingFilesAfterBoundedLookahead_WhenRequestedArtistMaxFilesReached()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var store = new RecordingFindingStore();
+        var firstPath = PathFor(1);
+        var lookaheadPath = PathFor(2);
+
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(1, firstPath),
+                TrackFile(2, lookaheadPath),
+            });
+        tagReader.Responses[firstPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[lookaheadPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, new RecordingFingerprintService(), store)
+            .Scan(new LibraryHealerScanRequest(ArtistId: 1, MaxFiles: 1));
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.TotalArtists.Should().Be(1);
+        result.AvailableTrackFiles.Should().Be(2);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        result.Truncated.Should().BeTrue();
+        result.NextAfterTrackFileId.Should().Be(1);
+        tagReader.Paths.Should().Equal(firstPath);
+        store.AllSaved.Select(x => x.File.TrackFileId).Should().Equal(1);
+        mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
+        mediaFileService.VerifyNoOtherCalls();
+        artistService.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void Scan_ShouldEnumerateAllArtistsBeforeApplyingGlobalCursor()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var store = new RecordingFindingStore();
+        var skippedPath = PathFor(1);
+        var lowPath = PathFor(60);
+        var highPath = PathFor(100);
+        var higherPath = PathFor(101);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 }, new() { Id = 2 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(100, highPath),
+                TrackFile(101, higherPath),
+            });
+        mediaFileService.Setup(x => x.GetFilesByArtist(2))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(1, skippedPath),
+                TrackFile(60, lowPath),
+            });
+        tagReader.Responses[skippedPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[lowPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[highPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[higherPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, new RecordingFingerprintService(), store)
+            .Scan(new LibraryHealerScanRequest(AfterTrackFileId: 50, MaxFiles: 1));
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.TotalArtists.Should().Be(2);
+        result.AvailableTrackFiles.Should().Be(3);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.Truncated.Should().BeTrue();
+        result.NextAfterTrackFileId.Should().Be(60);
+        tagReader.Paths.Should().Equal(lowPath);
+        store.AllSaved.Select(x => x.File.TrackFileId).Should().Equal(60);
+        mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
+        mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Once);
+        mediaFileService.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void Scan_ShouldResumeAfterTrackFileId()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
@@ -355,6 +438,46 @@ public sealed class LibraryHealerScanRunnerTests
         exception.Message.Should().NotContain("track01.m4a");
         fingerprints.Paths.Should().BeEmpty();
         store.AllSaved.Should().BeEmpty();
+    }
+
+    [Fact]
+    public void Scan_ShouldPersistCompletedFindings_WhenTagReaderReportsBusyAfterPriorTimeout()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var firstPath = PathFor(1);
+        var busyPath = PathFor(2);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(1, firstPath),
+                TrackFile(2, busyPath),
+            });
+        tagReader.Responses[firstPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[busyPath] = new TagReaderEvidence(
+            true,
+            false,
+            null,
+            "TagReaderBusyException",
+            "Lidarr audio tag reader is busy with a prior timed-out read");
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Failed);
+        result.AvailableTrackFiles.Should().Be(2);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        result.Truncated.Should().BeFalse();
+        result.NextAfterTrackFileId.Should().BeNull();
+        result.ErrorMessage.Should().Contain("busy");
+        fingerprints.Paths.Should().Equal(firstPath);
+        store.AllSaved.Select(x => x.File.TrackFileId).Should().Equal(1);
     }
 
     [Fact]

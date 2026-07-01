@@ -38,6 +38,19 @@ public class PathPrivacyTests
         PathPrivacy.Redact("   ").Should().Be("<missing>#000000000000");
     }
 
+    [Theory]
+    [InlineData(@"D:\Music\Private Artist\Album\track01.flac#abcdef123456", "track01.flac#abcdef123456")]
+    [InlineData(@"\\nas\Music\Private Artist\Album\track02.flac#abcdef123456", "track02.flac#abcdef123456")]
+    [InlineData(@"Private Artist\Album\track03.flac#abcdef123456", "track03.flac#abcdef123456")]
+    public void RedactDisplayPath_ShouldStripPathMaterialBeforeExistingHash(string value, string expected)
+    {
+        var redacted = PathPrivacy.RedactDisplayPath(value);
+
+        redacted.Should().Be(expected);
+        redacted.Should().NotContain("Private Artist");
+        redacted.Should().NotContain("Album");
+    }
+
     [Fact]
     public void HashPath_ShouldPreserveCaseSensitivity()
     {

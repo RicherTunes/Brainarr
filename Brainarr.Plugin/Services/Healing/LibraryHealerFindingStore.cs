@@ -107,33 +107,39 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
     private static LibraryHealerFinding Sanitize(LibraryHealerFinding finding)
     {
-        var originalPathMaterial = finding.File.RedactedPath;
-        var redactedPath = ShouldRedactPathMaterial(originalPathMaterial)
-            ? PathPrivacy.Redact(originalPathMaterial)
-            : originalPathMaterial;
-        var file = string.Equals(redactedPath, finding.File.RedactedPath, StringComparison.Ordinal)
-            ? finding.File
-            : finding.File with { RedactedPath = redactedPath };
+        var redactedPath = PathPrivacy.RedactDisplayPath(finding.File.RedactedPath);
+        var pathHash = SanitizePathHash(finding.File.PathHash);
+        var file = finding.File with
+        {
+            RedactedPath = redactedPath,
+            PathHash = pathHash,
+        };
 
         var tagReaderMessage = SanitizeMessage(finding.TagReader.ErrorMessage);
-        var tagReader = string.Equals(tagReaderMessage, finding.TagReader.ErrorMessage, StringComparison.Ordinal)
-            ? finding.TagReader
-            : finding.TagReader with { ErrorMessage = tagReaderMessage };
+        var tagReader = finding.TagReader with
+        {
+            ErrorType = SanitizePathLikeToken(finding.TagReader.ErrorType, "tag-error-"),
+            ErrorMessage = tagReaderMessage,
+        };
 
         var probe = finding.Probe;
         if (probe is not null)
         {
             var probeMessage = SanitizeMessage(probe.ErrorMessage);
-            if (!string.Equals(probeMessage, probe.ErrorMessage, StringComparison.Ordinal))
+            probe = probe with
             {
-                probe = probe with { ErrorMessage = probeMessage };
-            }
+                Container = SanitizePathLikeToken(probe.Container, "probe-container-"),
+                AudioCodec = SanitizePathLikeToken(probe.AudioCodec, "probe-codec-"),
+                ErrorType = SanitizePathLikeToken(probe.ErrorType, "probe-error-"),
+                ErrorMessage = probeMessage,
+            };
         }
 
         return finding with
         {
             Id = SanitizeFindingId(finding.Id),
             File = file,
+            InternalReasonCodes = SanitizePathLikeTokens(finding.InternalReasonCodes, "reason-"),
             TagReader = tagReader,
             Probe = probe,
         };
@@ -141,7 +147,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
     private static string SanitizeFindingId(string? id)
     {
-        if (string.IsNullOrWhiteSpace(id) || ShouldRedactPathMaterial(id))
+        if (string.IsNullOrWhiteSpace(id) || ShouldRedactTokenMaterial(id))
         {
             return "finding-" + PathPrivacy.HashPath(id);
         }
@@ -149,9 +155,41 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         return id;
     }
 
+    private static string SanitizePathHash(string? pathHash)
+    {
+        return ShouldRedactTokenMaterial(pathHash)
+            ? PathPrivacy.HashPath(pathHash)
+            : pathHash ?? string.Empty;
+    }
+
+    private static IReadOnlyList<string> SanitizePathLikeTokens(
+        IReadOnlyList<string>? values,
+        string redactedPrefix)
+    {
+        if (values is null || values.Count == 0)
+        {
+            return Array.Empty<string>();
+        }
+
+        var sanitized = new string[values.Count];
+        for (var i = 0; i < values.Count; i++)
+        {
+            sanitized[i] = SanitizePathLikeToken(values[i], redactedPrefix) ?? string.Empty;
+        }
+
+        return sanitized;
+    }
+
+    private static string? SanitizePathLikeToken(string? value, string redactedPrefix)
+    {
+        return ShouldRedactTokenMaterial(value)
+            ? redactedPrefix + PathPrivacy.HashPath(value)
+            : value;
+    }
+
     private static string? SanitizeMessage(string? message)
     {
-        return ContainsLikelyPath(message)
+        return ContainsSensitiveMessagePathMaterial(message)
             ? PathContainingMessageRedaction
             : message;
     }
@@ -167,6 +205,20 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         return trimmed.IndexOfAny(new[] { '\\', '/' }) >= 0 || HasWindowsRoot(trimmed);
     }
 
+    private static bool ShouldRedactTokenMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        return ShouldRedactPathMaterial(trimmed)
+            || HasDriveDesignator(trimmed)
+            || ContainsMediaExtension(trimmed)
+            || trimmed.Any(char.IsWhiteSpace);
+    }
+
     private static bool ContainsLikelyPath(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -178,6 +230,18 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             || value.Contains('\\', StringComparison.Ordinal)
             || value.Contains('/', StringComparison.Ordinal)
             || HasUnixRoot(value);
+    }
+
+    private static bool ContainsSensitiveMessagePathMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsLikelyPath(value)
+            || HasDriveDesignator(value)
+            || ContainsMediaExtension(value);
     }
 
     private static bool HasWindowsRoot(string value)
@@ -193,6 +257,42 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         }
 
         return false;
+    }
+
+    private static bool HasDriveDesignator(string value)
+    {
+        for (var i = 0; i + 1 < value.Length; i++)
+        {
+            if (char.IsLetter(value[i]) && value[i + 1] == ':')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsMediaExtension(string value)
+    {
+        var mediaExtensions = new[]
+        {
+            ".aac",
+            ".aif",
+            ".aiff",
+            ".alac",
+            ".ape",
+            ".flac",
+            ".m4a",
+            ".mka",
+            ".mp3",
+            ".mp4",
+            ".ogg",
+            ".opus",
+            ".wav",
+            ".wv",
+        };
+
+        return mediaExtensions.Any(extension => value.Contains(extension, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasUnixRoot(string value)

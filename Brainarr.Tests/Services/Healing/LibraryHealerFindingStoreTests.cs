@@ -215,6 +215,83 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldSanitizeFilenameLikeValuesInEvidenceMessages()
+    {
+        var store = CreateStore();
+        const string genericRedaction = "<path-containing message redacted>";
+        const string rawFilenameLikeValue = "Private Artist - Private Album - track01.flac";
+        const string rawDriveLikeValue = "D:Private Artist track02.m4a";
+        var finding = CreateFinding(
+            id: "safe-message-finding",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "callerhash001",
+            tagReaderErrorMessage: "TagLib failed reading " + rawFilenameLikeValue,
+            probeErrorMessage: "ffprobe failed opening " + rawDriveLikeValue,
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.File.RedactedPath.Should().Be("track01.flac#abcdef123456");
+        persisted.TagReader.ErrorMessage.Should().Be(genericRedaction);
+        persisted.Probe.Should().NotBeNull();
+        persisted.Probe!.ErrorMessage.Should().Be(genericRedaction);
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        json.Should().NotContain("D:Private");
+        json.Should().NotContain("track02.m4a");
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldSanitizeBareFilenameLikeRedactedPath()
+    {
+        var store = CreateStore();
+        const string rawFilenameLikeValue = "Private Artist - Private Album - track01.flac";
+        var finding = CreateFinding(
+            id: "safe-path-finding",
+            redactedPath: rawFilenameLikeValue,
+            pathHash: "callerhash001",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.File.RedactedPath.Should().Be("track01.flac#" + PathPrivacy.HashPath(rawFilenameLikeValue));
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        json.Should().NotContain(rawFilenameLikeValue);
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldSanitizePathMaterialBeforeExistingDisplayHash()
+    {
+        var store = CreateStore();
+        const string rawDisplayPath = @"D:\Music\Private Artist\Album\track01.flac#abcdef123456";
+        var finding = CreateFinding(
+            id: "safe-path-finding",
+            redactedPath: rawDisplayPath,
+            pathHash: "callerhash001",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.File.RedactedPath.Should().Be("track01.flac#abcdef123456");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain(@"D:\\Music");
+        json.Should().NotContain(@"\Album\");
+        json.Should().NotContain(@"\\Album\\");
+        json.Should().NotContain(rawDisplayPath);
+    }
+
+    [Fact]
     public void SaveBatch_ShouldSanitizePathLikeFindingId()
     {
         var store = CreateStore();
@@ -242,6 +319,82 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         json.Should().NotContain(@"D:\\Music");
         json.Should().NotContain(@"\Album\");
         json.Should().NotContain(@"\\Album\\");
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldSanitizePathLikeValuesInAllPersistedStringFields()
+    {
+        var store = CreateStore();
+        var rawWindowsPath = @"D:\Music\Private Artist\Album\track01.flac";
+        var rawUnixPath = "/mnt/music/Private Artist/Album/track02.flac";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: rawWindowsPath,
+            internalReasonCodes: new[] { "TAG_READER_ZERO_DURATION", rawWindowsPath },
+            tagReaderErrorType: rawWindowsPath,
+            probeContainer: rawUnixPath,
+            probeAudioCodec: rawWindowsPath,
+            probeErrorType: rawUnixPath,
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.File.PathHash.Should().Be(PathPrivacy.HashPath(rawWindowsPath));
+        persisted.InternalReasonCodes.Should().Contain("TAG_READER_ZERO_DURATION");
+        persisted.InternalReasonCodes.Should().OnlyContain(reason => !reason.Contains("Private Artist", StringComparison.Ordinal));
+        persisted.TagReader.ErrorType.Should().NotContain("Private Artist");
+        persisted.TagReader.ErrorType.Should().NotContain(@"D:\Music");
+        persisted.Probe.Should().NotBeNull();
+        persisted.Probe!.Container.Should().NotContain("Private Artist");
+        persisted.Probe.Container.Should().NotContain("/mnt/music");
+        persisted.Probe.AudioCodec.Should().NotContain("Private Artist");
+        persisted.Probe.ErrorType.Should().NotContain("Private Artist");
+        persisted.Probe.ErrorType.Should().NotContain("/mnt/music");
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain(@"D:\\Music");
+        json.Should().NotContain("/mnt/music");
+    }
+
+    [Fact]
+    public void SaveBatch_ShouldSanitizeFilenameLikeValuesInTokenFields()
+    {
+        var store = CreateStore();
+        const string rawFilenameLikeValue = "Private Artist - Private Album - track01.flac";
+        const string rawDriveLikeValue = "D:Private Artist track02.m4a";
+        var finding = CreateFinding(
+            id: "safe-finding-id",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: rawFilenameLikeValue,
+            internalReasonCodes: new[] { "TAG_READER_ZERO_DURATION", rawFilenameLikeValue },
+            tagReaderErrorType: rawFilenameLikeValue,
+            probeContainer: rawDriveLikeValue,
+            probeAudioCodec: rawFilenameLikeValue,
+            probeErrorType: rawDriveLikeValue,
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc));
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.File.RedactedPath.Should().Be("track01.flac#abcdef123456");
+        persisted.File.PathHash.Should().Be(PathPrivacy.HashPath(rawFilenameLikeValue));
+        persisted.InternalReasonCodes.Should().Contain("TAG_READER_ZERO_DURATION");
+        persisted.TagReader.ErrorType.Should().NotBe(rawFilenameLikeValue);
+        persisted.Probe.Should().NotBeNull();
+        persisted.Probe!.Container.Should().NotBe(rawDriveLikeValue);
+        persisted.Probe.AudioCodec.Should().NotBe(rawFilenameLikeValue);
+        persisted.Probe.ErrorType.Should().NotBe(rawDriveLikeValue);
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        json.Should().NotContain(rawFilenameLikeValue);
+        json.Should().NotContain("D:Private");
+        json.Should().NotContain("track02.m4a");
     }
 
     [Fact]
@@ -337,7 +490,12 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         string pathHash,
         DateTime observedAtUtc,
         string? tagReaderErrorMessage = null,
-        string? probeErrorMessage = null)
+        string? probeErrorMessage = null,
+        IReadOnlyList<string>? internalReasonCodes = null,
+        string? tagReaderErrorType = null,
+        string? probeContainer = null,
+        string? probeAudioCodec = null,
+        string? probeErrorType = null)
     {
         return new LibraryHealerFinding(
             id,
@@ -350,20 +508,20 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
                 Size: 12345,
                 ModifiedUtc: observedAtUtc.AddDays(-1)),
             LibraryHealerLabel.ProbeEvidence,
-            new[] { "TAG_READER_ZERO_DURATION", "PROBE_DURATION_POSITIVE" },
+            internalReasonCodes ?? new[] { "TAG_READER_ZERO_DURATION", "PROBE_DURATION_POSITIVE" },
             new TagReaderEvidence(
                 ReadAttempted: true,
-                ReadSucceeded: tagReaderErrorMessage is null,
+                ReadSucceeded: tagReaderErrorMessage is null && tagReaderErrorType is null,
                 DurationSeconds: tagReaderErrorMessage is null ? 0 : null,
-                ErrorType: tagReaderErrorMessage is null ? null : "ReadError",
+                ErrorType: tagReaderErrorType ?? (tagReaderErrorMessage is null ? null : "ReadError"),
                 ErrorMessage: tagReaderErrorMessage),
             new ProbeEvidence(
                 ProbeAttempted: true,
-                ProbeSucceeded: probeErrorMessage is null,
+                ProbeSucceeded: probeErrorMessage is null && probeErrorType is null,
                 DurationSeconds: probeErrorMessage is null ? 245.1 : null,
-                Container: probeErrorMessage is null ? "flac" : null,
-                AudioCodec: probeErrorMessage is null ? "flac" : null,
-                ErrorType: probeErrorMessage is null ? null : "ProbeError",
+                Container: probeContainer ?? (probeErrorMessage is null ? "flac" : null),
+                AudioCodec: probeAudioCodec ?? (probeErrorMessage is null ? "flac" : null),
+                ErrorType: probeErrorType ?? (probeErrorMessage is null ? null : "ProbeError"),
                 ErrorMessage: probeErrorMessage),
             observedAtUtc);
     }
