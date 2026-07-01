@@ -17,6 +17,7 @@ Brainarr is an AI-powered recommendation plugin for Lidarr. This documentation i
 | Document | Description |
 |----------|-------------|
 | [Architecture](ARCHITECTURE.md) | High-level system design |
+| [Library Healer](library-healer.md) | Read-only diagnostics for Lidarr-managed track files with tag-reader duration symptoms |
 | [Planner & Cache](planner-and-cache.md) | Prompt planning and caching behavior |
 | [Tokenization](tokenization-and-estimates.md) | Token budgeting and estimation |
 | [Correlation Tracking](CORRELATION_TRACKING.md) | Request tracing system |
