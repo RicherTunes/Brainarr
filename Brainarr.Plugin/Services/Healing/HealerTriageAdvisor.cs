@@ -7,6 +7,52 @@ public static class HealerTriageAdvisor
         HealerFindingFreshness? freshness = null)
     {
         var state = freshness ?? HealerFindingFreshness.Current;
+
+        if (finding is null)
+        {
+            return Malformed(state);
+        }
+
+        if (IsMalformedShape(finding))
+        {
+            return Malformed(state);
+        }
+
+        if (!IsCurrent(state.EvidenceFreshness))
+        {
+            return Review(
+                0.10,
+                state,
+                new[] { HealerTreatmentVocab.BlockedReason.EvidenceFreshnessNotCurrent },
+                new[] { HealerTreatmentVocab.RequiredEvidence.FreshFileFingerprint },
+                Rationale(finding));
+        }
+
+        if (!IsCurrent(state.IdentityFreshness))
+        {
+            return Review(
+                0.10,
+                state,
+                new[] { HealerTreatmentVocab.BlockedReason.IdentityFreshnessNotCurrent },
+                new[] { HealerTreatmentVocab.RequiredEvidence.FreshPathIdentity },
+                Rationale(finding));
+        }
+
+        if (state.MalformedRecord)
+        {
+            return Malformed(state);
+        }
+
+        if (!Enum.IsDefined(typeof(LibraryHealerLabel), finding.Label))
+        {
+            return Review(
+                0.10,
+                state,
+                new[] { HealerTreatmentVocab.BlockedReason.UnknownFindingLabel },
+                new[] { HealerTreatmentVocab.RequiredEvidence.None },
+                new[] { HealerTreatmentVocab.Rationale.UnknownFindingLabel });
+        }
+
         var label = LibraryHealerReasonCodes.NormalizeLabel(finding.Label, finding.TagReader.Metadata);
 
         return label switch
@@ -140,6 +186,16 @@ public static class HealerTriageAdvisor
             rationale);
     }
 
+    private static HealerTreatmentPlan Malformed(HealerFindingFreshness freshness)
+    {
+        return Review(
+            0.10,
+            freshness,
+            new[] { HealerTreatmentVocab.BlockedReason.MalformedFindingRecord },
+            new[] { HealerTreatmentVocab.RequiredEvidence.None },
+            new[] { HealerTreatmentVocab.Rationale.MalformedFindingRecord });
+    }
+
     private static HealerTreatmentPlan Plan(
         string workflow,
         double confidence,
@@ -171,7 +227,7 @@ public static class HealerTriageAdvisor
     private static IReadOnlyList<string> Rationale(LibraryHealerFinding finding)
     {
         var result = new List<string>();
-        foreach (var reason in LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, finding.TagReader.Metadata))
+        foreach (var reason in LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, finding.TagReader?.Metadata))
         {
             switch (reason)
             {
@@ -214,6 +270,16 @@ public static class HealerTriageAdvisor
         }
 
         return DistinctOrNone(result, HealerTreatmentVocab.Rationale.None);
+    }
+
+    private static bool IsMalformedShape(LibraryHealerFinding finding)
+    {
+        return finding.File is null || finding.TagReader is null;
+    }
+
+    private static bool IsCurrent(string freshness)
+    {
+        return string.Equals(freshness, HealerTreatmentVocab.Freshness.Current, StringComparison.Ordinal);
     }
 
     private static IReadOnlyList<string> DistinctOrNone(IReadOnlyList<string> values, string noneValue)
