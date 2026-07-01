@@ -50,8 +50,13 @@ public sealed class BrainarrOrchestratorHealerActionsTests
         var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
         var scanRunner = new Mock<ILibraryHealerScanRunner>(MockBehavior.Strict);
         LibraryHealerScanRequest? captured = null;
+        CancellationToken capturedToken = default;
         scanRunner.Setup(x => x.Scan(It.IsAny<LibraryHealerScanRequest?>(), It.IsAny<CancellationToken>()))
-            .Callback<LibraryHealerScanRequest?, CancellationToken>((request, _) => captured = request)
+            .Callback<LibraryHealerScanRequest?, CancellationToken>((request, token) =>
+            {
+                captured = request;
+                capturedToken = token;
+            })
             .Returns(new LibraryHealerScanResult(
                 LibraryHealerScanStatus.Completed,
                 TotalArtists: 1,
@@ -81,6 +86,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
         captured.AfterTrackFileId.Should().Be(11);
         captured.MaxFiles.Should().Be(500);
         captured.MaxSeconds.Should().Be(30);
+        capturedToken.CanBeCanceled.Should().BeFalse("maxSeconds is the runner's scan budget, not an action-level cancellation token");
         json.Should().Contain("\"ok\":true");
         json.Should().Contain("\"nextAfterTrackFileId\":42");
         scanRunner.VerifyAll();
