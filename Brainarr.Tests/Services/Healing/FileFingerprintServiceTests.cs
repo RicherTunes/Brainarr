@@ -110,26 +110,51 @@ public sealed class FileFingerprintServiceTests
                 probeFinished.Set();
             }
         });
-        var task = Task.Run(() => service.CheckExists(
-            "slow.flac",
-            TimeSpan.FromMilliseconds(25),
-            CancellationToken.None));
+        using var completed = new ManualResetEventSlim(false);
+        FileExistenceEvidence? result = null;
+        Exception? failure = null;
+        var checkThread = new Thread(() =>
+        {
+            try
+            {
+                result = service.CheckExists(
+                    "slow.flac",
+                    TimeSpan.FromMilliseconds(25),
+                    CancellationToken.None);
+            }
+            catch (Exception ex)
+            {
+                failure = ex;
+            }
+            finally
+            {
+                completed.Set();
+            }
+        })
+        {
+            IsBackground = true,
+            Name = nameof(CheckExists_ShouldReturnTimeoutEvidence_WhenProbeExceedsTimeout)
+        };
+
+        checkThread.Start();
 
         try
         {
-            task.Wait(TimeSpan.FromSeconds(1)).Should().BeTrue("CheckExists must enforce the supplied timeout");
-            var result = task.Result;
+            completed.Wait(TimeSpan.FromSeconds(1)).Should().BeTrue("CheckExists must enforce the supplied timeout");
+            failure.Should().BeNull();
+            result.Should().NotBeNull();
+            var evidence = result!;
 
-            result.CheckAttempted.Should().BeTrue();
-            result.CheckSucceeded.Should().BeFalse();
-            result.Exists.Should().BeFalse();
-            result.ErrorType.Should().Be(nameof(TimeoutException));
-            result.ErrorMessage.Should().Contain("Timed out");
+            evidence.CheckAttempted.Should().BeTrue();
+            evidence.CheckSucceeded.Should().BeFalse();
+            evidence.Exists.Should().BeFalse();
+            evidence.ErrorType.Should().Be(nameof(TimeoutException));
+            evidence.ErrorMessage.Should().Contain("Timed out");
         }
         finally
         {
             releaseProbe.Set();
-            task.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
+            completed.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
             probeFinished.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
         }
     }
