@@ -77,7 +77,6 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var scannedTrackFiles = 0;
         var persistedFindings = 0;
         var findings = new List<LibraryHealerFinding>();
-        var pendingFindingsSaveAttempted = false;
 
         void SavePendingFindings()
         {
@@ -86,7 +85,6 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 return;
             }
 
-            pendingFindingsSaveAttempted = true;
             _findingStore.SaveBatch(findings);
             persistedFindings = findings.Count;
         }
@@ -123,7 +121,8 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 LibraryHealerFinding? finding;
                 try
                 {
-                    finding = ScanCandidate(candidate, cancellationToken);
+                    var existenceTimeout = GetCandidateOperationTimeout(scannedTrackFiles, Elapsed(), maxElapsed);
+                    finding = ScanCandidate(candidate, existenceTimeout, cancellationToken);
                 }
                 catch (ReaderBusyException ex)
                 {
@@ -154,7 +153,11 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            SavePendingFindings();
+            if (findings.Count > 0)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                SavePendingFindings();
+            }
 
             var truncated = scannedTrackFiles < availableTrackFiles;
             return new LibraryHealerScanResult(
@@ -169,18 +172,6 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         }
         catch (OperationCanceledException)
         {
-            if (findings.Count > 0 && !pendingFindingsSaveAttempted)
-            {
-                try
-                {
-                    SavePendingFindings();
-                }
-                catch (OperationCanceledException)
-                {
-                    // Keep cancellation messages path-safe even if the finding store is the canceling component.
-                }
-            }
-
             throw new OperationCanceledException("Library healer scan was canceled");
         }
         catch (Exception ex)
@@ -240,11 +231,15 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             .ToList();
     }
 
-    private LibraryHealerFinding? ScanCandidate(Candidate candidate, CancellationToken cancellationToken)
+    private LibraryHealerFinding? ScanCandidate(
+        Candidate candidate,
+        TimeSpan existenceTimeout,
+        CancellationToken cancellationToken)
     {
         var trackFile = candidate.TrackFile;
         var path = trackFile.Path ?? string.Empty;
-        var existence = _fingerprints.CheckExists(path, cancellationToken);
+        var existence = _fingerprints.CheckExists(path, existenceTimeout, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
         if (IsCancellationEvidence(existence))
         {
             throw new OperationCanceledException("Canceled checking file existence");
@@ -360,6 +355,20 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
     {
         return !string.IsNullOrWhiteSpace(expected)
             && string.Equals(actual, expected, StringComparison.Ordinal);
+    }
+
+    private static TimeSpan GetCandidateOperationTimeout(
+        int scannedTrackFiles,
+        TimeSpan elapsed,
+        TimeSpan maxElapsed)
+    {
+        var remaining = maxElapsed - elapsed;
+        if (remaining > TimeSpan.Zero)
+        {
+            return remaining;
+        }
+
+        return scannedTrackFiles == 0 ? maxElapsed : TimeSpan.Zero;
     }
 
     private sealed record Candidate(int ArtistId, TrackFile TrackFile);

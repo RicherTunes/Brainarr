@@ -6,7 +6,7 @@ Library Healer is the first read-only milestone of the broader Brainarr Library 
 
 A1 can:
 - enumerate Lidarr artists and track files;
-- run a tri-state path existence precheck before invoking Lidarr's tag reader;
+- run a bounded path existence precheck before invoking Lidarr's tag reader;
 - detect confirmed-missing `TrackFile.Path` entries without invoking TagLib or fingerprint reads;
 - call Lidarr's `IAudioTagService.ReadTags(string)` only after the precheck confirms the path exists;
 - classify read-only evidence as `FalsePositive`, `PathInconsistency`, `TagReaderSymptom`, or `NeedsHumanReview` in the default A1 scan;
@@ -26,7 +26,7 @@ A1 cannot:
 
 ## Actions
 
-- `healer/scan`: runs one read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
+- `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
 - `healer/getfindings`: returns recent findings with redacted paths.
 - `healer/clearfindings`: clears Brainarr-owned findings.
 
@@ -46,9 +46,11 @@ A1 sanitizes path-like values at both the store boundary and the action boundary
 
 ## Scan Behavior
 
-Scans are batch-bounded and resumable. The `maxSeconds` setting is a cooperative budget checked between candidates, not a hard timeout around filesystem calls. Whole-library scans enumerate all target artists before applying the global track-file cursor so low-ID files from later artists are not skipped. Requested-artist scans may stop after one lookahead item so the action can report truncation without scanning more than the configured batch.
+Scans are bounded and resumable. Whole-library scans enumerate all target artists before applying the global track-file cursor so low-ID files from later artists are not skipped. Requested-artist scans may stop after one lookahead item so the action can report truncation without scanning more than the configured batch.
 
-Confirmed missing paths are recorded as `PathInconsistency` with `FILE_MISSING` evidence, redacted path identity, and Lidarr's last known file size and modified timestamp. Inconclusive path probes, including timeout evidence returned by a path-probe implementation, access denied results, invalid paths, unavailable parents, and transient storage/import churn, are recorded as `NeedsHumanReview` with `PATH_PROBE_INCONCLUSIVE` plus the specific reason. A1 does not invoke TagLib or run a full file fingerprint read for confirmed missing or inconclusive path probes.
+Confirmed missing paths are recorded as `PathInconsistency` with `FILE_MISSING` evidence, redacted path identity, and Lidarr's last known file size and modified timestamp. Inconclusive path probes, including timeouts, access denied results, invalid paths, unavailable parents, and transient storage/import churn, are recorded as `NeedsHumanReview` with `PATH_PROBE_INCONCLUSIVE` plus the specific reason. A1 does not invoke TagLib or run a full file fingerprint read for confirmed missing or inconclusive path probes.
+
+The action's `maxSeconds` value is enforced through the runner's bounded operation timeouts, not by canceling the scan token. If the scan budget expires while a path probe is waiting, A1 records the probe as a timeout finding for human review; an external cancellation token remains an abort signal and does not persist partial findings.
 
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
