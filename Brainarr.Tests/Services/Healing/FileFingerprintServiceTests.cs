@@ -45,7 +45,7 @@ public sealed class FileFingerprintServiceTests
     {
         var path = typeof(PathPrivacy).Assembly.Location;
 
-        var result = new FileFingerprintService().CheckExists(path, CancellationToken.None);
+        var result = new FileFingerprintService().CheckExists(path, TimeSpan.FromSeconds(1), CancellationToken.None);
 
         result.CheckAttempted.Should().BeTrue();
         result.CheckSucceeded.Should().BeTrue();
@@ -59,7 +59,7 @@ public sealed class FileFingerprintServiceTests
     {
         var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".flac");
 
-        var result = new FileFingerprintService().CheckExists(path, CancellationToken.None);
+        var result = new FileFingerprintService().CheckExists(path, TimeSpan.FromSeconds(1), CancellationToken.None);
 
         result.CheckAttempted.Should().BeTrue();
         result.CheckSucceeded.Should().BeTrue();
@@ -71,7 +71,7 @@ public sealed class FileFingerprintServiceTests
     [Fact]
     public void CheckExists_ShouldReturnInconclusiveEvidence_WhenPathIsInvalid()
     {
-        var result = new FileFingerprintService().CheckExists("\0", CancellationToken.None);
+        var result = new FileFingerprintService().CheckExists("\0", TimeSpan.FromSeconds(1), CancellationToken.None);
 
         result.CheckAttempted.Should().BeTrue();
         result.CheckSucceeded.Should().BeFalse();
@@ -85,12 +85,53 @@ public sealed class FileFingerprintServiceTests
         using var cancellation = new CancellationTokenSource();
         cancellation.Cancel();
 
-        var result = new FileFingerprintService().CheckExists("slow.flac", cancellation.Token);
+        var result = new FileFingerprintService().CheckExists("slow.flac", TimeSpan.FromSeconds(1), cancellation.Token);
 
         result.CheckAttempted.Should().BeTrue();
         result.CheckSucceeded.Should().BeFalse();
         result.Exists.Should().BeFalse();
         result.ErrorType.Should().Be(nameof(OperationCanceledException));
+    }
+
+    [Fact]
+    public void CheckExists_ShouldReturnTimeoutEvidence_WhenProbeExceedsTimeout()
+    {
+        using var releaseProbe = new ManualResetEventSlim(false);
+        using var probeFinished = new ManualResetEventSlim(false);
+        var service = new FileFingerprintService(_ =>
+        {
+            try
+            {
+                releaseProbe.Wait();
+                return true;
+            }
+            finally
+            {
+                probeFinished.Set();
+            }
+        });
+        var task = Task.Run(() => service.CheckExists(
+            "slow.flac",
+            TimeSpan.FromMilliseconds(25),
+            CancellationToken.None));
+
+        try
+        {
+            task.Wait(TimeSpan.FromSeconds(1)).Should().BeTrue("CheckExists must enforce the supplied timeout");
+            var result = task.Result;
+
+            result.CheckAttempted.Should().BeTrue();
+            result.CheckSucceeded.Should().BeFalse();
+            result.Exists.Should().BeFalse();
+            result.ErrorType.Should().Be(nameof(TimeoutException));
+            result.ErrorMessage.Should().Contain("Timed out");
+        }
+        finally
+        {
+            releaseProbe.Set();
+            task.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
+            probeFinished.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
+        }
     }
 
 }
