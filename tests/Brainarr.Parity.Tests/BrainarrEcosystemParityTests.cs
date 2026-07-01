@@ -158,6 +158,7 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void Check_PluginManifest_Capabilities_HaveBackingTypes_Test() { var r = Check_PluginManifest_Capabilities_HaveBackingTypes(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_NoFluentValidation_ErrorsApi_Drift_Test() { var r = Check_NoFluentValidation_ErrorsApi_Drift(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_UsesCommonPluginConfigRoots_Test() { var r = Check_UsesCommonPluginConfigRoots(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_SimpleDownloadOrchestratorCoverArtComplianceAdopted_Test() { var r = Check_SimpleDownloadOrchestratorCoverArtComplianceAdopted(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
     #endregion
 }
