@@ -122,13 +122,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Utils
 
             try
             {
-                using var cts = new CancellationTokenSource();
-                var timeoutTask = Task.Delay(timeoutMs, cts.Token);
-                var completed = Task.WhenAny(task, timeoutTask).GetAwaiter().GetResult();
-
-                if (completed == task)
+                // Use a hard synchronous wait for the timeout boundary. A Task.Delay/WhenAny race can
+                // be starved behind thread-pool work and observe the long-running task first.
+                if (task.Wait(timeoutMs))
                 {
-                    cts.Cancel();
                     return task.GetAwaiter().GetResult();
                 }
 
