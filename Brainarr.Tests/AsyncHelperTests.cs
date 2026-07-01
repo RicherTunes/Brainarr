@@ -144,13 +144,9 @@ namespace Brainarr.Tests
             // Arrange
             async Task<string> LongRunningTask()
             {
-                // Far longer than the 100ms timeout. The previous 200ms (a 2x margin) flaked under
-                // full-suite thread-pool starvation: RunSyncWithTimeout races the task against a
-                // Task.Delay(timeout) via WhenAny, and when both are timer-bound on a starved pool the
-                // 100ms timer's completion could be observed AFTER the 200ms task finished, so no
-                // TimeoutException was thrown. A 30s task gives the timeout an overwhelming margin to win
-                // the race regardless of load; the orphaned delay is harmless (abandoned once the timeout
-                // fires at ~100ms, GC'd — the test still completes in ~100ms, not 30s).
+                // Far longer than the 100ms timeout. This verifies RunSyncWithTimeout enforces the
+                // timeout at the synchronous wait boundary instead of waiting for the long-running task
+                // to complete under full-suite thread-pool starvation.
                 await Task.Delay(30000);
                 return "Should not reach here";
             }
