@@ -188,36 +188,29 @@ namespace Brainarr.Tests.EdgeCases
             // 30s real-time fence for scheduling overhead only — NOT for rate-limiting waits.
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
 
-            // Act — all clients fire at once
-            var tasks = Enumerable.Range(0, clientCount).Select(_ => Task.Run(async () =>
-            {
-                await rateLimiter.ExecuteAsync("api", async (ct) =>
+            // Act — start every request synchronously until its first incomplete await. This avoids
+            // scheduling-dependent Task.Run sleeps while still exercising the real limiter path.
+            var tasks = Enumerable.Range(0, clientCount)
+                .Select(_ => rateLimiter.ExecuteAsync("api", async (ct) =>
                 {
                     Interlocked.Increment(ref completedCount);
                     await Task.Yield();
                     return true;
-                }, cts.Token);
-            })).ToArray();
-
-            // Yield for scheduling: burst tasks complete synchronously; throttled tasks suspend on fake delays.
-            // 100ms real time is ample — no rate-limiting wait happens here.
-            await Task.Delay(100, CancellationToken.None);
+                }, cts.Token))
+                .ToArray();
 
             // Assert throttling contract: non-burst requests are suspended on fake-clock delays (not real wall-clock).
-            fakeTime.PendingDelayCount.Should().BeGreaterThan(0,
+            fakeTime.PendingDelayCount.Should().Be(clientCount - burstCapacity,
                 "tasks beyond burst capacity should be throttled — awaiting fake-clock delays, not real wall-clock");
-            completedCount.Should().BeGreaterThanOrEqualTo(burstCapacity,
-                "at least burst-capacity tasks must complete without any clock advancement");
+            completedCount.Should().Be(burstCapacity,
+                "only burst-capacity tasks should start before any clock advancement");
 
             // Advance fake clock past all pending delay due-times.
             // Token bucket 10/sec, 20 tasks: max wait = (10 tokens needed / 10 tokens/sec) = 1.0s for task #20.
             fakeTime.Advance(TimeSpan.FromSeconds(1.5));
 
-            // Yield to allow released task continuations to be scheduled.
-            await Task.Delay(100, CancellationToken.None);
-
             // Assert — all 20 requests complete; WhenAll must not block (all fake delays now resolved).
-            await Task.WhenAll(tasks);
+            await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(30));
 
             completedCount.Should().Be(clientCount,
                 "all thundering-herd requests must complete after fake-clock advancement releases the throttled tasks");
