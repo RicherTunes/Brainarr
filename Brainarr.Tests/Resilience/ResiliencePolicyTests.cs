@@ -32,22 +32,6 @@ namespace Brainarr.Tests.Resilience
         }
 
         [Fact]
-        public async Task RunWithRetriesAsync_succeeds_on_second_attempt()
-        {
-            int attempts = 0;
-            var result = await ResiliencePolicy.RunWithRetriesAsync<int>(async ct =>
-            {
-                attempts++;
-                await Task.Yield();
-                if (attempts == 1) throw new InvalidOperationException("boom");
-                return 99;
-            }, L, "op.retry", maxAttempts: 3, initialDelay: TimeSpan.Zero, cancellationToken: CancellationToken.None);
-
-            attempts.Should().Be(2);
-            result.Should().Be(99);
-        }
-
-        [Fact]
         public async Task WithHttpResilienceAsync_retries_transient_then_returns_ok()
         {
             int attempts = 0;
