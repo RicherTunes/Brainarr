@@ -1,0 +1,85 @@
+# GitHub Actions mirror of .gitea/workflows/ci.yml (dual-platform CI parity).
+# Billing-blocked as of 2026-07; validated to build once Actions billing is restored.
+# Keep in sync with the .gitea copy -- patch both in the same PR.
+#
+# Jobs mirrored : secret-scan, lint, verify
+# Jobs omitted  : none (all brainarr Gitea jobs are portable to GitHub)
+#
+# Translation vs .gitea/workflows/ci.yml:
+#   - Checkout     : actions/checkout@v4 with submodules:recursive (replaces the Gitea-only
+#                    hand-rolled git-clone workaround for verify; lint already used recursive;
+#                    Common submodule is public on GitHub so no auth header needed)
+#   - .NET SDK     : actions/setup-dotnet@v4 replaces the curl dotnet-install.sh block (verify only;
+#                    lint is pwsh/Pester-only and does not need the SDK)
+#   - PowerShell   : ubuntu-latest ships pwsh -- "Install PowerShell" tarball step removed
+#   - Docker CLI   : ubuntu-latest ships docker -- "Install Docker CLI" apt step removed
+#   - SourceLink   : -p:EnableSourceLink=false removed; GitHub origin maps correctly
+#   - CS2012 fix   : -m:1 -p:UseSharedCompilation=false retained (open parity gap from feedback)
+#   - schedule     : omitted to avoid surprise billing when credits are restored
+name: CI
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  secret-scan:
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Gitleaks secret scan
+        shell: bash
+        run: |
+          set -euo pipefail
+          GITLEAKS_SHA256=ba6dbb656933921c775ee5a2d1c13a91046e7952e9d919f9bac4cec61d628e7d
+          curl -sSL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz -o /tmp/gitleaks.tgz
+          echo "${GITLEAKS_SHA256}  /tmp/gitleaks.tgz" | sha256sum -c -
+          tar -xzf /tmp/gitleaks.tgz -C /tmp gitleaks
+          /tmp/gitleaks detect --source . --no-banner --redact --exit-code 1
+
+  lint:
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      # Pester is not bundled with the pre-installed pwsh on ubuntu-latest; install from PSGallery.
+      # Pinned to a known-good 5.x release to avoid accidental major-version drift.
+      - name: Install Pester
+        shell: pwsh
+        run: |
+          Set-PSRepository -Name PSGallery -InstallationPolicy Trusted
+          Install-Module -Name Pester -RequiredVersion 5.6.1 -Force -SkipPublisherCheck
+      - name: Shared plugin lint gates
+        shell: pwsh
+        run: ./ext/Lidarr.Plugin.Common/scripts/ci/run-plugin-lint-gates.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
+
+  verify:
+    if: ${{ github.server_url == 'https://github.com' }}
+    needs: [lint, secret-scan]
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - name: Common submodule pin guard
+        shell: bash
+        run: bash ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --verify-only --path ext/Lidarr.Plugin.Common
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Full local-ci verification
+        shell: bash
+        run: pwsh ./scripts/verify-local.ps1

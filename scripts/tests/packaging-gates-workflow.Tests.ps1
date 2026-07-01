@@ -5,8 +5,8 @@
     TDD gate: Gitea CI must run Brainarr's local packaging/closure verification.
 
 .DESCRIPTION
-    Brainarr is Gitea-primary and intentionally has no .github/workflows directory.
-    The packaging gate now lives in scripts/verify-local.ps1, which the Gitea verify job runs.
+    Brainarr is Gitea-primary. The packaging gate lives in scripts/verify-local.ps1,
+    which the Gitea verify job runs; GitHub carries only a guarded CI mirror.
 #>
 
 BeforeAll {
