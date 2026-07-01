@@ -26,6 +26,7 @@ on:
 
 jobs:
   secret-scan:
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -43,6 +44,7 @@ jobs:
           /tmp/gitleaks detect --source . --no-banner --redact --exit-code 1
 
   lint:
+    if: ${{ github.server_url == 'https://github.com' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -61,6 +63,7 @@ jobs:
         run: ./ext/Lidarr.Plugin.Common/scripts/ci/run-plugin-lint-gates.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
 
   verify:
+    if: ${{ github.server_url == 'https://github.com' }}
     needs: [lint, secret-scan]
     runs-on: ubuntu-latest
     timeout-minutes: 90

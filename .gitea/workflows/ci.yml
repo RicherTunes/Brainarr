@@ -6,8 +6,8 @@ name: CI
 #     the Lidarr plugins-branch host assemblies); the node image lacks the docker CLI, so the job
 #     installs pwsh / .NET / Docker CLI from self-contained downloads. Mirrors tidal/amazon/qobuz/apple.
 # Actions ARE enabled on Gitea and this is the authoritative primary CI (lint + verify).
-# There is no .github/workflows/ directory in this repo — GitHub Actions is out of credits and
-# GitHub serves only as a mirror; no workflow-duplication concern applies.
+# .github/workflows/ci.yml is a guarded GitHub mirror; Gitea remains the authoritative
+# merge gate and the mirror jobs are scoped to github.com.
 on:
   workflow_dispatch:
   push:
