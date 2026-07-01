@@ -6,6 +6,33 @@ public sealed record LibraryHealerClassification(
 
 public static class LibraryHealerClassifier
 {
+    public static LibraryHealerClassification ClassifyFileFingerprint(FileFingerprint fingerprint)
+    {
+        return ClassifyFileExistence(new FileExistenceEvidence(true, true, fingerprint.Exists, null, null));
+    }
+
+    public static LibraryHealerClassification ClassifyFileExistence(FileExistenceEvidence existence)
+    {
+        if (existence.CheckSucceeded)
+        {
+            return existence.Exists
+                ? new LibraryHealerClassification(
+                    LibraryHealerLabel.FalsePositive,
+                    new[] { "FILE_EXISTS" })
+                : new LibraryHealerClassification(
+                    LibraryHealerLabel.PathInconsistency,
+                    new[] { "FILE_MISSING" });
+        }
+
+        var reasons = new List<string> { "PATH_PROBE_INCONCLUSIVE" };
+        if (!string.IsNullOrWhiteSpace(existence.ErrorType))
+        {
+            reasons.Add(existence.ErrorType);
+        }
+
+        return new LibraryHealerClassification(LibraryHealerLabel.NeedsHumanReview, reasons);
+    }
+
     public static LibraryHealerClassification Classify(TagReaderEvidence tagReader, ProbeEvidence? probe)
     {
         var reasons = new List<string>();

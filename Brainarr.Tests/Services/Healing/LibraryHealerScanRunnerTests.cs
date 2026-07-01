@@ -1,3 +1,4 @@
+using System.Text.Json;
 using FluentAssertions;
 using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
@@ -74,6 +75,299 @@ public sealed class LibraryHealerScanRunnerTests
         mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
         mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Once);
         mediaFileService.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordMissingPathWithoutCallingTagReader()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var missingPath = @"D:\Music\Private Artist\missing-track.flac";
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(40, missingPath, 444, new DateTime(2026, 6, 29, 4, 5, 6, DateTimeKind.Utc), albumId: 400),
+            });
+        fingerprints.Responses[missingPath] = new FileFingerprint(false, null, null);
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.AvailableTrackFiles.Should().Be(1);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.ExistencePaths.Should().Equal(missingPath);
+        fingerprints.Paths.Should().BeEmpty();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.PathInconsistency);
+        finding.InternalReasonCodes.Should().Contain("FILE_MISSING");
+        finding.TagReader.ReadAttempted.Should().BeFalse();
+        finding.TagReader.ReadSucceeded.Should().BeFalse();
+        finding.File.TrackFileId.Should().Be(40);
+        finding.File.ArtistId.Should().Be(1);
+        finding.File.AlbumId.Should().Be(400);
+        finding.File.RedactedPath.Should().Be(PathPrivacy.Redact(missingPath));
+        finding.File.PathHash.Should().Be(PathPrivacy.HashPath(missingPath));
+        finding.File.Size.Should().Be(444);
+        finding.File.ModifiedUtc.Should().Be(new DateTime(2026, 6, 29, 4, 5, 6, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordTimedOutPathProbeForHumanReviewWithoutCallingTagReader()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var slowPath = @"\\offline-nas\Music\Private Artist\slow.flac";
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(41, slowPath) });
+        fingerprints.ExistenceResponses[slowPath] = new FileExistenceEvidence(
+            true,
+            false,
+            false,
+            nameof(TimeoutException),
+            @"Timed out checking \\offline-nas\Music\Private Artist\slow.flac");
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(new LibraryHealerScanRequest(MaxSeconds: 3));
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.AvailableTrackFiles.Should().Be(1);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        result.ErrorMessage.Should().BeNull();
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.Paths.Should().BeEmpty();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain(nameof(TimeoutException));
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+    }
+
+    [Fact]
+    public void Scan_ShouldPersistTimedOutPathProbeForHumanReview_WhenCancellationFiresDuringExistenceCheck()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var slowPath = @"\\offline-nas\Music\Private Artist\slow-cancel.flac";
+        using var cancellation = new CancellationTokenSource();
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(42, slowPath) });
+        fingerprints.OnCheckExists = () => cancellation.Cancel();
+        fingerprints.ExistenceResponses[slowPath] = new FileExistenceEvidence(
+            true,
+            false,
+            false,
+            nameof(TimeoutException),
+            "Timed out checking file existence");
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(new LibraryHealerScanRequest(MaxSeconds: 1), cancellation.Token);
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.AvailableTrackFiles.Should().Be(1);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        result.ErrorMessage.Should().BeNull();
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.Paths.Should().BeEmpty();
+        fingerprints.ExistenceTokens.Should().ContainSingle().Which.Should().Be(cancellation.Token);
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain(nameof(TimeoutException));
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+    }
+    [Fact]
+    public void Scan_ShouldRecordInconclusivePathProbeForHumanReviewWithoutReadingTagsOrFingerprint()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var unknownPath = @"D:\Music\Private Artist\nas-churn.flac";
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(40, unknownPath, 444, new DateTime(2026, 6, 29, 4, 5, 6, DateTimeKind.Utc), albumId: 400),
+            });
+        fingerprints.ExistenceResponses[unknownPath] = new FileExistenceEvidence(
+            true,
+            false,
+            false,
+            "PATH_ACCESS_DENIED",
+            "Access denied");
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.AvailableTrackFiles.Should().Be(1);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.ExistencePaths.Should().Equal(unknownPath);
+        fingerprints.Paths.Should().BeEmpty();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain("PATH_ACCESS_DENIED");
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+        finding.TagReader.ReadAttempted.Should().BeFalse();
+        finding.File.TrackFileId.Should().Be(40);
+        finding.File.Size.Should().Be(444);
+        finding.File.ModifiedUtc.Should().Be(new DateTime(2026, 6, 29, 4, 5, 6, DateTimeKind.Utc));
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordAccessDeniedPathProbeFromRealServiceForHumanReview()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var store = new RecordingFindingStore();
+        var accessDeniedPath = @"D:\Music\Private Artist\locked.flac";
+        var fingerprints = new FileFingerprintService(_ => throw new UnauthorizedAccessException("Access denied"));
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(40, accessDeniedPath, 444, albumId: 400) });
+
+        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.PersistedFindings.Should().Be(1);
+        tagReader.Paths.Should().BeEmpty();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain("PATH_ACCESS_DENIED");
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+        finding.TagReader.ReadAttempted.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Scan_ShouldCountConfirmedMissingPathForCursorAndResumeWithNextFile()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var missingPath = @"D:\Music\Private Artist\missing-track.flac";
+        var normalPath = @"D:\Music\Private Artist\zero-duration.m4a";
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(40, missingPath, 444, albumId: 400),
+                TrackFile(41, normalPath, 555, albumId: 410),
+            });
+        fingerprints.ExistenceResponses[missingPath] = new FileExistenceEvidence(true, true, false, null, null);
+        tagReader.Responses[normalPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var first = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(new LibraryHealerScanRequest(MaxFiles: 1));
+
+        first.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        first.AvailableTrackFiles.Should().Be(2);
+        first.ScannedTrackFiles.Should().Be(1);
+        first.PersistedFindings.Should().Be(1);
+        first.Truncated.Should().BeTrue();
+        first.NextAfterTrackFileId.Should().Be(40);
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.ExistencePaths.Should().Equal(missingPath);
+        fingerprints.Paths.Should().BeEmpty();
+        store.AllSaved.Select(x => x.File.TrackFileId).Should().Equal(40);
+
+        var second = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(new LibraryHealerScanRequest(AfterTrackFileId: 40, MaxFiles: 1));
+
+        second.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        second.AvailableTrackFiles.Should().Be(1);
+        second.ScannedTrackFiles.Should().Be(1);
+        second.PersistedFindings.Should().Be(1);
+        second.Truncated.Should().BeFalse();
+        second.NextAfterTrackFileId.Should().BeNull();
+        tagReader.Paths.Should().Equal(normalPath);
+        fingerprints.ExistencePaths.Should().Equal(missingPath, normalPath);
+        fingerprints.Paths.Should().Equal(normalPath);
+        store.AllSaved.Select(x => x.File.TrackFileId).Should().Equal(40, 41);
+    }
+
+    [Fact]
+    public void Scan_ShouldNotLeakMissingPathMaterialThroughStoreOrActionOutput()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var tempRoot = Path.Combine(Path.GetTempPath(), "brainarr-healer-missing-boundary-" + Guid.NewGuid().ToString("N"));
+        var missingPath = @"D:\Music\Private Artist\Private Album\secret-track.flac";
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+            var store = new LibraryHealerFindingStore(tempRoot);
+            artistService.Setup(x => x.GetAllArtists())
+                .Returns(new List<Artist> { new() { Id = 1 } });
+            mediaFileService.Setup(x => x.GetFilesByArtist(1))
+                .Returns(new List<TrackFile>
+                {
+                    TrackFile(40, missingPath, 444, albumId: 400),
+                });
+            fingerprints.ExistenceResponses[missingPath] = new FileExistenceEvidence(true, true, false, null, null);
+
+            var scan = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+            var actionResult = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store)
+                .Handle("healer/getfindings", new Dictionary<string, string>());
+            var storeJson = File.ReadAllText(Path.Combine(tempRoot, "library_healer_findings.json"));
+            var actionJson = JsonSerializer.Serialize(actionResult);
+
+            scan.PersistedFindings.Should().Be(1);
+            storeJson.Should().Contain("FILE_MISSING");
+            actionJson.Should().Contain("PathInconsistency");
+            AssertNoPrivateMissingPathMaterial(storeJson);
+            AssertNoPrivateMissingPathMaterial(actionJson);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
     }
 
     [Fact]
@@ -575,7 +869,7 @@ public sealed class LibraryHealerScanRunnerTests
         Mock<IMediaFileService> mediaFileService,
         RecordingTagReader tagReader,
         IFileFingerprintService? fingerprints = null,
-        RecordingFindingStore? store = null,
+        ILibraryHealerFindingStore? store = null,
         Func<TimeSpan>? elapsedProvider = null)
     {
         return new LibraryHealerScanRunner(
@@ -607,6 +901,16 @@ public sealed class LibraryHealerScanRunnerTests
     private static string PathFor(int id)
     {
         return $@"D:\Music\Private Artist\track{id:D2}.m4a";
+    }
+
+    private static void AssertNoPrivateMissingPathMaterial(string json)
+    {
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain(@"D:\\Music");
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        json.Should().NotContain(@"Private Artist\Private Album");
+        json.Should().NotContain(@"Private Artist\\Private Album");
     }
 
     private sealed class RecordingTagReader : ITagLibSymptomReader
@@ -649,16 +953,38 @@ public sealed class LibraryHealerScanRunnerTests
     {
         public Dictionary<string, FileFingerprint> Responses { get; } = new(StringComparer.OrdinalIgnoreCase);
 
+        public Dictionary<string, FileExistenceEvidence> ExistenceResponses { get; } = new(StringComparer.OrdinalIgnoreCase);
+
+        public List<string> ExistencePaths { get; } = new();
+
+
+        public List<CancellationToken> ExistenceTokens { get; } = new();
+
         public List<string> Paths { get; } = new();
 
         public Action? AfterRead { get; set; }
+        public Action? OnCheckExists { get; set; }
+
+        public FileExistenceEvidence CheckExists(string path, CancellationToken cancellationToken)
+        {
+            ExistencePaths.Add(path);
+            ExistenceTokens.Add(cancellationToken);
+            OnCheckExists?.Invoke();
+            if (ExistenceResponses.TryGetValue(path, out var existence))
+            {
+                return existence;
+            }
+
+            var exists = !Responses.TryGetValue(path, out var fingerprint) || fingerprint.Exists;
+            return new FileExistenceEvidence(true, true, exists, null, null);
+        }
 
         public FileFingerprint Read(string path)
         {
             Paths.Add(path);
             var result = Responses.TryGetValue(path, out var fingerprint)
                 ? fingerprint
-                : new FileFingerprint(false, null, null);
+                : new FileFingerprint(true, null, null);
             AfterRead?.Invoke();
             return result;
         }

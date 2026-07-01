@@ -110,7 +110,8 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 LibraryHealerFinding? finding;
                 try
                 {
-                    finding = ScanCandidate(candidate, cancellationToken);
+                    var existenceTimeout = GetCandidateOperationTimeout(scannedTrackFiles, Elapsed(), maxElapsed);
+                    finding = ScanCandidate(candidate, existenceTimeout, cancellationToken);
                 }
                 catch (ReaderBusyException ex)
                 {
@@ -219,10 +220,62 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             .ToList();
     }
 
-    private LibraryHealerFinding? ScanCandidate(Candidate candidate, CancellationToken cancellationToken)
+    private LibraryHealerFinding? ScanCandidate(
+        Candidate candidate,
+        TimeSpan existenceTimeout,
+        CancellationToken cancellationToken)
     {
         var trackFile = candidate.TrackFile;
         var path = trackFile.Path ?? string.Empty;
+        var existence = _fingerprints.CheckExists(path, existenceTimeout, cancellationToken);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (IsCancellationEvidence(existence))
+        {
+            throw new OperationCanceledException("Canceled checking file existence");
+        }
+
+        if (!existence.CheckSucceeded)
+        {
+            var inconclusiveClassification = LibraryHealerClassifier.ClassifyFileExistence(existence);
+            var inconclusivePathHash = PathPrivacy.HashPath(path);
+            return new LibraryHealerFinding(
+                "track-" + trackFile.Id + "-" + inconclusivePathHash,
+                new LibraryHealerFileIdentity(
+                    trackFile.Id,
+                    candidate.ArtistId,
+                    trackFile.AlbumId,
+                    PathPrivacy.Redact(path),
+                    inconclusivePathHash,
+                    trackFile.Size,
+                    trackFile.Modified),
+                inconclusiveClassification.Label,
+                inconclusiveClassification.InternalReasonCodes,
+                new TagReaderEvidence(false, false, null, null, null),
+                null,
+                DateTime.UtcNow);
+        }
+
+        if (!existence.Exists)
+        {
+            var missingPathClassification = LibraryHealerClassifier.ClassifyFileExistence(existence);
+            var missingPathHash = PathPrivacy.HashPath(path);
+            return new LibraryHealerFinding(
+                "track-" + trackFile.Id + "-" + missingPathHash,
+                new LibraryHealerFileIdentity(
+                    trackFile.Id,
+                    candidate.ArtistId,
+                    trackFile.AlbumId,
+                    PathPrivacy.Redact(path),
+                    missingPathHash,
+                    trackFile.Size,
+                    trackFile.Modified),
+                missingPathClassification.Label,
+                missingPathClassification.InternalReasonCodes,
+                new TagReaderEvidence(false, false, null, null, null),
+                null,
+                DateTime.UtcNow);
+        }
+
         var tagReader = _tagReader.Read(path, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         if (IsCancellationEvidence(tagReader))
@@ -277,10 +330,32 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             StringComparison.Ordinal);
     }
 
+    private static bool IsCancellationEvidence(FileExistenceEvidence existence)
+    {
+        return IsCancellationType(existence.ErrorType, nameof(OperationCanceledException))
+            || IsCancellationType(existence.ErrorType, typeof(OperationCanceledException).FullName)
+            || IsCancellationType(existence.ErrorType, nameof(TaskCanceledException))
+            || IsCancellationType(existence.ErrorType, typeof(TaskCanceledException).FullName);
+    }
+
     private static bool IsCancellationType(string? actual, string? expected)
     {
         return !string.IsNullOrWhiteSpace(expected)
             && string.Equals(actual, expected, StringComparison.Ordinal);
+    }
+
+    private static TimeSpan GetCandidateOperationTimeout(
+        int scannedTrackFiles,
+        TimeSpan elapsed,
+        TimeSpan maxElapsed)
+    {
+        var remaining = maxElapsed - elapsed;
+        if (remaining > TimeSpan.Zero)
+        {
+            return remaining;
+        }
+
+        return scannedTrackFiles == 0 ? maxElapsed : TimeSpan.Zero;
     }
 
     private sealed record Candidate(int ArtistId, TrackFile TrackFile);
