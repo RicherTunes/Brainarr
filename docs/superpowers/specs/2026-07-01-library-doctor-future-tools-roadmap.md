@@ -113,45 +113,117 @@ These items either enrich the ranked backlog or describe subfeatures that should
 | Finding lifecycle history | Full triage dashboard/work queues | Track when findings appear, clear, recur, or change classification. | 5 | 3 | 5 | A2.5 | History is operator context only; recurrent findings still require fresh evidence. |
 | Waiver/suppression registry | Full triage dashboard/work queues | Store fingerprint-bound accepted-risk records with expiry and reason. | 5 | 2 | 5 | A2.5 | Suppression hides noise from queues but never becomes approval for mutation. |
 | Decision calibration log | Full triage dashboard/work queues | Let users mark findings as true positive, false positive, repaired elsewhere, ignored, or manually reacquired. | 4 | 2 | 4 | A2.5 | Use sanitized aggregate learning only; no automatic threshold changes without review. |
-| Dependency/toolchain doctor | Lidarr host API conformance harness | Check ffmpeg/ffprobe availability, TagLib behavior, Lidarr assembly identity, filesystem features, and recycle-bin readiness. | 4 | 2 | 5 | A2.5 | Audit-only until specific capability gates are tested. |
-| Export leak scanner | Shareable support export plus leak scanner | Fail export if raw paths, prompt text, exception text, or likely private library strings remain. | 4 | 2 | 4 | A2.5 | Prefer false-positive export blocking over leaking private data. |
-| Approval provenance ledger | Global read-only kill switch and approval authority model | Record operator, timestamp, evidence hash, policy gates, and intended workflow for every future explicit opt-in. | 5 | 3 | 5 | A3/A4 | Approval expires with evidence TTL and cannot be reused across fingerprints. |
+| Tool availability quick check | Lidarr host API conformance harness | Check whether required tools and host services are discoverable before deeper conformance tests run. | 4 | 2 | 5 | A2.5 | Availability is not capability proof; filesystem, recycle-bin, and mutation semantics stay in A3/A4 gates. |
+| Export leak-scanner fixture corpus | Shareable support export plus leak scanner | Maintain fixtures for raw paths, prompt fragments, exception text, MusicBrainz identifiers, and private library strings. | 4 | 3 | 4 | A2.5 | Fixtures strengthen deterministic leak scanning; they do not certify an export by themselves. |
+| Approval receipt model | Global read-only kill switch and approval authority model | Record operator, timestamp, evidence hash, policy gates, intended workflow, expiry, and replay protections for future explicit opt-ins. | 5 | 4 | 5 | A3/A4 | Approval expires with evidence TTL and cannot be reused across fingerprints or workflows. |
 | Manual review packet builder | Full triage dashboard/work queues | Build per-album or per-cohort packets with sanitized evidence, candidate workflow, missing gates, and decision options. | 4 | 3 | 4 | A2.5/C1 | Packets are advisory and must not contain executable commands. |
 | Policy profile simulator presets | Batch policy simulator | Compare diagnostic-only, dry-run-allowed, repair-allowed, and reacquire-allowed policies against findings. | 4 | 3 | 4 | A2.5/A3 | Simulator explains pass/fail only and cannot queue Lidarr or filesystem actions. |
-| AppData/state janitor | State schema migration/corruption harness | Manage old reports, stale findings, expired waivers, evidence bundles, and confirmed backup metadata. | 3 | 4 | 2 | A2.5/A3 | Deletes only Brainarr-owned state after retention and dry-run delete previews exist. |
+| State retention/quarantine auditor | State schema migration/corruption harness | Report stale reports, expired waivers, orphaned evidence bundles, and backup metadata that may need retention action. | 3 | 3 | 3 | A2.5/A3 | A2.5 is report/quarantine-preview only; deletion requires retention policy, journaled state transition, and restore proof. |
 | Root migration impact analyzer | Lidarr state snapshot/diff inspector | Simulate whether findings, fingerprints, backups, and suppressions survive storage/root moves. | 4 | 3 | 4 | C1 | No filesystem moves or path rewrites. |
-| Source/release reputation tracker | Cohort risk analyzer | Aggregate sanitized defect rates by indexer/source/release group/import path when evidence exists. | 4 | 3 | 4 | C1 | Use only for operator filtering and future policy simulation. |
-| Canary batch planner | Batch policy simulator | Select tiny representative batches with stop conditions, required evidence, rollback gates, and confirmation criteria. | 5 | 4 | 5 | A3/A4 | Planner never authorizes mutation; any canary execution needs a separate executor contract, fresh evidence, explicit approval, rollback proof, and per-item gates. |
+| Source/release defect trend report | Cohort risk analyzer | Aggregate local opt-in defect trends by source, release group, import age, and queue/history context when sanitized evidence exists. | 3 | 4 | 3 | C1 | Local-only and advisory; no automatic quality changes, source penalties, blocklists, deletions, or upgrades. |
+| Canary batch planner | Batch policy simulator | Select tiny representative batches with stop conditions, required evidence, rollback gates, and confirmation criteria. | 5 | 4 | 4 | A3/A4 | Planner never authorizes mutation; delete/reacquire canaries require blast-radius proof, rollback contracts, fresh evidence, explicit approval, and per-item gates. |
 | Root/path mapping conformance tool | Mutation-grade root containment proof | Prove Docker, UNC, symlink, reparse, case, and companion-host path semantics. | 5 | 4 | 4 | A2.5/D | No path update or move; it only blocks unsafe assumptions. |
-| Evidence schema migration simulator | State schema migration/corruption harness | Load old schemas and report exactly how they would migrate or fail closed. | 4 | 3 | 4 | A2.5 | Dry-run first; migration writes require their own tested state transition. |
-| Healer metrics/SLO dashboard | Metrics/cardinality and scan-cost budget | Show scan duration, timeouts, finding churn, queue size, and cardinality-safe cohorts. | 4 | 2 | 5 | A2.5 | UI displays aggregate operational health only. |
+| Legacy-state fixture corpus | State schema migration/corruption harness | Keep old, malformed, and partial state files as fixtures proving migrations and fail-closed behavior. | 4 | 2 | 4 | A2.5 | Fixtures cover dry-run migration expectations; migration writes require their own tested state transition. |
+| Healer scan-cost report | Metrics/cardinality and scan-cost budget | Show scan duration, timeouts, finding churn, queue size, and cardinality-safe cohorts. | 4 | 2 | 4 | A2.5 | Report displays aggregate operational health only and must not hide high-risk findings. |
+
+## New Rated Additions
+
+These ideas came from the follow-up healer/QoL brainstorm. They should be folded into parent milestones only after the existing A2/A2.5 contracts remain stable; none of them grants permission to mutate media or Lidarr state.
+
+| Feature | Purpose | Usefulness | Complexity | ROI | Likely milestone | Safety caveat |
+| --- | --- | ---: | ---: | ---: | --- | --- |
+| Container/codec mismatch signature detector | Flag files whose extension/container/codec combination is suspicious, such as FLAC audio inside MP4/M4A, before deciding whether a repair strategy is even plausible. | 5 | 2 | 5 | A2.5/A3 | Read-only signature evidence; mismatch alone never authorizes remux, rename, or reacquire. |
+| FLAC STREAMINFO MD5 verifier | Verify lossless FLAC stream integrity cheaply where available and use it as a repair/dry-run gate. | 5 | 3 | 5 | A2.5/A3 | Integrity evidence must be bound to the current fingerprint and tool provenance. |
+| Recycle-bin and backup readiness doctor | Audit Lidarr recycle-bin settings, backup target health, free space, same-volume constraints, and restore feasibility before A3/A4 execution exists. | 5 | 2 | 5 | A2.5/A3/A4 | Audit-only; a ready backup target is necessary but not sufficient for mutation. |
+| Known-bad signature library | Build deterministic rules for recurring defect patterns by extension, container, codec, encoder hints, import source, and TagLib/probe/decode outcome. | 5 | 3 | 5 | A2.5/C1 | Signatures can raise suspicion and choose required evidence, not select destructive workflows by themselves. |
+| Classifier replay/regression bench | Replay historical findings through new classifiers, treatment-plan rules, and policy changes before release. | 5 | 2 | 5 | A2.5/C | Read-only release gate; changed labels/plans require review before migration or rollout. |
+| Root outage storm coalescer | Collapse thousands of missing-file findings into one root/NAS/offline-storage incident when evidence points to a shared outage. | 5 | 2 | 5 | A2.5 | Coalescing reduces noise only; it must not hide per-file findings or authorize repair. |
+| Evidence contract golden pack | Freeze treatment-plan DTOs, vocabularies, summaries, redaction behavior, and fail-closed cases as compatibility fixtures. | 5 | 2 | 5 | A2.5 | Contract drift blocks release until migration or versioning is explicit. |
+| Field sensitivity annotations | Mark each evidence, export, log, metric, AI-note, and UI field as public, local, private, or secret. | 5 | 3 | 5 | A2.5/B/C | Mechanical leak checks use annotations; missing annotations fail closed. |
+| Deterministic track-slot identity index | Build a normalized index of album, release, medium, disc, track, recording IDs, durations, and current file occupancy. | 5 | 3 | 5 | C1/B | Powers coverage and Import Brain evidence but cannot claim, delete, or replace files by itself. |
+| Adaptive large-library sampler | Use stratified read-only sampling by root, codec, import age, source, and prior findings before expensive sweeps. | 4 | 2 | 5 | A2.5/A5 | Sampling prioritizes investigation but cannot certify the full library healthy. |
+| Evidence change explainer | Explain why a finding changed between scans: moved file, mtime/fingerprint change, label normalization, added probe evidence, or TTL expiry. | 4 | 2 | 4 | A2.5/C1 | Explanation is derived from stored facts and never becomes action approval. |
+| Content identity graph across moves | Track path hash, TrackFile ID, size, mtime, and optional content fingerprint over time so stale approvals cannot follow the wrong file. | 5 | 3 | 4 | C1/A3/A4 | Fingerprints are privacy-bearing and need salt, retention, and stale-plan invalidation rules. |
+| Root capability atlas | Map filesystem traits such as hardlinks, same-volume proof, mtime precision, case behavior, reparse points, and cloud placeholders. | 5 | 4 | 4 | A2.5/A3 | Read-only atlas data gates future writes but cannot authorize them. |
+| Toolchain reproducibility runner | Run TagLib, ffprobe, ffmpeg, fixture, and host-assembly checks against pinned versions. | 4 | 3 | 4 | A2.5/A3 | Drift blocks higher-confidence evidence until fixtures are refreshed or the toolchain is pinned. |
+| Synthetic fixture/corruption generator | Generate truncated, bad-header, missing-tag, odd-container, and hostile-filename fixtures for deterministic tests. | 4 | 3 | 4 | A2.5/A3 | Generated fixtures avoid private media and must be clearly separated from user library paths. |
+| Album-level finding packet aggregator | Group per-track findings into album, root, or cohort packets so operators review causes instead of isolated symptoms. | 4 | 2 | 4 | A2.5/C1 | Packets preserve item-level evidence and cannot batch-authorize actions. |
+| Human review calibration log | Capture sanitized outcomes such as true positive, false positive, externally repaired, ignored, or manually reacquired. | 4 | 3 | 4 | A2.5/B/C | Outcomes inform versioned threshold reviews only; no silent automatic threshold changes. |
+| Track survivorship review planner | For duplicate or collision cases, rank keep-candidates by quality, completeness, tags, duration, provenance, and slot fit. | 4 | 3 | 4 | C1 | Review-only; no deletion, replacement, or move from survivorship ranking. |
+| Dependency allow/block policy | Known-bad TagLib, ffmpeg, ffprobe, or Lidarr assembly versions fail closed; known-good versions unlock higher-confidence evidence. | 4 | 2 | 4 | A2.5/A3 | Allow/block status affects evidence confidence only, not execution authorization. |
+| Dummy restore rehearsal | Prove backup restore and ledger reconciliation on plugin-owned dummy files before any real media repair path exists. | 5 | 3 | 4 | A3 | Dummy paths only; live media remains untouched until restore proof and authorization contracts exist. |
+| Source-of-truth conflict detector | Compare Lidarr DB state, file tags, folder/file names, MusicBrainz topology, and optional probe evidence to identify which source disagrees. | 5 | 4 | 5 | C1/B | Conflicts become review packets; AI may summarize ambiguity but deterministic IDs/gates decide action eligibility. |
+| Import rejection explainer | Translate Lidarr manual-import and failed-import reasons into actionable, evidence-linked next steps. | 5 | 3 | 5 | C1/B | Explanation only; no queue retry, import, delete, or replace without a separate workflow. |
+| Track split/merge anomaly detector | Detect likely one-file-many-tracks, many-files-one-track, hidden-track, pregap, or incorrectly split album cases. | 4 | 4 | 3 | C1 | Review-only; topology mismatches are too ambiguous for automatic repair. |
+| Sample-rate and bit-depth drift audit | Report files that drift from release/profile expectations, including unexpected downsampling or inconsistent album-level technical traits. | 4 | 3 | 4 | C1 | Report-only; upgrades and replacements remain Lidarr policy decisions. |
+| Lossy transcode suspicion audit | Identify cases that look like lossy-to-lossless transcodes using codec history hints, spectrogram-capable optional tooling, or trusted provenance gaps. | 3 | 5 | 2 | C1/A5 | Expensive and probabilistic; never delete or reacquire from this signal alone. |
+| Silence, clipping, and audio-content anomaly sampler | Run bounded optional audio-content checks for all-silence files, severe clipping, tiny decoded audio, or broken channel layouts. | 4 | 4 | 3 | A5 | Explicit slow mode only; content heuristics require human review and fresh decode evidence. |
+| Tag round-trip compatibility verifier | Before any tag-write milestone, prove that TagLib, Lidarr, and common players can read proposed tag changes consistently. | 4 | 4 | 4 | C2 | Uses synthetic or copied fixtures first; no live media tag writes until backup/rollback gates exist. |
+| MusicBrainz evidence cache and rate-limit planner | Cache canonical release/release-group/recording topology with provenance, expiry, and request budgets for later Import Brain/tag tools. | 4 | 3 | 4 | C1/B | Cached canonical data expires; stale IDs can explain but cannot authorize. |
+| Privacy budget and AI prompt preflight | Before any model call, show exactly what evidence fields would be sent, verify redaction, estimate tokens/cost, and require policy approval. | 5 | 3 | 5 | B/C | AI is off by default for healer execution; preflight can block or redact but cannot approve mutation. |
+| AI confidence calibration dataset | Store sanitized operator outcomes for AI-assisted suggestions so thresholds can be evaluated instead of guessed. | 4 | 4 | 3 | B/C | Aggregates only; no raw tags/paths/prompts, and calibration never silently changes execution gates. |
+| AI evidence contradiction checker | Ask a model to find contradictions in already-redacted evidence packets, such as year/runtime/tag/release mismatches, before human review. | 4 | 3 | 4 | B/C1 | The model can lower confidence or request more evidence; it cannot raise authorization. |
+| Evidence packet review-note drafter | Draft short review notes from sanitized structured evidence with citations to finding IDs. | 4 | 2 | 4 | B/C1 | Output is explanation, never evidence, approval, or policy. |
+| Missing-evidence recommender | Suggest which allowed read-only evidence would reduce ambiguity for a blocked treatment plan. | 4 | 3 | 4 | B/C1 | Suggestions come from an allowlist of probes/questions and contain no commands. |
+| Policy decision explainer | Translate deterministic gate pass/fail reasons into operator-readable summaries. | 3 | 2 | 4 | A3/B/C | Deterministic gates compute decisions; AI only explains blocked reasons. |
+| Canary/batch adversarial reviewer | Challenge proposed canary or batch packets and identify missing gates or unsafe assumptions. | 4 | 4 | 3 | A3/A4/B | Can lower confidence or request review only; cannot approve mutation or relax item gates. |
+| Semantic privacy risk reviewer | Review already-redacted exports, AI notes, and support bundles for subtle privacy leaks after deterministic scanners run. | 4 | 4 | 3 | B/C | AI can block or escalate suspected leaks but cannot certify privacy safety. |
+| Cohort/root-cause narrative assistant | Summarize cohort evidence into hypotheses about likely causes, such as source, root outage, encoder, or import path. | 3 | 3 | 3 | B/C1 | Hypotheses require evidence references and cannot change thresholds or remediation policy. |
+| AI output grounding checker | Validate AI-generated notes for unsupported claims, leaked identifiers, command-like language, or missing evidence citations. | 5 | 4 | 4 | B/C | Deterministic schemas still enforce allowed fields and fail closed. |
+| Human-readable remediation runbook generator | Generate a short operator runbook per cohort or album: what was found, what evidence is missing, what the safest next manual step is. | 4 | 2 | 4 | A2.5/C1 | Runbooks contain no executable commands and no raw private values. |
+| Health score and trendline | Summarize library health trends by read-only cohorts, finding churn, recurrence, stale evidence, and remediation outcomes. | 3 | 2 | 4 | A2.5/C1 | Score is navigation aid only; it must not hide high-risk findings or become a pass/fail gate. |
+| Maintenance window and resource governor | Let operators constrain scan/probe/decode work by time window, disk pressure, CPU budget, and Lidarr activity state. | 4 | 3 | 4 | A2.5/A5 | Governs read-only work first; write-capable operations need stricter per-item approval gates. |
+| Mutation chaos drill harness | Inject crashes, access-denied errors, disk-full states, lock contention, and partial-renames against synthetic files to prove ledger recovery. | 5 | 4 | 5 | A3 | Synthetic/plugin-owned paths only; must pass before any repair-in-place implementation touches media. |
+| Support-safe fixture minimizer | Produce synthetic or heavily minimized repro fixtures that preserve structural failure signals without exposing private audio or tags. | 3 | 5 | 2 | A2.5/A3 | Default should be metadata-only or synthetic; never export user audio by accident. |
+| Provider/source defect feedback loop | Aggregate sanitized defect patterns by source, release group, import age, and queue/history context to help users tune acquisition policy. | 4 | 4 | 3 | C1 | Advisory only; no automatic blocklists, quality changes, or source penalties from healer alone. |
+| Policy-as-code simulator | Express future operator policies as versioned, testable rules and simulate them against findings before enabling any dry-run or execution path. | 4 | 4 | 4 | A3/C | Simulation cannot mutate; policy rules must be covered by fixtures and adversarial review. |
+| Append-only library fact store | Persist scan facts, Lidarr snapshots, fingerprints, gate outcomes, and operator decisions as historical evidence instead of only current state. | 5 | 4 | 5 | A2.5/C | Facts are evidence only; compaction and retention must preserve auditability and privacy. |
+| Stable logical track lineage graph | Track identity across renames, rescans, release remaps, reimports, repairs, and replacements. | 5 | 4 | 5 | C1/A3/A4 | Lineage explains history but never grants deletion, replacement, or import authority. |
+| Incremental dirty-set scanner | Scan changed files, albums, or roots from Lidarr events, stored fingerprints, and filesystem hints instead of rescanning everything. | 5 | 4 | 4 | A2.5/C1 | Missed events must fall back to bounded revalidation; dirty-set membership cannot authorize action. |
+| Reference-data version pinning | Record the MusicBrainz/Lidarr metadata snapshot used for a decision so ambiguous results remain reproducible. | 4 | 3 | 4 | C1/B | Stale reference data can explain old plans but blocks mutation gates until refreshed. |
+| Deterministic policy DSL | Represent repair, reacquire, tag, and import gates as versioned declarative rules with static validation. | 5 | 5 | 4 | A3/C/B | AI may suggest policies, but only reviewed deterministic rules can run. |
+| Machine-checkable gate proof bundle | Export a compact pass/fail proof for every required gate behind a candidate action. | 5 | 3 | 5 | A3/A4/C | Proof bundles must be redacted and must not include executable commands. |
+| AI-to-rule distillation workbench | Let AI mine recurring ambiguous cases and propose deterministic predicates for humans to turn into tests and policy rules. | 4 | 4 | 4 | B/C | Proposed rules require human approval, fixtures, and adversarial review before adoption. |
+| Root/library sharding coordinator | Partition very large libraries by root, artist cohort, storage tier, or risk class with independent budgets and backpressure. | 4 | 3 | 4 | A2.5/C1 | Shards must not create inconsistent authorization or partial batch approval. |
+| Cross-tool contention detector | Detect concurrent Lidarr, manual, backup, tagger, or filesystem edits during diagnosis, dry-run, or future execution windows. | 5 | 3 | 5 | A2.5/A3/A4 | Any contention invalidates stale plans and fails closed to review. |
+| Format lifecycle planner | Produce a read-only plan for obsolete codecs, risky containers, archival policy, sample-rate drift, and future migration pressure. | 3 | 3 | 3 | C1 | No transcoding, replacement, or quality upgrade action belongs in this planner. |
+
+Highest-ROI additions to consider pulling forward after A2 projection conformance: evidence contract golden packs, field sensitivity annotations, classifier replay benches, root outage coalescing, container/codec mismatch signatures, FLAC STREAMINFO MD5 verification, recycle-bin and backup readiness, known-bad signatures, import rejection explanations, privacy/AI prompt preflight, append-only fact storage, machine-checkable gate proofs, cross-tool contention detection, and mutation chaos drills. These improve later repair/reacquire safety without requiring media writes in the near term.
 
 ## Recommended Next Pulls
 
-The best near-term sequence is intentionally smaller than the full A2.5 band:
+The best near-term sequence is intentionally smaller than the full A2.5/C/A3 backlog and stays read-only until the synthetic mutation drills:
 
 1. Finish A2 projection conformance: treatment plans and summary counts in `healer/getfindings`.
-2. Finding revalidation loop.
-3. State schema migration/corruption harness.
-4. Evidence provenance fingerprint.
-5. Evidence TTL policy.
-6. Global read-only kill switch and approval authority model.
-7. Fingerprint acquisition and retention policy.
-8. Lidarr state snapshot/diff inspector.
-9. Basic storage/root health audit.
-10. Lidarr host API conformance harness.
-11. Redaction policy verifier for all stores.
-12. Local diagnostic evidence export.
-13. Basic triage filters/API.
-14. Read-only probe collector.
-15. Targeted decode-on-finding verifier.
-16. Fixture truth-table lab and local fixture health check command.
-17. Metrics/cardinality and scan-cost budget.
-18. Mutation-grade root containment proof.
-19. Mutation safety drill on synthetic files.
-20. Operation ledger state machine.
+2. Evidence contract golden pack.
+3. Field sensitivity annotations.
+4. Finding revalidation loop.
+5. Classifier replay/regression bench.
+6. State schema migration/corruption harness plus legacy-state fixture corpus.
+7. Evidence provenance fingerprint.
+8. Evidence TTL policy.
+9. Global read-only kill switch and approval authority model.
+10. Fingerprint acquisition and retention policy.
+11. Lidarr state snapshot/diff inspector.
+12. Basic storage/root health audit plus root outage storm coalescing.
+13. Lidarr host API conformance harness plus tool availability quick check.
+14. Redaction policy verifier for all stores plus export leak-scanner fixture corpus.
+15. Local diagnostic evidence export.
+16. Basic triage filters/API.
+17. Read-only probe collector plus container/codec mismatch signatures.
+18. Targeted decode-on-finding verifier plus FLAC STREAMINFO MD5 verification.
+19. Fixture truth-table lab, local fixture health check, toolchain reproducibility runner, and synthetic fixture generator.
+20. Metrics/cardinality and scan-cost budget plus healer scan-cost report.
+21. Album-level finding packet aggregator and evidence change explainer.
+22. Privacy budget and AI prompt preflight for any later AI-assisted review note.
+23. Append-only library fact store.
+24. Cross-tool contention detector.
+25. Mutation-grade root containment proof plus root capability atlas.
+26. Recycle-bin and backup readiness doctor.
+27. Mutation safety drill on synthetic files plus dummy restore rehearsal.
+28. Operation ledger state machine and machine-checkable gate proof bundle.
 
-This sequence improves trust, debuggability, and evidence quality without introducing media writes. It also reduces A3/A4 risk by proving freshness, state migration, probe behavior, fixture behavior, redaction, root containment, and host semantics before repair or reacquire exists.
+This sequence improves trust, debuggability, scale, privacy, and evidence quality without introducing media writes through A2.5. It also reduces A3/A4 risk by proving contract stability, field sensitivity, freshness, state migration, probe behavior, fixture behavior, redaction, root containment, backup readiness, host semantics, and synthetic recovery before repair or reacquire exists.
 
 ## Deferred Or Rejected Defaults
 
@@ -175,23 +247,29 @@ These ideas should not be defaults:
 A2 should finish the projection contract before the roadmap pulls any A2.5 work. A2.5 should then ship as many small read-only tools, not as one broad release:
 
 - revalidation;
+- evidence contract golden packs and classifier replay;
+- field sensitivity annotations;
 - schema migration and corruption handling;
 - provenance and TTL;
 - read-only kill switch, protected scopes, and approval authority model;
 - fingerprint policy;
 - Lidarr state snapshots and diffing;
-- storage/root health audit;
-- host/API conformance;
-- redaction verification;
+- storage/root health audit and root outage coalescing;
+- host/API conformance and tool availability checks;
+- redaction verification and leak-scanner fixtures;
 - local diagnostic export;
 - triage filters;
-- probe collection;
-- targeted decode verification;
-- fixture truth-table work;
-- metrics/cardinality and scan-cost budgets.
+- probe collection and container/codec signatures;
+- targeted decode verification and FLAC STREAMINFO MD5 checks;
+- fixture truth-table work, local fixture health checks, and toolchain reproducibility;
+- metrics/cardinality and scan-cost budgets;
+- evidence change explanations and album-level finding packets;
+- AI prompt privacy preflight before any model-assisted review notes;
+- append-only fact storage;
+- cross-tool contention detection.
 
-A3 should start only after A2.5 has enough fixture and live-read-only evidence to make repair dry-runs meaningful, after mutation-grade root containment is proven, and after synthetic mutation drills prove the journal/backup/rollback path outside the library. A4 should remain separate from A3 because reacquire is a Lidarr workflow with album-wide and recycle-bin risks, not a file repair workflow.
+A3 should start only after A2.5 has enough fixture and live-read-only evidence to make repair dry-runs meaningful, after mutation-grade root containment and the root capability atlas are proven, after backup/recycle readiness is audited, and after synthetic mutation plus dummy-restore drills prove the journal/backup/rollback path outside the library. A4 should remain separate from A3 because reacquire is a Lidarr workflow with album-wide and recycle-bin risks, not a file repair workflow.
 
-The C-series data-management tools should be developed mostly read-only first. Track-slot coverage, release topology, queue/history diagnostics, duplicates, sidecars, artwork, ReplayGain, and tag canonicalization can deliver operator value before any write path exists.
+The C-series data-management tools should be developed mostly read-only first. Track-slot coverage, deterministic slot indexes, release topology, queue/history diagnostics, import rejection explanations, source-of-truth conflict detection, duplicates, survivorship review, sidecars, artwork, ReplayGain, and tag canonicalization can deliver operator value before any write path exists.
 
-AI-assisted tools should remain late and advisory. They may summarize evidence or challenge ambiguous identity/release decisions, but model output is never evidence, never execution authorization, and never a source of filesystem paths or Lidarr commands.
+AI-assisted tools should remain late and advisory. They may draft review notes, suggest missing evidence from an allowlist, explain deterministic policy decisions, challenge ambiguous identity/release decisions, or block suspicious privacy leaks, but model output is never evidence, never execution authorization, never a privacy certification, and never a source of filesystem paths or Lidarr commands.

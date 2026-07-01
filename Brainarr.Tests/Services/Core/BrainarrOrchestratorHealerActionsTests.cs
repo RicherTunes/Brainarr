@@ -43,6 +43,244 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldIncludeTreatmentPlan_ForEveryFinding()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("track-1-redacted", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction(
+            "healer/getfindings",
+            new Dictionary<string, string>(),
+            new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        var plan = item.GetProperty("treatmentPlan");
+        plan.GetProperty("schemaVersion").GetInt32().Should().Be(HealerTreatmentVocab.SchemaVersion);
+        plan.GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.RepairDryRunCandidate);
+        plan.GetProperty("confidence").GetDouble().Should().Be(0.55);
+        plan.GetProperty("risk").GetString().Should().Be(HealerTreatmentVocab.Risk.Medium);
+        plan.GetProperty("safetyLevel").GetString().Should().Be(HealerTreatmentVocab.SafetyLevel.ReadOnly);
+        plan.GetProperty("evidenceFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Current);
+        plan.GetProperty("identityFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Current);
+        var authorization = plan.GetProperty("executionAuthorization");
+        authorization.GetProperty("authorized").GetBoolean().Should().BeFalse();
+        authorization.GetProperty("authority").GetString().Should().Be(HealerTreatmentVocab.AuthorizationAuthority.None);
+        authorization.GetProperty("reason").GetString().Should().Be(HealerTreatmentVocab.AuthorizationReason.A2ReadOnly);
+        JsonStrings(plan.GetProperty("blockedReasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.RepairDryRunNotImplemented);
+        JsonStrings(plan.GetProperty("requiredEvidence")).Should().Contain(HealerTreatmentVocab.RequiredEvidence.FullDecodeClean);
+        JsonStrings(plan.GetProperty("requiredPolicyGates")).Should().Contain(HealerTreatmentVocab.RequiredPolicyGate.BackupPolicyApproved);
+        JsonStrings(plan.GetProperty("rationaleCodes")).Should().Contain(HealerTreatmentVocab.Rationale.TagReaderDurationZero);
+
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldReturnTriageSummary_ForReturnedFindings()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var summary = document.RootElement.GetProperty("summary");
+        summary.GetProperty("total").GetInt32().Should().Be(2);
+        summary.GetProperty("byWorkflow").GetProperty(HealerTreatmentVocab.Workflow.RepairDryRunCandidate).GetInt32().Should().Be(1);
+        summary.GetProperty("byWorkflow").GetProperty(HealerTreatmentVocab.Workflow.Review).GetInt32().Should().Be(1);
+        summary.GetProperty("byRisk").GetProperty(HealerTreatmentVocab.Risk.Medium).GetInt32().Should().Be(1);
+        summary.GetProperty("byRisk").GetProperty(HealerTreatmentVocab.Risk.High).GetInt32().Should().Be(1);
+        summary.GetProperty("byWorkflowByRisk")
+            .GetProperty(HealerTreatmentVocab.Workflow.RepairDryRunCandidate)
+            .GetProperty(HealerTreatmentVocab.Risk.Medium)
+            .GetInt32()
+            .Should()
+            .Be(1);
+        summary.GetProperty("authorization").GetProperty("authorized").GetInt32().Should().Be(0);
+        summary.GetProperty("authorization").GetProperty("unauthorized").GetInt32().Should().Be(2);
+        summary.GetProperty("blockedReasons").GetProperty(HealerTreatmentVocab.BlockedReason.RepairDryRunNotImplemented).GetInt32().Should().Be(1);
+        summary.GetProperty("blockedReasons").GetProperty(HealerTreatmentVocab.BlockedReason.HumanReviewRequired).GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldFailClosed_WhenStoredFindingShapeIsMalformed()
+    {
+        var malformed = new LibraryHealerFinding(
+            "malformed",
+            File: null!,
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_ZERO_DURATION" },
+            TagReader: null!,
+            Probe: null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new FakeFindingStore(new[] { malformed }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("trackFileId").GetInt32().Should().Be(0);
+        item.GetProperty("label").GetString().Should().Be(LibraryHealerLabel.NeedsHumanReview.ToString());
+        JsonStrings(item.GetProperty("reasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+        var plan = item.GetProperty("treatmentPlan");
+        plan.GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.Review);
+        plan.GetProperty("risk").GetString().Should().Be(HealerTreatmentVocab.Risk.High);
+        plan.GetProperty("executionAuthorization").GetProperty("authorized").GetBoolean().Should().BeFalse();
+        JsonStrings(plan.GetProperty("blockedReasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+        document.RootElement.GetProperty("summary")
+            .GetProperty("blockedReasons")
+            .GetProperty(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord)
+            .GetInt32()
+            .Should()
+            .Be(1);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldFailClosed_WhenStoredFindingIdentityShapeIsInvalid()
+    {
+        var malformed = new LibraryHealerFinding(
+            "malformed",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 0,
+                ArtistId: 0,
+                AlbumId: 0,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: -1,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_ZERO_DURATION" },
+            new TagReaderEvidence(true, true, 0, null, null),
+            Probe: null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new FakeFindingStore(new[] { malformed }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("trackFileId").GetInt32().Should().Be(0);
+        item.GetProperty("label").GetString().Should().Be(LibraryHealerLabel.NeedsHumanReview.ToString());
+        JsonStrings(item.GetProperty("reasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+        var plan = item.GetProperty("treatmentPlan");
+        plan.GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.Review);
+        plan.GetProperty("risk").GetString().Should().Be(HealerTreatmentVocab.Risk.High);
+        JsonStrings(plan.GetProperty("blockedReasons")).Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldRedactSensitiveTokensAndGenericExceptionTextInTreatmentProjection()
+    {
+        const string rawMusicBrainzLikeValue = "550e8400-e29b-41d4-a716-446655440000";
+        const string genericExceptionText = "bad header near private frame";
+        var finding = new LibraryHealerFinding(
+            "finding-" + rawMusicBrainzLikeValue,
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: rawMusicBrainzLikeValue,
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_FAILED" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: rawMusicBrainzLikeValue,
+                ErrorMessage: genericExceptionText),
+            new ProbeEvidence(
+                ProbeAttempted: true,
+                ProbeSucceeded: false,
+                DurationSeconds: null,
+                Container: rawMusicBrainzLikeValue,
+                AudioCodec: rawMusicBrainzLikeValue,
+                ErrorType: rawMusicBrainzLikeValue,
+                ErrorMessage: genericExceptionText),
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new FakeFindingStore(new[] { finding }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().NotContain(rawMusicBrainzLikeValue);
+        json.Should().NotContain(genericExceptionText);
+        json.Should().NotContain("bad header");
+        json.Should().Contain("TAG_READER_FAILED");
+        json.Should().Contain(HealerTreatmentVocab.Rationale.TagReaderReadFailed);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldRedactSingleTokenMetadataAndCommandLikeValuesInStoredProjection()
+    {
+        const string rawMetadataValue = "PrivateArtist";
+        const string rawCommandValue = "ffmpeg";
+        var finding = new LibraryHealerFinding(
+            "finding-" + rawMetadataValue,
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: rawMetadataValue,
+                PathHash: rawCommandValue,
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_FAILED" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: rawMetadataValue,
+                ErrorMessage: "failed"),
+            new ProbeEvidence(
+                ProbeAttempted: true,
+                ProbeSucceeded: false,
+                DurationSeconds: null,
+                Container: rawMetadataValue,
+                AudioCodec: rawCommandValue,
+                ErrorType: rawCommandValue,
+                ErrorMessage: "failed"),
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new FakeFindingStore(new[] { finding }));
+
+        var result = handler.Handle("healer/getfindings", new Dictionary<string, string>());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().NotContain(rawMetadataValue);
+        json.Should().NotContain(rawCommandValue);
+        json.Should().Contain("TAG_READER_FAILED");
+        json.Should().Contain(HealerTreatmentVocab.Rationale.TagReaderReadFailed);
+    }
+
+    [Fact]
     public void HandleAction_ShouldRouteHealerScanWithBoundedQueryWithoutProviderPipeline()
     {
         var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
@@ -975,6 +1213,15 @@ public sealed class BrainarrOrchestratorHealerActionsTests
 
         thread.Start();
         return completion.Task;
+    }
+
+    private static IReadOnlyList<string> JsonStrings(JsonElement array)
+    {
+        return array.EnumerateArray()
+            .Select(item => item.GetString())
+            .Where(value => value is not null)
+            .Select(value => value!)
+            .ToList();
     }
 
     private sealed class FakeFindingStore : ILibraryHealerFindingStore

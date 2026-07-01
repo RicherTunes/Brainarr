@@ -19,6 +19,24 @@ internal static class LibraryHealerSensitiveText
         "title",
     };
 
+    private static readonly string[] CommandKeywords =
+    {
+        "cmd.exe",
+        "command",
+        "copy",
+        "delete",
+        "execute",
+        "ffmpeg",
+        "ffprobe",
+        "import",
+        "move",
+        "powershell",
+        "remove",
+        "replace",
+        "rescan",
+        "search",
+    };
+
     public static bool ContainsMetadataMaterial(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -32,5 +50,15 @@ internal static class LibraryHealerSensitiveText
         }
 
         return MetadataKeywords.Any(keyword => value.Contains(keyword, StringComparison.OrdinalIgnoreCase));
+    }
+
+    public static bool ContainsCommandMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return CommandKeywords.Any(keyword => value.Contains(keyword, StringComparison.OrdinalIgnoreCase));
     }
 }

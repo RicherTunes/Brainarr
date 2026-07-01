@@ -3,6 +3,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 public sealed class LibraryHealerActionHandler
 {
     private const string PathContainingValueRedaction = "<path-containing value redacted>";
+    private const string EvidenceErrorMessageRedaction = "<evidence error message redacted>";
     private readonly ILibraryHealerScanRunner _scanRunner;
     private readonly ILibraryHealerFindingStore _store;
     private int _scanInProgress;
@@ -72,11 +73,21 @@ public sealed class LibraryHealerActionHandler
     private object GetFindings(IDictionary<string, string> query)
     {
         var limit = Math.Clamp(TryParseQueryInt(query, "limit") ?? 100, 1, 500);
-        var items = _store.GetRecent(limit)
-            .Select(ProjectFinding)
+        var projectedFindings = _store.GetRecent(limit)
+            .Select(SanitizeFindingForProjection)
+            .ToList();
+        var plans = projectedFindings
+            .Select(finding => HealerTriageAdvisor.Advise(finding.Finding, finding.Freshness))
+            .ToList();
+        var items = projectedFindings
+            .Zip(plans, (finding, plan) => ProjectFinding(finding.Finding, plan))
             .ToList();
 
-        return new { items };
+        return new
+        {
+            items,
+            summary = ProjectSummary(HealerTriageSummary.Create(plans)),
+        };
     }
 
     private object ClearFindings()
@@ -102,23 +113,152 @@ public sealed class LibraryHealerActionHandler
         }
     }
 
-    private static object ProjectFinding(LibraryHealerFinding finding)
+    private static ProjectedFinding SanitizeFindingForProjection(LibraryHealerFinding? finding)
+    {
+        if (finding is null)
+        {
+            return new ProjectedFinding(
+                EmptyMalformedFinding(),
+                HealerFindingFreshness.Current with { MalformedRecord = true });
+        }
+
+        var malformedRecord = IsMalformedStoredFinding(finding);
+        var file = finding.File is null ? EmptyFileIdentity() : finding.File with
+        {
+            RedactedPath = SanitizePathDisplayString(finding.File.RedactedPath) ?? string.Empty,
+            PathHash = SanitizeTokenString(finding.File.PathHash) ?? string.Empty,
+            Size = finding.File.Size.GetValueOrDefault() < 0 ? null : finding.File.Size,
+        };
+        var tagReader = finding.TagReader is null ? EmptyTagReaderEvidence() : ProjectTagReader(finding.TagReader);
+        var probe = finding.Probe is null ? null : ProjectProbe(finding.Probe);
+        var label = malformedRecord
+            ? LibraryHealerLabel.NeedsHumanReview
+            : LibraryHealerReasonCodes.NormalizeLabel(finding.Label, tagReader.Metadata);
+        var reasons = malformedRecord
+            ? new[] { HealerTreatmentVocab.BlockedReason.MalformedFindingRecord }
+            : LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, tagReader.Metadata);
+
+        return new ProjectedFinding(
+            finding with
+            {
+                Id = SanitizeTokenString(finding.Id) ?? string.Empty,
+                File = file,
+                Label = label,
+                InternalReasonCodes = reasons,
+                TagReader = tagReader,
+                Probe = probe,
+            },
+            HealerFindingFreshness.Current with { MalformedRecord = malformedRecord });
+    }
+
+    private static LibraryHealerFinding EmptyMalformedFinding()
+    {
+        return new LibraryHealerFinding(
+            string.Empty,
+            EmptyFileIdentity(),
+            LibraryHealerLabel.NeedsHumanReview,
+            new[] { HealerTreatmentVocab.BlockedReason.MalformedFindingRecord },
+            EmptyTagReaderEvidence(),
+            null,
+            DateTime.MinValue);
+    }
+
+    private static LibraryHealerFileIdentity EmptyFileIdentity()
+    {
+        return new LibraryHealerFileIdentity(
+            TrackFileId: 0,
+            ArtistId: 0,
+            AlbumId: 0,
+            RedactedPath: string.Empty,
+            PathHash: string.Empty,
+            Size: null,
+            ModifiedUtc: null);
+    }
+
+    private static TagReaderEvidence EmptyTagReaderEvidence()
+    {
+        return new TagReaderEvidence(
+            ReadAttempted: false,
+            ReadSucceeded: false,
+            DurationSeconds: null,
+            ErrorType: null,
+            ErrorMessage: null);
+    }
+
+    private static bool IsMalformedStoredFinding(LibraryHealerFinding finding)
+    {
+        return finding.File is null
+            || finding.TagReader is null
+            || !Enum.IsDefined(finding.Label)
+            || IsMalformedFileIdentity(finding.File);
+    }
+
+    private static bool IsMalformedFileIdentity(LibraryHealerFileIdentity? file)
+    {
+        return file is null
+            || file.TrackFileId <= 0
+            || file.ArtistId <= 0
+            || file.AlbumId <= 0
+            || string.IsNullOrWhiteSpace(file.RedactedPath)
+            || string.IsNullOrWhiteSpace(file.PathHash)
+            || file.Size.GetValueOrDefault() < 0;
+    }
+
+    private static object ProjectFinding(LibraryHealerFinding finding, HealerTreatmentPlan treatmentPlan)
     {
         return new
         {
-            id = SanitizeTokenString(finding.Id),
+            id = finding.Id,
             trackFileId = finding.File.TrackFileId,
             artistId = finding.File.ArtistId,
             albumId = finding.File.AlbumId,
-            path = SanitizePathDisplayString(finding.File.RedactedPath),
-            pathHash = SanitizeTokenString(finding.File.PathHash),
+            path = finding.File.RedactedPath,
+            pathHash = finding.File.PathHash,
             size = finding.File.Size,
             modifiedUtc = finding.File.ModifiedUtc,
-            label = LibraryHealerReasonCodes.NormalizeLabel(finding.Label, finding.TagReader.Metadata).ToString(),
-            reasons = LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, finding.TagReader.Metadata),
+            label = finding.Label.ToString(),
+            reasons = finding.InternalReasonCodes,
             observedAtUtc = finding.ObservedAtUtc,
-            tagReader = ProjectTagReader(finding.TagReader),
-            probe = finding.Probe is null ? null : ProjectProbe(finding.Probe),
+            tagReader = finding.TagReader,
+            probe = finding.Probe,
+            treatmentPlan = ProjectTreatmentPlan(treatmentPlan),
+        };
+    }
+
+    private static object ProjectTreatmentPlan(HealerTreatmentPlan plan)
+    {
+        return new
+        {
+            schemaVersion = plan.SchemaVersion,
+            candidateWorkflow = plan.CandidateWorkflow,
+            confidence = plan.Confidence,
+            risk = plan.Risk,
+            safetyLevel = plan.SafetyLevel,
+            evidenceFreshness = plan.EvidenceFreshness,
+            identityFreshness = plan.IdentityFreshness,
+            executionAuthorization = new
+            {
+                authorized = plan.ExecutionAuthorization.Authorized,
+                authority = plan.ExecutionAuthorization.Authority,
+                reason = plan.ExecutionAuthorization.Reason,
+            },
+            blockedReasons = plan.BlockedReasons,
+            requiredEvidence = plan.RequiredEvidence,
+            requiredPolicyGates = plan.RequiredPolicyGates,
+            rationaleCodes = plan.RationaleCodes,
+        };
+    }
+
+    private static object ProjectSummary(HealerTriageSummary summary)
+    {
+        return new
+        {
+            total = summary.Total,
+            byWorkflow = summary.ByWorkflow,
+            byRisk = summary.ByRisk,
+            byWorkflowByRisk = summary.ByWorkflowByRisk,
+            authorization = summary.Authorization,
+            blockedReasons = summary.BlockedReasons,
         };
     }
 
@@ -129,7 +269,7 @@ public sealed class LibraryHealerActionHandler
             evidence.ReadSucceeded,
             evidence.DurationSeconds,
             SanitizeTokenString(evidence.ErrorType),
-            SanitizeMessageString(evidence.ErrorMessage),
+            SanitizeEvidenceMessageString(evidence.ErrorMessage),
             ProjectMetadata(evidence.Metadata));
     }
 
@@ -155,7 +295,7 @@ public sealed class LibraryHealerActionHandler
             SanitizeTokenString(evidence.Container),
             SanitizeTokenString(evidence.AudioCodec),
             SanitizeTokenString(evidence.ErrorType),
-            SanitizeMessageString(evidence.ErrorMessage));
+            SanitizeEvidenceMessageString(evidence.ErrorMessage));
     }
 
     internal static string? SanitizeBoundaryString(string? value)
@@ -165,7 +305,10 @@ public sealed class LibraryHealerActionHandler
 
     private static string? SanitizePathDisplayString(string? value)
     {
-        return PathPrivacy.RedactDisplayPath(value);
+        var redacted = PathPrivacy.RedactDisplayPath(value);
+        return ContainsUnsafeDisplayPathMaterial(redacted)
+            ? PathContainingValueRedaction
+            : redacted;
     }
 
     private static string? SanitizeTokenString(string? value)
@@ -183,6 +326,13 @@ public sealed class LibraryHealerActionHandler
             : redacted;
     }
 
+    private static string? SanitizeEvidenceMessageString(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? null
+            : EvidenceErrorMessageRedaction;
+    }
+
     private static bool ShouldRedactTokenMaterial(string? value)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -194,7 +344,44 @@ public sealed class LibraryHealerActionHandler
         return ContainsLikelyPath(trimmed)
             || HasDriveDesignator(trimmed)
             || ContainsMediaExtension(trimmed)
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(trimmed)
+            || LibraryHealerSensitiveText.ContainsCommandMaterial(trimmed)
             || trimmed.Any(char.IsWhiteSpace);
+    }
+
+    private static bool ContainsUnsafeDisplayPathMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var displayName = GetDisplayNamePart(value.Trim());
+        return ContainsLikelyPath(displayName)
+            || HasDriveDesignator(displayName)
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(displayName)
+            || LibraryHealerSensitiveText.ContainsCommandMaterial(displayName);
+    }
+
+    private static string GetDisplayNamePart(string value)
+    {
+        var separator = value.LastIndexOf('#');
+        if (separator <= 0 || separator + 13 != value.Length)
+        {
+            return value;
+        }
+
+        var candidateHash = value.Substring(separator + 1);
+        for (var i = 0; i < candidateHash.Length; i++)
+        {
+            var ch = candidateHash[i];
+            if (!((ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f')))
+            {
+                return value;
+            }
+        }
+
+        return value.Substring(0, separator);
     }
 
     private static bool ContainsLikelyPath(string? value)
@@ -220,7 +407,8 @@ public sealed class LibraryHealerActionHandler
         return ContainsLikelyPath(value)
             || HasDriveDesignator(value)
             || ContainsMediaExtension(value)
-            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value);
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value)
+            || LibraryHealerSensitiveText.ContainsCommandMaterial(value);
     }
 
     private static bool HasWindowsRoot(string value)
@@ -307,4 +495,6 @@ public sealed class LibraryHealerActionHandler
         var parsed = TryParseQueryInt(query, key);
         return parsed.GetValueOrDefault() > 0 ? parsed : null;
     }
+
+    private sealed record ProjectedFinding(LibraryHealerFinding Finding, HealerFindingFreshness Freshness);
 }
