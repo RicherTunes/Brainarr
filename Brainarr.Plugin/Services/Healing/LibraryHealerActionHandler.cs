@@ -51,7 +51,7 @@ public sealed class LibraryHealerActionHandler
                 persistedFindings = result.PersistedFindings,
                 truncated = result.Truncated,
                 nextAfterTrackFileId = result.NextAfterTrackFileId,
-                error = SanitizeString(result.ErrorMessage),
+                error = SanitizeMessageString(result.ErrorMessage),
             };
         }
         finally
@@ -107,16 +107,16 @@ public sealed class LibraryHealerActionHandler
     {
         return new
         {
-            id = SanitizeString(finding.Id),
+            id = SanitizeTokenString(finding.Id),
             trackFileId = finding.File.TrackFileId,
             artistId = finding.File.ArtistId,
             albumId = finding.File.AlbumId,
-            path = SanitizeString(finding.File.RedactedPath),
-            pathHash = SanitizeString(finding.File.PathHash),
+            path = SanitizePathDisplayString(finding.File.RedactedPath),
+            pathHash = SanitizeTokenString(finding.File.PathHash),
             size = finding.File.Size,
             modifiedUtc = finding.File.ModifiedUtc,
             label = finding.Label.ToString(),
-            reasons = finding.InternalReasonCodes.Select(SanitizeString).ToList(),
+            reasons = finding.InternalReasonCodes.Select(SanitizeTokenString).ToList(),
             observedAtUtc = finding.ObservedAtUtc,
             tagReader = ProjectTagReader(finding.TagReader),
             probe = finding.Probe is null ? null : ProjectProbe(finding.Probe),
@@ -129,8 +129,8 @@ public sealed class LibraryHealerActionHandler
             evidence.ReadAttempted,
             evidence.ReadSucceeded,
             evidence.DurationSeconds,
-            SanitizeString(evidence.ErrorType),
-            SanitizeString(evidence.ErrorMessage));
+            SanitizeTokenString(evidence.ErrorType),
+            SanitizeMessageString(evidence.ErrorMessage));
     }
 
     private static ProbeEvidence ProjectProbe(ProbeEvidence evidence)
@@ -139,21 +139,49 @@ public sealed class LibraryHealerActionHandler
             evidence.ProbeAttempted,
             evidence.ProbeSucceeded,
             evidence.DurationSeconds,
-            SanitizeString(evidence.Container),
-            SanitizeString(evidence.AudioCodec),
-            SanitizeString(evidence.ErrorType),
-            SanitizeString(evidence.ErrorMessage));
+            SanitizeTokenString(evidence.Container),
+            SanitizeTokenString(evidence.AudioCodec),
+            SanitizeTokenString(evidence.ErrorType),
+            SanitizeMessageString(evidence.ErrorMessage));
     }
 
     internal static string? SanitizeBoundaryString(string? value)
     {
-        var redacted = PathPrivacy.RedactMessage(value);
-        return ContainsLikelyPath(redacted) ? PathContainingValueRedaction : redacted;
+        return SanitizeMessageString(value);
     }
 
-    private static string? SanitizeString(string? value)
+    private static string? SanitizePathDisplayString(string? value)
     {
-        return SanitizeBoundaryString(value);
+        return PathPrivacy.RedactDisplayPath(value);
+    }
+
+    private static string? SanitizeTokenString(string? value)
+    {
+        return ShouldRedactTokenMaterial(value)
+            ? PathContainingValueRedaction
+            : value;
+    }
+
+    private static string? SanitizeMessageString(string? value)
+    {
+        var redacted = PathPrivacy.RedactMessage(value);
+        return ContainsSensitiveMessagePathMaterial(value) || ContainsSensitiveMessagePathMaterial(redacted)
+            ? PathContainingValueRedaction
+            : redacted;
+    }
+
+    private static bool ShouldRedactTokenMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        var trimmed = value.Trim();
+        return ContainsLikelyPath(trimmed)
+            || HasDriveDesignator(trimmed)
+            || ContainsMediaExtension(trimmed)
+            || trimmed.Any(char.IsWhiteSpace);
     }
 
     private static bool ContainsLikelyPath(string? value)
@@ -169,6 +197,18 @@ public sealed class LibraryHealerActionHandler
             || HasUnixRoot(value);
     }
 
+    private static bool ContainsSensitiveMessagePathMaterial(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return false;
+        }
+
+        return ContainsLikelyPath(value)
+            || HasDriveDesignator(value)
+            || ContainsMediaExtension(value);
+    }
+
     private static bool HasWindowsRoot(string value)
     {
         for (var i = 0; i + 2 < value.Length; i++)
@@ -182,6 +222,42 @@ public sealed class LibraryHealerActionHandler
         }
 
         return false;
+    }
+
+    private static bool HasDriveDesignator(string value)
+    {
+        for (var i = 0; i + 1 < value.Length; i++)
+        {
+            if (char.IsLetter(value[i]) && value[i + 1] == ':')
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static bool ContainsMediaExtension(string value)
+    {
+        var mediaExtensions = new[]
+        {
+            ".aac",
+            ".aif",
+            ".aiff",
+            ".alac",
+            ".ape",
+            ".flac",
+            ".m4a",
+            ".mka",
+            ".mp3",
+            ".mp4",
+            ".ogg",
+            ".opus",
+            ".wav",
+            ".wv",
+        };
+
+        return mediaExtensions.Any(extension => value.Contains(extension, StringComparison.OrdinalIgnoreCase));
     }
 
     private static bool HasUnixRoot(string value)

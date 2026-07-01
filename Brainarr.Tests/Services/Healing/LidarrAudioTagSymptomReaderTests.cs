@@ -49,19 +49,37 @@ public class LidarrAudioTagSymptomReaderTests
     [Fact]
     public void Read_ShouldReturnTimeoutEvidence_WhenLidarrReaderHangsPastTimeout()
     {
+        using var releaseRead = new ManualResetEventSlim(false);
+        using var readFinished = new ManualResetEventSlim(false);
         var audio = new Mock<IAudioTagService>();
         audio.Setup(x => x.ReadTags("slow.flac"))
             .Returns(() =>
             {
-                Thread.Sleep(250);
-                return new ParsedTrackInfo
+                try
                 {
-                    Duration = TimeSpan.FromSeconds(245)
-                };
+                    releaseRead.Wait();
+                    return new ParsedTrackInfo
+                    {
+                        Duration = TimeSpan.FromSeconds(245)
+                    };
+                }
+                finally
+                {
+                    readFinished.Set();
+                }
             });
 
-        var result = new LidarrAudioTagSymptomReader(audio.Object, TimeSpan.FromMilliseconds(25))
-            .Read("slow.flac", CancellationToken.None);
+        TagReaderEvidence result;
+        try
+        {
+            result = new LidarrAudioTagSymptomReader(audio.Object, TimeSpan.FromMilliseconds(25))
+                .Read("slow.flac", CancellationToken.None);
+        }
+        finally
+        {
+            releaseRead.Set();
+            readFinished.Wait(TimeSpan.FromSeconds(2));
+        }
 
         result.ReadAttempted.Should().BeTrue();
         result.ReadSucceeded.Should().BeFalse();
@@ -73,7 +91,6 @@ public class LidarrAudioTagSymptomReaderTests
     public async Task Read_ShouldNotStartSecondLidarrRead_WhenFirstTimedOutReadIsStillRunning()
     {
         var releaseRead = new ManualResetEventSlim(false);
-        var firstReadStarted = new ManualResetEventSlim(false);
         var firstReadFinished = new ManualResetEventSlim(false);
         var readAttempts = 0;
         var audio = new Mock<IAudioTagService>();
@@ -83,7 +100,6 @@ public class LidarrAudioTagSymptomReaderTests
                 var attempt = Interlocked.Increment(ref readAttempts);
                 if (attempt == 1)
                 {
-                    firstReadStarted.Set();
                     try
                     {
                         releaseRead.Wait();
@@ -105,9 +121,11 @@ public class LidarrAudioTagSymptomReaderTests
 
         try
         {
-            firstReadTask = Task.Run(() => reader.Read("first.flac", CancellationToken.None));
-            firstReadStarted.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
-
+            firstReadTask = Task.Factory.StartNew(
+                () => reader.Read("first.flac", CancellationToken.None),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
             var firstResult = await firstReadTask.WaitAsync(TimeSpan.FromSeconds(2));
             firstResult.ReadSucceeded.Should().BeFalse();
             firstResult.ErrorType.Should().Be(nameof(TimeoutException));
@@ -115,7 +133,10 @@ public class LidarrAudioTagSymptomReaderTests
             var secondResult = reader.Read("second.flac", CancellationToken.None);
 
             secondResult.ReadSucceeded.Should().BeFalse();
-            secondResult.ErrorType.Should().Be(nameof(TimeoutException));
+            secondResult.ErrorType.Should().Be("TagReaderBusyException");
+            secondResult.ErrorMessage.Should().Contain("busy");
+            releaseRead.Set();
+            firstReadFinished.Wait(TimeSpan.FromSeconds(2)).Should().BeTrue();
             Volatile.Read(ref readAttempts).Should().Be(1);
             audio.Verify(x => x.ReadTags(It.IsAny<string>()), Times.Once);
         }
@@ -124,7 +145,6 @@ public class LidarrAudioTagSymptomReaderTests
             releaseRead.Set();
             firstReadFinished.Wait(TimeSpan.FromSeconds(2));
             releaseRead.Dispose();
-            firstReadStarted.Dispose();
             firstReadFinished.Dispose();
             if (firstReadTask is { IsCompleted: false })
             {
@@ -136,19 +156,37 @@ public class LidarrAudioTagSymptomReaderTests
     [Fact]
     public void Read_ShouldUsePreciseTimeoutEvidence_WhenWaitingForLidarrReaderTimesOut()
     {
+        using var releaseRead = new ManualResetEventSlim(false);
+        using var readFinished = new ManualResetEventSlim(false);
         var audio = new Mock<IAudioTagService>();
         audio.Setup(x => x.ReadTags("slow.flac"))
             .Returns(() =>
             {
-                Thread.Sleep(250);
-                return new ParsedTrackInfo
+                try
                 {
-                    Duration = TimeSpan.FromSeconds(245)
-                };
+                    releaseRead.Wait();
+                    return new ParsedTrackInfo
+                    {
+                        Duration = TimeSpan.FromSeconds(245)
+                    };
+                }
+                finally
+                {
+                    readFinished.Set();
+                }
             });
 
-        var result = new LidarrAudioTagSymptomReader(audio.Object, TimeSpan.FromMilliseconds(25))
-            .Read("slow.flac", CancellationToken.None);
+        TagReaderEvidence result;
+        try
+        {
+            result = new LidarrAudioTagSymptomReader(audio.Object, TimeSpan.FromMilliseconds(25))
+                .Read("slow.flac", CancellationToken.None);
+        }
+        finally
+        {
+            releaseRead.Set();
+            readFinished.Wait(TimeSpan.FromSeconds(2));
+        }
 
         result.ErrorType.Should().Be(nameof(TimeoutException));
         result.ErrorMessage.Should().Be("Timed out waiting for Lidarr audio tag reader");

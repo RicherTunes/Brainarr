@@ -374,6 +374,134 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldRedactUntrustedStoredFilenameLikeFindingPayloads()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string safeRedactedPath = "track01.flac#abcdef123456";
+        const string rawFilenameLikeValue = "Private Artist - Private Album - track01.flac";
+        const string rawDriveLikeValue = "D:Private Artist track02.m4a";
+        var finding = new LibraryHealerFinding(
+            rawFilenameLikeValue,
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: safeRedactedPath,
+                PathHash: rawFilenameLikeValue,
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_ZERO_DURATION", rawFilenameLikeValue },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: rawFilenameLikeValue,
+                ErrorMessage: "failed reading " + rawFilenameLikeValue),
+            new ProbeEvidence(
+                ProbeAttempted: true,
+                ProbeSucceeded: false,
+                DurationSeconds: null,
+                Container: rawDriveLikeValue,
+                AudioCodec: rawFilenameLikeValue,
+                ErrorType: rawDriveLikeValue,
+                ErrorMessage: "probe failed " + rawDriveLikeValue),
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain(safeRedactedPath);
+        json.Should().NotContain(rawFilenameLikeValue);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        json.Should().NotContain("D:Private");
+        json.Should().NotContain("track02.m4a");
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldRedactUntrustedStoredFilenameLikeRedactedPath()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawFilenameLikeValue = "Private Artist - Private Album - track01.flac";
+        var finding = new LibraryHealerFinding(
+            "safe-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: rawFilenameLikeValue,
+                PathHash: "callerhash001",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_ZERO_DURATION" },
+            new TagReaderEvidence(true, true, 0, null, null),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("track01.flac#" + PathPrivacy.HashPath(rawFilenameLikeValue));
+        json.Should().NotContain(rawFilenameLikeValue);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain("Private Album");
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
+    public void HandleAction_ShouldRedactPathMaterialBeforeExistingDisplayHash()
+    {
+        var providerFactory = new Mock<IProviderFactory>(MockBehavior.Strict);
+        var providerInvoker = new Mock<IProviderInvoker>(MockBehavior.Strict);
+        var promptBuilder = new Mock<ILibraryAwarePromptBuilder>(MockBehavior.Strict);
+        const string rawDisplayPath = @"D:\Music\Private Artist\Album\track01.flac#abcdef123456";
+        var finding = new LibraryHealerFinding(
+            "safe-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 99,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: rawDisplayPath,
+                PathHash: "callerhash001",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_ZERO_DURATION" },
+            new TagReaderEvidence(true, true, 0, null, null),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
+        var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
+
+        var result = orchestrator.HandleAction("healer/getfindings", new Dictionary<string, string>(), new BrainarrSettings());
+        var json = JsonSerializer.Serialize(result);
+
+        json.Should().Contain("track01.flac#abcdef123456");
+        json.Should().NotContain(rawDisplayPath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain(@"D:\\Music");
+        providerFactory.VerifyNoOtherCalls();
+        providerInvoker.VerifyNoOtherCalls();
+        promptBuilder.VerifyNoOtherCalls();
+    }
+
+    [Fact]
     public void HandleAction_ShouldDefaultMalformedHealerScanQueryValues()
     {
         var scanRunner = new Mock<ILibraryHealerScanRunner>(MockBehavior.Strict);

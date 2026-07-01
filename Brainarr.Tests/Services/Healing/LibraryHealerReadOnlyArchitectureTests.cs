@@ -63,12 +63,11 @@ public class LibraryHealerReadOnlyArchitectureTests
         var orchestrator = Path.Combine(root, "Brainarr.Plugin", "Services", "Core", "BrainarrOrchestrator.cs");
         var source = File.ReadAllText(orchestrator);
         var healerBranchStart = source.IndexOf("if (isHealerAction)", StringComparison.Ordinal);
-        var providerBranchStart = source.IndexOf("try", healerBranchStart, StringComparison.Ordinal);
 
         healerBranchStart.Should().BeGreaterThanOrEqualTo(0);
-        providerBranchStart.Should().BeGreaterThan(healerBranchStart);
 
-        var healerRoutingSource = source.Substring(healerBranchStart, providerBranchStart - healerBranchStart);
+        var healerRoutingSource = ExtractBlock(source, healerBranchStart);
+        healerRoutingSource.Should().Contain("_healerActionHandler.Handle");
         var offenders = ForbiddenMutationOrDecisioningTokens
             .Where(token => healerRoutingSource.Contains(token, StringComparison.Ordinal))
             .ToList();
@@ -184,5 +183,30 @@ public class LibraryHealerReadOnlyArchitectureTests
         }
 
         return dir?.FullName ?? throw new DirectoryNotFoundException("Brainarr.sln not found");
+    }
+
+    private static string ExtractBlock(string source, int statementStart)
+    {
+        var bodyStart = source.IndexOf('{', statementStart);
+        bodyStart.Should().BeGreaterThan(statementStart);
+
+        var depth = 0;
+        for (var i = bodyStart; i < source.Length; i++)
+        {
+            if (source[i] == '{')
+            {
+                depth++;
+            }
+            else if (source[i] == '}')
+            {
+                depth--;
+                if (depth == 0)
+                {
+                    return source.Substring(statementStart, i - statementStart + 1);
+                }
+            }
+        }
+
+        throw new InvalidOperationException("Could not extract healer routing block");
     }
 }

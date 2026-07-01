@@ -76,6 +76,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var availableTrackFiles = 0;
         var scannedTrackFiles = 0;
         var persistedFindings = 0;
+        var findings = new List<LibraryHealerFinding>();
 
         try
         {
@@ -83,14 +84,14 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
 
             var artistIds = GetArtistIds(scanRequest.ArtistId);
             totalArtists = artistIds.Count;
-            var candidates = GatherCandidates(artistIds, cancellationToken)
-                .Where(candidate => !scanRequest.AfterTrackFileId.HasValue
-                    || candidate.TrackFile.Id > scanRequest.AfterTrackFileId.Value)
-                .OrderBy(candidate => candidate.TrackFile.Id)
-                .ToList();
+            var targetCandidateCount = scanRequest.ArtistId.HasValue ? maxFiles + 1 : int.MaxValue;
+            var candidates = GatherCandidates(
+                artistIds,
+                scanRequest.AfterTrackFileId,
+                targetCandidateCount,
+                cancellationToken);
 
             availableTrackFiles = candidates.Count;
-            var findings = new List<LibraryHealerFinding>();
             int? lastScannedTrackFileId = null;
 
             foreach (var candidate in candidates)
@@ -106,7 +107,31 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                     break;
                 }
 
-                var finding = ScanCandidate(candidate, cancellationToken);
+                LibraryHealerFinding? finding;
+                try
+                {
+                    finding = ScanCandidate(candidate, cancellationToken);
+                }
+                catch (ReaderBusyException ex)
+                {
+                    if (findings.Count > 0)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        _findingStore.SaveBatch(findings);
+                        persistedFindings = findings.Count;
+                    }
+
+                    return new LibraryHealerScanResult(
+                        LibraryHealerScanStatus.Failed,
+                        totalArtists,
+                        availableTrackFiles,
+                        scannedTrackFiles,
+                        persistedFindings,
+                        false,
+                        null,
+                        PathPrivacy.RedactMessage(ex.Message) ?? ex.GetType().Name);
+                }
+
                 scannedTrackFiles++;
                 lastScannedTrackFileId = candidate.TrackFile.Id;
                 if (finding is not null)
@@ -163,20 +188,35 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             .ToList();
     }
 
-    private List<Candidate> GatherCandidates(IReadOnlyCollection<int> artistIds, CancellationToken cancellationToken)
+    private List<Candidate> GatherCandidates(
+        IReadOnlyCollection<int> artistIds,
+        int? afterTrackFileId,
+        int targetCandidateCount,
+        CancellationToken cancellationToken)
     {
         var candidates = new List<Candidate>();
         foreach (var artistId in artistIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var files = _mediaFileService.GetFilesByArtist(artistId) ?? new List<TrackFile>();
-            foreach (var trackFile in files.Where(static file => file is not null))
+            foreach (var trackFile in files
+                .Where(static file => file is not null)
+                .Where(file => !afterTrackFileId.HasValue || file.Id > afterTrackFileId.Value)
+                .OrderBy(static file => file.Id))
             {
                 candidates.Add(new Candidate(artistId, trackFile));
+                if (candidates.Count >= targetCandidateCount)
+                {
+                    return candidates
+                        .OrderBy(static candidate => candidate.TrackFile.Id)
+                        .ToList();
+                }
             }
         }
 
-        return candidates;
+        return candidates
+            .OrderBy(static candidate => candidate.TrackFile.Id)
+            .ToList();
     }
 
     private LibraryHealerFinding? ScanCandidate(Candidate candidate, CancellationToken cancellationToken)
@@ -188,6 +228,11 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         if (IsCancellationEvidence(tagReader))
         {
             throw new OperationCanceledException("Canceled reading audio tags");
+        }
+
+        if (IsReaderBusyEvidence(tagReader))
+        {
+            throw new ReaderBusyException(tagReader.ErrorMessage ?? "Lidarr audio tag reader is busy");
         }
 
         var classification = LibraryHealerClassifier.Classify(tagReader, null);
@@ -224,6 +269,14 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             || IsCancellationType(tagReader.ErrorType, typeof(TaskCanceledException).FullName);
     }
 
+    private static bool IsReaderBusyEvidence(TagReaderEvidence tagReader)
+    {
+        return string.Equals(
+            tagReader.ErrorType,
+            LidarrAudioTagSymptomReader.ReaderBusyErrorType,
+            StringComparison.Ordinal);
+    }
+
     private static bool IsCancellationType(string? actual, string? expected)
     {
         return !string.IsNullOrWhiteSpace(expected)
@@ -231,4 +284,12 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
     }
 
     private sealed record Candidate(int ArtistId, TrackFile TrackFile);
+
+    private sealed class ReaderBusyException : Exception
+    {
+        public ReaderBusyException(string message)
+            : base(message)
+        {
+        }
+    }
 }
