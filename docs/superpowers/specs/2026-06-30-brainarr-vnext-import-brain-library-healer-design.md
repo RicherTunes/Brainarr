@@ -628,7 +628,12 @@ Reviewers must challenge the design and implementation with these questions:
    - Expose exhaustive summary counts by workflow, risk, workflow-by-risk, authorization, and blocked reason.
    - Prove no treatment candidate has execution authorization in A2.
 
-7. Milestone A3: repair dry-run then opt-in repair
+7. Milestone A2.5: read-only hardening and operator tooling
+   - Pull from `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`.
+   - Prioritize finding revalidation, redacted evidence export, triage queues, read-only probe collection, fixture truth tables, storage/root health audit, and batch policy simulation.
+   - Keep all tools read-only over media files and Lidarr state unless a later milestone explicitly defines execution authorization.
+
+8. Milestone A3: repair dry-run then opt-in repair
    - Requires A1 telemetry and fixture confidence.
    - Consumes A2 `repairDryRunCandidate` plans as input only.
    - Defines a separate dry-run verification contract before creating temp outputs.
@@ -636,12 +641,12 @@ Reviewers must challenge the design and implementation with these questions:
    - Requires rollback guide before implementation.
    - Requires ffmpeg availability strategy.
 
-8. Milestone A4: reacquire orchestration
+9. Milestone A4: reacquire orchestration
    - Consumes only unrecoverable/high-risk candidates with decode evidence.
    - Requires recycle bin configuration, album-wide scope disclosure, and Lidarr search dry-run evidence.
    - Defines its own execution authorization contract and cannot inherit A2 authorization.
 
-9. Milestone B: Import Brain
+10. Milestone B: Import Brain
    - Separate spec refinement.
    - Separate implementation plan.
    - AI adjudication only after deterministic prefilter and safety gate contracts are tested.
