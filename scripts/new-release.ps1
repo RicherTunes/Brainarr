@@ -236,7 +236,7 @@ Write-Host ""
 Write-Host "📦 Release Status:" -ForegroundColor Blue
 Write-Host "  ✅ Tag pushed to origin"
 Write-Host "  ✅ Local package/checksum generation completed before tagging"
-Write-Host "  ℹ️  Brainarr has no GitHub mirror workflow or tag-triggered release workflow"
+Write-Host "  ℹ️  Brainarr has a guarded GitHub CI mirror, but no tag-triggered release workflow"
 Write-Host "  📌 Publish/update release notes and assets manually from the local artifacts"
 Write-Host ""
 
