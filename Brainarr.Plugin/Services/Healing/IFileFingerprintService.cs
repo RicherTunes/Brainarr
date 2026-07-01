@@ -11,7 +11,7 @@ public sealed record FileExistenceEvidence(
 
 public interface IFileFingerprintService
 {
-    FileExistenceEvidence CheckExists(string path, CancellationToken cancellationToken);
+    FileExistenceEvidence CheckExists(string path, TimeSpan timeout, CancellationToken cancellationToken);
 
     FileFingerprint Read(string path);
 }

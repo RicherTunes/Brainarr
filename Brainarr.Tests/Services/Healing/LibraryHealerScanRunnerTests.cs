@@ -160,7 +160,7 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
-    public void Scan_ShouldPersistTimedOutPathProbeForHumanReview_WhenCancellationFiresDuringExistenceCheck()
+    public void Scan_ShouldThrowAndNotPersist_WhenCancellationFiresDuringExistenceCheck()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
         var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
@@ -182,23 +182,15 @@ public sealed class LibraryHealerScanRunnerTests
             nameof(TimeoutException),
             "Timed out checking file existence");
 
-        var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
             .Scan(new LibraryHealerScanRequest(MaxSeconds: 1), cancellation.Token);
 
-        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
-        result.AvailableTrackFiles.Should().Be(1);
-        result.ScannedTrackFiles.Should().Be(1);
-        result.PersistedFindings.Should().Be(1);
-        result.ErrorMessage.Should().BeNull();
+        act.Should().Throw<OperationCanceledException>()
+            .WithMessage("Library healer scan was canceled");
         tagReader.Paths.Should().BeEmpty();
         fingerprints.Paths.Should().BeEmpty();
         fingerprints.ExistenceTokens.Should().ContainSingle().Which.Should().Be(cancellation.Token);
-
-        var finding = store.AllSaved.Should().ContainSingle().Subject;
-        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
-        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
-        finding.InternalReasonCodes.Should().Contain(nameof(TimeoutException));
-        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+        store.AllSaved.Should().BeEmpty();
     }
     [Fact]
     public void Scan_ShouldRecordInconclusivePathProbeForHumanReviewWithoutReadingTagsOrFingerprint()
@@ -957,6 +949,7 @@ public sealed class LibraryHealerScanRunnerTests
 
         public List<string> ExistencePaths { get; } = new();
 
+        public List<TimeSpan> ExistenceTimeouts { get; } = new();
 
         public List<CancellationToken> ExistenceTokens { get; } = new();
 
@@ -965,9 +958,10 @@ public sealed class LibraryHealerScanRunnerTests
         public Action? AfterRead { get; set; }
         public Action? OnCheckExists { get; set; }
 
-        public FileExistenceEvidence CheckExists(string path, CancellationToken cancellationToken)
+        public FileExistenceEvidence CheckExists(string path, TimeSpan timeout, CancellationToken cancellationToken)
         {
             ExistencePaths.Add(path);
+            ExistenceTimeouts.Add(timeout);
             ExistenceTokens.Add(cancellationToken);
             OnCheckExists?.Invoke();
             if (ExistenceResponses.TryGetValue(path, out var existence))
