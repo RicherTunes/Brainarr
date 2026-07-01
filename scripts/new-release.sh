@@ -212,7 +212,7 @@ echo ""
 echo -e "${BLUE}📦 Release Status:${NC}"
 echo "  ✅ Tag pushed to origin"
 echo "  ✅ Local package/checksum generation completed before tagging"
-echo "  ℹ️  Brainarr has no GitHub mirror workflow or tag-triggered release workflow"
+echo "  ℹ️  Brainarr has a guarded GitHub CI mirror, but no tag-triggered release workflow"
 echo "  📌 Publish/update release notes and assets manually from the local artifacts"
 echo ""
 
