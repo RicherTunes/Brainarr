@@ -28,7 +28,7 @@ A1 cannot:
 ## Actions
 
 - `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
-- `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans.
+- `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans. It supports optional read-only triage filters: `workflow`, `risk`, `blockedReason`, and `authorized`. `workflow`, `risk`, and `blockedReason` accept comma-separated, case-insensitive values. Unknown treatment filter values are ignored; if no supplied values are recognized, that filter is not applied. `authorized` accepts `true` or `false`; malformed boolean values are ignored. Recognized filters apply before the output `limit`, and the `summary` describes only the returned filtered findings.
 - `healer/clearfindings`: clears Brainarr-owned findings.
 
 ## Safety Model
@@ -65,9 +65,13 @@ A2 adds a read-only treatment plan to each finding returned by `healer/getfindin
 
 A2 does not repair, retag, reacquire, rescan, delete, replace, import, run `ffmpeg`, or call AI providers. Its treatment plans are advisory evidence planning only; future mutating milestones must define separate authorization, preflight, journal, backup, and rollback contracts.
 
+## A2.5 Scope
+
+A2.5 begins with read-only triage filtering on `healer/getfindings`. The first filter slice lets operators narrow returned findings by treatment workflow, risk, blocked reason, and authorization state without changing stored findings, Lidarr state, media files, treatment-plan authorization, or scan behavior.
+
 ## Next Milestones
 
-A2.5 should harden the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, triage filters, probe collection, targeted decode verification, and fixture truth tables.
+A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, and fixture truth tables.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 

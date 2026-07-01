@@ -574,6 +574,27 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void GetAllRecent_ShouldReturnAllFindingsNewestFirst()
+    {
+        var store = CreateStore();
+        var start = new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc);
+        var findings = Enumerable.Range(0, 501)
+            .Select(i => CreateFinding(
+                id: "finding-" + i,
+                redactedPath: $"track{i:D3}.flac#hash{i:D3}",
+                pathHash: $"hash{i:D3}",
+                observedAtUtc: start.AddMinutes(i)))
+            .ToList();
+
+        store.SaveBatch(findings);
+
+        var persisted = store.GetAllRecent();
+
+        persisted.Should().HaveCount(501);
+        persisted.Select(f => f.Id).Take(3).Should().Equal("finding-500", "finding-499", "finding-498");
+    }
+
+    [Fact]
     public void Clear_ShouldRemovePersistedFindings()
     {
         var store = CreateStore();

@@ -14,6 +14,8 @@ public interface ILibraryHealerFindingStore
 
     IReadOnlyList<LibraryHealerFinding> GetRecent(int limit);
 
+    IReadOnlyList<LibraryHealerFinding> GetAllRecent();
+
     void Clear();
 }
 
@@ -68,9 +70,15 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
     public IReadOnlyList<LibraryHealerFinding> GetRecent(int limit)
     {
         var boundedLimit = Math.Clamp(limit, 1, MaxRecentLimit);
+        return GetAllRecent()
+            .Take(boundedLimit)
+            .ToList();
+    }
+
+    public IReadOnlyList<LibraryHealerFinding> GetAllRecent()
+    {
         return EnumerateAll()
             .OrderByDescending(static finding => finding.ObservedAtUtc)
-            .Take(boundedLimit)
             .ToList();
     }
 

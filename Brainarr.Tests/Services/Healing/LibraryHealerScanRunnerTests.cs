@@ -1163,6 +1163,11 @@ public sealed class LibraryHealerScanRunnerTests
             return AllSaved.Take(limit).ToList();
         }
 
+        public IReadOnlyList<LibraryHealerFinding> GetAllRecent()
+        {
+            return AllSaved.ToList();
+        }
+
         public void Clear()
         {
             AllSaved.Clear();

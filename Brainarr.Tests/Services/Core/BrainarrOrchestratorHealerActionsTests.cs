@@ -118,6 +118,190 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
+    public void HandleAction_ShouldFilterFindingsByTreatmentWorkflowAndSummarizeFilteredItems()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+            MetadataFinding("tag-repair", trackFileId: 3),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string> { ["workflow"] = HealerTreatmentVocab.Workflow.Review });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("id").GetString().Should().Be("review");
+        item.GetProperty("treatmentPlan").GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.Review);
+        var summary = document.RootElement.GetProperty("summary");
+        summary.GetProperty("total").GetInt32().Should().Be(1);
+        summary.GetProperty("byWorkflow").GetProperty(HealerTreatmentVocab.Workflow.Review).GetInt32().Should().Be(1);
+        summary.GetProperty("byWorkflow").TryGetProperty(HealerTreatmentVocab.Workflow.RepairDryRunCandidate, out _).Should().BeFalse();
+        summary.GetProperty("byRisk").GetProperty(HealerTreatmentVocab.Risk.High).GetInt32().Should().Be(1);
+        summary.GetProperty("authorization").GetProperty("unauthorized").GetInt32().Should().Be(1);
+        summary.GetProperty("blockedReasons").GetProperty(HealerTreatmentVocab.BlockedReason.HumanReviewRequired).GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldComposeRiskBlockedReasonAndAuthorizationFilters()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+            MetadataFinding("tag-repair", trackFileId: 3),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string>
+            {
+                ["risk"] = "MeDiUm",
+                ["blockedReason"] = HealerTreatmentVocab.BlockedReason.RepairDryRunNotImplemented.ToLowerInvariant(),
+                ["authorized"] = "FALSE",
+            });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("id").GetString().Should().Be("repair");
+        var summary = document.RootElement.GetProperty("summary");
+        summary.GetProperty("total").GetInt32().Should().Be(1);
+        summary.GetProperty("byWorkflow").GetProperty(HealerTreatmentVocab.Workflow.RepairDryRunCandidate).GetInt32().Should().Be(1);
+        summary.GetProperty("byRisk").GetProperty(HealerTreatmentVocab.Risk.Medium).GetInt32().Should().Be(1);
+        summary.GetProperty("blockedReasons").GetProperty(HealerTreatmentVocab.BlockedReason.RepairDryRunNotImplemented).GetInt32().Should().Be(1);
+        summary.GetProperty("authorization").GetProperty("authorized").GetInt32().Should().Be(0);
+        summary.GetProperty("authorization").GetProperty("unauthorized").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldSupportCommaSeparatedWorkflowAndBlockedReasonFilters()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+            MetadataFinding("tag-repair", trackFileId: 3),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string>
+            {
+                ["workflow"] = string.Join(",", HealerTreatmentVocab.Workflow.Review, HealerTreatmentVocab.Workflow.TagRepairCandidate),
+                ["blockedReason"] = string.Join(",", HealerTreatmentVocab.BlockedReason.HumanReviewRequired, HealerTreatmentVocab.BlockedReason.TagRepairNotImplemented),
+            });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var ids = document.RootElement.GetProperty("items")
+            .EnumerateArray()
+            .Select(item => item.GetProperty("id").GetString())
+            .ToArray();
+        ids.Should().BeEquivalentTo(new[] { "review", "tag-repair" });
+        document.RootElement.GetProperty("summary").GetProperty("total").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldApplyTreatmentFiltersBeforeLimit()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string>
+            {
+                ["workflow"] = HealerTreatmentVocab.Workflow.Review,
+                ["limit"] = "1",
+            });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        var item = document.RootElement.GetProperty("items").EnumerateArray().Should().ContainSingle().Subject;
+        item.GetProperty("id").GetString().Should().Be("review");
+        document.RootElement.GetProperty("summary").GetProperty("total").GetInt32().Should().Be(1);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldIgnoreUnknownTreatmentFilterValuesWithoutHidingFindings()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string>
+            {
+                ["workflow"] = "repair-dry-run-candidate",
+                ["risk"] = "medum",
+                ["blockedReason"] = "not-a-known-blocked-reason",
+            });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("items").EnumerateArray().Should().HaveCount(2);
+        document.RootElement.GetProperty("summary").GetProperty("total").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldReturnEmptySummary_WhenAuthorizedFilterHasNoMatches()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string> { ["authorized"] = "true" });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("items").EnumerateArray().Should().BeEmpty();
+        var summary = document.RootElement.GetProperty("summary");
+        summary.GetProperty("total").GetInt32().Should().Be(0);
+        summary.GetProperty("authorization").GetProperty("authorized").GetInt32().Should().Be(0);
+        summary.GetProperty("authorization").GetProperty("unauthorized").GetInt32().Should().Be(0);
+    }
+
+    [Fact]
+    public void HandleAction_ShouldIgnoreMalformedAuthorizedFilterWithoutHidingFindings()
+    {
+        var store = new FakeFindingStore(new[]
+        {
+            Finding("repair", trackFileId: 1, label: LibraryHealerLabel.TagReaderSymptom),
+            Finding("review", trackFileId: 2, label: LibraryHealerLabel.NeedsHumanReview),
+        });
+        var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), store);
+
+        var result = handler.Handle(
+            "healer/getfindings",
+            new Dictionary<string, string> { ["authorized"] = "not-a-bool" });
+        var json = JsonSerializer.Serialize(result);
+        using var document = JsonDocument.Parse(json);
+
+        document.RootElement.GetProperty("items").EnumerateArray().Should().HaveCount(2);
+        document.RootElement.GetProperty("summary").GetProperty("total").GetInt32().Should().Be(2);
+    }
+
+    [Fact]
     public void HandleAction_ShouldFailClosed_WhenStoredFindingShapeIsMalformed()
     {
         var malformed = new LibraryHealerFinding(
@@ -1192,6 +1376,42 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
     }
 
+    private static LibraryHealerFinding MetadataFinding(string id, int trackFileId)
+    {
+        return new LibraryHealerFinding(
+            id,
+            new LibraryHealerFileIdentity(
+                trackFileId,
+                ArtistId: 10,
+                AlbumId: 20,
+                RedactedPath: "metadata.flac#abc123",
+                PathHash: "abc123",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 6, 30, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagMetadataIssue,
+            new[]
+            {
+                "TAG_READER_DURATION_POSITIVE",
+                "TAG_METADATA_MISSING",
+                "TAG_MISSING_TITLE",
+                "TAG_MISSING_MUSICBRAINZID",
+            },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: true,
+                DurationSeconds: 245.2,
+                ErrorType: null,
+                ErrorMessage: null,
+                Metadata: new TagMetadataEvidence(
+                    TitlePresent: false,
+                    ArtistPresent: true,
+                    AlbumPresent: true,
+                    AnyMusicBrainzIdPresent: false,
+                    MissingFields: new[] { "title", "musicBrainzId" })),
+            null,
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+    }
+
     private static Task<object> RunOnDedicatedThread(Func<object> action)
     {
         var completion = new TaskCompletionSource<object>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -1251,6 +1471,16 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             }
 
             return _findings.Take(limit).ToList();
+        }
+
+        public IReadOnlyList<LibraryHealerFinding> GetAllRecent()
+        {
+            if (_getRecentException != null)
+            {
+                throw _getRecentException;
+            }
+
+            return _findings.ToList();
         }
 
         public void Clear()
