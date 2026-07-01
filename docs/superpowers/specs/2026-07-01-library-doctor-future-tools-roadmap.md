@@ -237,7 +237,7 @@ Highest-ROI additions to consider pulling forward after A2 projection conformanc
 The best near-term sequence is intentionally smaller than the full A2.5/C/A3 backlog and stays read-only until the synthetic mutation drills:
 
 1. Finish A2 projection conformance: treatment plans and summary counts in `healer/getfindings`.
-2. Evidence contract golden pack.
+2. Evidence contract golden pack; initial `healer/getfindings` projection and treatment-vocabulary snapshots are the first slice, and future slices should add fixtures as fields, workflows, exports, or AI review packets are introduced.
 3. Field sensitivity annotations.
 4. Finding revalidation loop.
 5. Classifier replay/regression bench.
