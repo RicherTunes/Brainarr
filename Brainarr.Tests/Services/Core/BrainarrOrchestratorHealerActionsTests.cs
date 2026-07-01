@@ -86,7 +86,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
         captured.AfterTrackFileId.Should().Be(11);
         captured.MaxFiles.Should().Be(500);
         captured.MaxSeconds.Should().Be(30);
-        capturedToken.CanBeCanceled.Should().BeFalse("maxSeconds is the runner's scan budget, not an action-level cancellation token");
+        capturedToken.CanBeCanceled.Should().BeFalse("maxSeconds is a cooperative scan budget, not an action-level timeout");
         json.Should().Contain("\"ok\":true");
         json.Should().Contain("\"nextAfterTrackFileId\":42");
         scanRunner.VerifyAll();

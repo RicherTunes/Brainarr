@@ -160,7 +160,7 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
-    public void Scan_ShouldThrowAndNotPersist_WhenCancellationFiresDuringExistenceCheck()
+    public void Scan_ShouldPersistTimedOutPathProbeAndThrow_WhenCancellationFiresDuringFinalExistenceCheck()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
         var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
@@ -190,45 +190,105 @@ public sealed class LibraryHealerScanRunnerTests
         tagReader.Paths.Should().BeEmpty();
         fingerprints.Paths.Should().BeEmpty();
         fingerprints.ExistenceTokens.Should().ContainSingle().Which.Should().Be(cancellation.Token);
-        store.AllSaved.Should().BeEmpty();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain(nameof(TimeoutException));
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
     }
 
     [Fact]
-    public void Scan_ShouldThrowAndNotPersist_WhenExternalCancellationPrecedesBudgetButProbeReturnsAfterBudget()
+    public void Scan_ShouldPersistMissingPathAndThrow_WhenCancellationFiresDuringExistenceCheck()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
         var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
         var tagReader = new RecordingTagReader();
         var fingerprints = new RecordingFingerprintService();
         var store = new RecordingFindingStore();
-        var slowPath = @"\\offline-nas\Music\Private Artist\external-cancel.flac";
+        var missingPath = @"D:\Music\Private Artist\missing-cancel.flac";
         using var cancellation = new CancellationTokenSource();
-        var elapsed = TimeSpan.Zero;
 
         artistService.Setup(x => x.GetAllArtists())
             .Returns(new List<Artist> { new() { Id = 1 } });
         mediaFileService.Setup(x => x.GetFilesByArtist(1))
-            .Returns(new List<TrackFile> { TrackFile(44, slowPath) });
-        fingerprints.OnCheckExists = () =>
-        {
-            cancellation.Cancel();
-            elapsed = TimeSpan.FromSeconds(1);
-        };
-        fingerprints.ExistenceResponses[slowPath] = new FileExistenceEvidence(
+            .Returns(new List<TrackFile> { TrackFile(44, missingPath) });
+        fingerprints.OnCheckExists = () => cancellation.Cancel();
+        fingerprints.ExistenceResponses[missingPath] = new FileExistenceEvidence(
+            true,
             true,
             false,
-            false,
-            nameof(OperationCanceledException),
-            "Canceled checking file existence");
+            null,
+            null);
 
-        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store, () => elapsed)
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
             .Scan(new LibraryHealerScanRequest(MaxSeconds: 1), cancellation.Token);
 
         act.Should().Throw<OperationCanceledException>()
             .WithMessage("Library healer scan was canceled");
         tagReader.Paths.Should().BeEmpty();
         fingerprints.Paths.Should().BeEmpty();
-        store.AllSaved.Should().BeEmpty();
+        fingerprints.ExistencePaths.Should().Equal(missingPath);
+        fingerprints.ExistenceTokens.Should().ContainSingle().Which.Should().Be(cancellation.Token);
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.File.TrackFileId.Should().Be(44);
+        finding.Label.Should().Be(LibraryHealerLabel.PathInconsistency);
+        finding.InternalReasonCodes.Should().Contain("FILE_MISSING");
+        finding.TagReader.ReadAttempted.Should().BeFalse();
+    }
+
+    [Fact]
+    public void Scan_ShouldPersistTimedOutPathProbeBeforeCancellationStopsNextCandidate()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var slowPath = @"\\offline-nas\Music\Private Artist\slow-cancel.flac";
+        var nextPath = @"D:\Music\Private Artist\next-track.flac";
+        using var cancellation = new CancellationTokenSource();
+        var checkCount = 0;
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile>
+            {
+                TrackFile(42, slowPath),
+                TrackFile(43, nextPath),
+            });
+        fingerprints.OnCheckExists = () =>
+        {
+            if (Interlocked.Increment(ref checkCount) == 1)
+            {
+                cancellation.Cancel();
+            }
+        };
+        fingerprints.ExistenceResponses[slowPath] = new FileExistenceEvidence(
+            true,
+            false,
+            false,
+            nameof(TimeoutException),
+            "Timed out checking file existence");
+        tagReader.Responses[nextPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan(new LibraryHealerScanRequest(MaxSeconds: 1), cancellation.Token);
+
+        act.Should().Throw<OperationCanceledException>()
+            .WithMessage("Library healer scan was canceled");
+        tagReader.Paths.Should().BeEmpty();
+        fingerprints.Paths.Should().BeEmpty();
+        fingerprints.ExistencePaths.Should().Equal(slowPath);
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.File.TrackFileId.Should().Be(42);
+        finding.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        finding.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        finding.InternalReasonCodes.Should().Contain(nameof(TimeoutException));
+        finding.InternalReasonCodes.Should().NotContain("FILE_MISSING");
     }
 
     [Fact]
@@ -734,6 +794,33 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
+    public void Scan_ShouldSanitizeStoreCancellationAndNotRetrySave()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore
+        {
+            ThrowOnSave = new OperationCanceledException(@"Canceled writing D:\Music\Private Artist\track01.m4a"),
+        };
+        var path = PathFor(1);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var act = () => CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store)
+            .Scan();
+
+        var exception = act.Should().Throw<OperationCanceledException>().Which;
+        exception.Message.Should().Be("Library healer scan was canceled");
+        store.SaveAttempts.Should().Be(1);
+    }
+
+    [Fact]
     public void Scan_ShouldThrowAndNotPersist_WhenTagReaderReturnsCancellationEvidence()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
@@ -988,19 +1075,17 @@ public sealed class LibraryHealerScanRunnerTests
 
         public List<string> ExistencePaths { get; } = new();
 
-        public List<TimeSpan> ExistenceTimeouts { get; } = new();
-
         public List<CancellationToken> ExistenceTokens { get; } = new();
 
         public List<string> Paths { get; } = new();
 
         public Action? AfterRead { get; set; }
+
         public Action? OnCheckExists { get; set; }
 
-        public FileExistenceEvidence CheckExists(string path, TimeSpan timeout, CancellationToken cancellationToken)
+        public FileExistenceEvidence CheckExists(string path, CancellationToken cancellationToken)
         {
             ExistencePaths.Add(path);
-            ExistenceTimeouts.Add(timeout);
             ExistenceTokens.Add(cancellationToken);
             OnCheckExists?.Invoke();
             if (ExistenceResponses.TryGetValue(path, out var existence))
@@ -1027,8 +1112,18 @@ public sealed class LibraryHealerScanRunnerTests
     {
         public List<LibraryHealerFinding> AllSaved { get; } = new();
 
+        public int SaveAttempts { get; private set; }
+
+        public Exception? ThrowOnSave { get; init; }
+
         public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
         {
+            SaveAttempts++;
+            if (ThrowOnSave is not null)
+            {
+                throw ThrowOnSave;
+            }
+
             AllSaved.AddRange(findings);
         }
 

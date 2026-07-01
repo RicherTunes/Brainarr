@@ -2,10 +2,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
 public sealed class FileFingerprintService : IFileFingerprintService
 {
-    private static readonly TimeSpan DefaultExistenceTimeout = TimeSpan.FromSeconds(5);
-
     private readonly Func<string, bool>? _existsProbe;
-    private readonly SemaphoreSlim _existsGate = new(1, 1);
 
     public FileFingerprintService()
     {
@@ -16,66 +13,16 @@ public sealed class FileFingerprintService : IFileFingerprintService
         _existsProbe = existsProbe ?? throw new ArgumentNullException(nameof(existsProbe));
     }
 
-    public FileExistenceEvidence CheckExists(string path, TimeSpan timeout, CancellationToken cancellationToken)
+    public FileExistenceEvidence CheckExists(string path, CancellationToken cancellationToken)
     {
         if (cancellationToken.IsCancellationRequested)
         {
             return Unknown(nameof(OperationCanceledException), "Canceled checking file existence");
         }
 
-        var boundedTimeout = NormalizeTimeout(timeout);
-        if (boundedTimeout == TimeSpan.Zero)
-        {
-            return TimeoutEvidence();
-        }
-
         try
         {
-            if (!_existsGate.Wait(boundedTimeout, cancellationToken))
-            {
-                return TimeoutEvidence();
-            }
-
-            var releaseInTask = false;
-            try
-            {
-                var existsTask = Task.Factory.StartNew(
-                    () =>
-                    {
-                        try
-                        {
-                            return ProbePath(path);
-                        }
-                        catch (Exception ex)
-                        {
-                            return Unknown(ReasonCodeFor(ex), PathPrivacy.RedactMessage(ex.Message, path));
-                        }
-                        finally
-                        {
-                            _existsGate.Release();
-                        }
-                    },
-                    CancellationToken.None,
-                    TaskCreationOptions.LongRunning,
-                    TaskScheduler.Default);
-                releaseInTask = true;
-
-                return existsTask
-                    .WaitAsync(boundedTimeout, cancellationToken)
-                    .GetAwaiter()
-                    .GetResult();
-            }
-            finally
-            {
-                if (!releaseInTask)
-                {
-                    _existsGate.Release();
-                }
-            }
-        }
-        catch (TimeoutException)
-        {
-            return TimeoutEvidence();
+            return ProbePath(path);
         }
         catch (OperationCanceledException)
         {
@@ -91,7 +38,7 @@ public sealed class FileFingerprintService : IFileFingerprintService
     {
         try
         {
-            var existence = CheckExists(path, DefaultExistenceTimeout, CancellationToken.None);
+            var existence = CheckExists(path, CancellationToken.None);
             if (!existence.CheckSucceeded || !existence.Exists)
             {
                 return Missing();
@@ -173,21 +120,6 @@ public sealed class FileFingerprintService : IFileFingerprintService
     private static FileExistenceEvidence Unknown(string? errorType, string? errorMessage)
     {
         return new FileExistenceEvidence(true, false, false, errorType, errorMessage);
-    }
-
-    private static FileExistenceEvidence TimeoutEvidence()
-    {
-        return Unknown(nameof(TimeoutException), "Timed out checking file existence");
-    }
-
-    private static TimeSpan NormalizeTimeout(TimeSpan timeout)
-    {
-        if (timeout == Timeout.InfiniteTimeSpan)
-        {
-            return timeout;
-        }
-
-        return timeout > TimeSpan.Zero ? timeout : TimeSpan.Zero;
     }
 
     private static string ReasonCodeFor(Exception ex)
