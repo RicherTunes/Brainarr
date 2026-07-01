@@ -28,14 +28,14 @@ A1 cannot:
 ## Actions
 
 - `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
-- `healer/getfindings`: returns recent findings with redacted paths.
+- `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans.
 - `healer/clearfindings`: clears Brainarr-owned findings.
 
 ## Safety Model
 
-The A1 implementation is intentionally diagnostic. It includes architecture tests that block references to Lidarr mutation APIs, command queue actions, and media file mutation operations from the healing subsystem.
+The A1/A2 implementation is intentionally diagnostic. It includes architecture tests that block references to Lidarr mutation APIs, command queue actions, and media file mutation operations from the healing subsystem.
 
-The default A1 scan does not contact AI providers and does not use external media tooling. It only reads Lidarr-managed file metadata, records Brainarr-owned diagnostic evidence, and leaves remediation decisions for later milestones.
+The default scan and A2 triage projection do not contact AI providers and do not use external media tooling. They only read Lidarr-managed file metadata, record Brainarr-owned diagnostic evidence, and return advisory treatment plans for later milestones.
 
 ## Path Privacy
 
@@ -44,6 +44,8 @@ Default action output returns `basename#hash`, where `hash` is the first 12 hex 
 The persisted finding store uses the same redacted path shape for shareable evidence. Raw media paths may be read in process to open the file, but A1 should not persist them in diagnostic records.
 
 A1 sanitizes path-like values at both the store boundary and the action boundary. This includes stale or hand-edited values that already look like `name#hash` but still contain Windows, UNC, or relative path material before the hash.
+
+The A2 action projection treats persisted findings as tainted input. Suspicious single-token metadata or command-like strings are redacted from output evidence, generic reader/probe exception messages are replaced with a fixed redaction token, and malformed stored records are surfaced consistently as `NeedsHumanReview` with `MALFORMED_FINDING_RECORD`.
 
 ## Scan Behavior
 
@@ -57,12 +59,18 @@ The action's `maxSeconds` value is enforced through the runner's bounded operati
 
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
+## A2 Scope
+
+A2 adds a read-only treatment plan to each finding returned by `healer/getfindings`. The plan includes `candidateWorkflow`, confidence, risk, freshness, fixed blocked reasons, required evidence, required policy gates, rationale codes, and `executionAuthorization.authorized=false`. The response `summary` counts workflows, risks, workflow-by-risk, authorization state, and all non-zero blocked reasons for the returned findings.
+
+A2 does not repair, retag, reacquire, rescan, delete, replace, import, run `ffmpeg`, or call AI providers. Its treatment plans are advisory evidence planning only; future mutating milestones must define separate authorization, preflight, journal, backup, and rollback contracts.
+
 ## Next Milestones
 
-A2 is planned as a read-only triage and evidence-planning layer. It should add a deterministic treatment plan to each finding, including the candidate workflow, confidence, risk, blocked reasons, required evidence, required policy gates, and an explicit `executionAuthorization.authorized=false` result for every treatment. A2 must not repair, retag, reacquire, rescan, delete, replace, import, or call AI providers.
+A2.5 should harden the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, triage filters, probe collection, targeted decode verification, and fixture truth tables.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
 A4 may add reacquire orchestration for genuinely unrecoverable files only after decode evidence, album-wide scope disclosure, recycle-bin configuration, and Lidarr search dry-run behavior are tested. A4 must also define a separate execution authorization contract.
 
-The longer-term scored backlog lives in `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`. The next pulls should finish A2 projection conformance first, then add read-only hardening tools such as revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, state diffing, storage/root health audits, host conformance, redaction verification, triage filters, probe collection, targeted decode verification, and fixture truth tables.
+The longer-term scored backlog lives in `docs/superpowers/specs/2026-07-01-library-doctor-future-tools-roadmap.md`.
