@@ -53,4 +53,26 @@ public class LibraryHealerClassifierTests
         result.InternalReasonCodes.Should().Contain("TAG_READER_FAILED");
         result.InternalReasonCodes.Should().Contain("PROBE_FAILED");
     }
+
+    [Fact]
+    public void ClassifyFileExistence_ShouldReturnPathInconsistency_WhenFileIsConfirmedMissing()
+    {
+        var result = LibraryHealerClassifier.ClassifyFileExistence(
+            new FileExistenceEvidence(true, true, false, null, null));
+
+        result.Label.Should().Be(LibraryHealerLabel.PathInconsistency);
+        result.InternalReasonCodes.Should().Contain("FILE_MISSING");
+    }
+
+    [Fact]
+    public void ClassifyFileExistence_ShouldReturnNeedsHumanReview_WhenProbeIsInconclusive()
+    {
+        var result = LibraryHealerClassifier.ClassifyFileExistence(
+            new FileExistenceEvidence(true, false, false, "PATH_ACCESS_DENIED", "Access denied"));
+
+        result.Label.Should().Be(LibraryHealerLabel.NeedsHumanReview);
+        result.InternalReasonCodes.Should().Contain("PATH_PROBE_INCONCLUSIVE");
+        result.InternalReasonCodes.Should().Contain("PATH_ACCESS_DENIED");
+        result.InternalReasonCodes.Should().NotContain("FILE_MISSING");
+    }
 }

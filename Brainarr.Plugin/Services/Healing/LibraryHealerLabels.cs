@@ -5,7 +5,8 @@ public enum LibraryHealerLabel
     FalsePositive = 0,
     TagReaderSymptom = 1,
     ProbeEvidence = 2,
-    NeedsHumanReview = 3
+    NeedsHumanReview = 3,
+    PathInconsistency = 4
 }
 
 public enum LibraryHealerEvidenceKind

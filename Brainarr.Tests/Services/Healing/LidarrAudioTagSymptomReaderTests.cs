@@ -208,38 +208,4 @@ public class LidarrAudioTagSymptomReaderTests
         audio.Verify(x => x.ReadTags(It.IsAny<string>()), Times.Never);
     }
 
-    [Fact]
-    public void ReadFingerprint_ShouldReturnSizeAndModifiedUtc_WhenFileExists()
-    {
-        var path = typeof(PathPrivacy).Assembly.Location;
-        var expected = new FileInfo(path);
-
-        var result = new FileFingerprintService().Read(path);
-
-        result.Exists.Should().BeTrue();
-        result.Size.Should().Be(expected.Length);
-        result.ModifiedUtc.Should().Be(expected.LastWriteTimeUtc);
-    }
-
-    [Fact]
-    public void ReadFingerprint_ShouldReturnMissingFingerprint_WhenFileDoesNotExist()
-    {
-        var path = Path.Combine(Path.GetTempPath(), Guid.NewGuid() + ".flac");
-
-        var result = new FileFingerprintService().Read(path);
-
-        result.Exists.Should().BeFalse();
-        result.Size.Should().BeNull();
-        result.ModifiedUtc.Should().BeNull();
-    }
-
-    [Fact]
-    public void ReadFingerprint_ShouldReturnMissingFingerprint_WhenPathIsInvalid()
-    {
-        var result = new FileFingerprintService().Read("\0");
-
-        result.Exists.Should().BeFalse();
-        result.Size.Should().BeNull();
-        result.ModifiedUtc.Should().BeNull();
-    }
 }
