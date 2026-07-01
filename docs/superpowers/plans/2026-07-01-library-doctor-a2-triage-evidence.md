@@ -53,6 +53,12 @@ Use this Lidarr path in commands unless the local environment changes:
 $lidarrPath = "C:\R\Alex\github\brainarr\ext\Lidarr\_output\net8.0"
 ```
 
+On Windows worktrees, run focused `dotnet test` commands serially to avoid Common submodule intermediate-output file locks:
+
+```powershell
+-m:1 -p:BuildInParallel=false -p:UseSharedCompilation=false
+```
+
 ---
 
 ### Task 1: Treatment Plan Contract And First Advisor Rules
