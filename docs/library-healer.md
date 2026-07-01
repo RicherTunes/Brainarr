@@ -59,4 +59,8 @@ If the tag reader reports a busy state after an earlier timed-out read, A1 fails
 
 ## Next Milestones
 
-A2 may add richer probe evidence. A3 may add lossless repair-in-place only after a separate design review, crash-recovery journal, fixture matrix, and explicit opt-in.
+A2 is planned as a read-only triage and evidence-planning layer. It should add a deterministic treatment plan to each finding, including the candidate workflow, confidence, risk, blocked reasons, required evidence, required policy gates, and an explicit `executionAuthorization.authorized=false` result for every treatment. A2 must not repair, retag, reacquire, rescan, delete, replace, import, or call AI providers.
+
+A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
+
+A4 may add reacquire orchestration for genuinely unrecoverable files only after decode evidence, album-wide scope disclosure, recycle-bin configuration, and Lidarr search dry-run behavior are tested. A4 must also define a separate execution authorization contract.

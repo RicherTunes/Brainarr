@@ -222,7 +222,7 @@ Classifications:
 - `TagMetadataIssue`: Lidarr can read the file and duration, but core tags needed for reliable matching are missing or incomplete.
 - `TagReaderSymptom`: Lidarr's tag reader sees zero duration or fails, but audio integrity is not yet proven.
 - `ProbeEvidence`: optional probe/decode evidence attached to a finding without implying repair authorization.
-- `HeaderRepairCandidate`: hidden/internal until Phase A2; requires TagLib failure plus successful probe/decode evidence that suggests intact audio in a problematic container/header.
+- `HeaderRepairCandidate`: hidden/internal until Phase A3; requires TagLib failure plus successful probe/decode evidence that suggests intact audio in a problematic container/header.
 - `GenuinelyBad`: fatal decode error, decoded duration zero, or materially truncated decode.
 - `NeedsHumanReview`: evidence conflicts or is incomplete.
 
@@ -236,7 +236,7 @@ Rules:
 - Missing tag field names must be recomputed from the presence booleans only, with a fixed output vocabulary (`title`, `artist`, `album`, `musicBrainzId`) at classifier, persistence, and action-output boundaries instead of trusting stored or reader-provided strings.
 - Tag metadata reason codes must be recomputed from the same booleans and merged only with an allow-listed diagnostic reason vocabulary before persistence or action output.
 - Stale `TagMetadataIssue` labels must be downgraded when the sanitized booleans indicate complete metadata, and free-text errors containing tag-field terms or MusicBrainz-like identifiers must be fully redacted before persistence or action output.
-- `HeaderRepairCandidate` is not shown as an actionable label until A2 dry-run verification exists.
+- `HeaderRepairCandidate` is not shown as an execution-authorized label until A3 dry-run verification exists. A2 may only expose an unauthorized `repairDryRunCandidate` treatment plan.
 - `HeaderRepairCandidate` requires successful full decode or equivalent structural proof from the repair dry-run.
 - `GenuinelyBad` requires decode verifier evidence; absent full decode, use `NeedsHumanReview`.
 - Duration comparisons use tolerance bands: within 2 seconds or 1%, whichever is larger, is equivalent; less than 95% of the best canonical duration signal is materially short; between those bands is `NeedsHumanReview`.
@@ -246,7 +246,7 @@ Disagreement matrix:
 
 - TagLib OK, ffprobe OK, decode OK: `FalsePositive`.
 - TagLib zero/fail, ffprobe OK, decode not run: `TagReaderSymptom` with `ProbeEvidence`.
-- TagLib zero/fail, ffprobe OK, decode OK: hidden `HeaderRepairCandidate` for A2 only; A1 displays `TagReaderSymptom`.
+- TagLib zero/fail, ffprobe OK, decode OK: hidden `HeaderRepairCandidate` for later repair phases; A1 displays `TagReaderSymptom`; A2 may add an unauthorized treatment plan.
 - TagLib zero/fail, ffprobe fail, decode not run: `NeedsHumanReview`.
 - Decode fatal error or decoded duration zero: `GenuinelyBad`.
 - Decode materially short against canonical duration: `GenuinelyBad`.
@@ -268,15 +268,23 @@ Disagreement matrix:
 
 ### Later Library Healer Phases
 
-Phase A2: Repair dry-run
+Phase A2: Triage and evidence planning
 
-- Verify `ffmpeg` availability.
-- Produce temp repaired outputs in a controlled temp area.
+- Add a deterministic `HealerTriageAdvisor`.
+- Attach a versioned treatment plan to each finding returned by `healer/getfindings`.
+- Separate diagnostic labels from treatment workflow candidates.
+- Include candidate workflow, confidence, risk, safety level, freshness, execution authorization, blocked reasons, required evidence, required policy gates, and rationale codes.
+- Keep `safetyLevel=readOnly` for every plan.
+- Keep `executionAuthorization.authorized=false` for every plan.
+- Add summary counts grouped by candidate workflow, risk, authorization, workflow-by-risk, and exhaustive blocked reason.
+- Do not repair, retag, reacquire, rescan, delete, replace, import, run `ffmpeg`, or call AI providers.
+
+Phase A3: Repair dry-run and repair-in-place opt-in
+
+- Verify `ffmpeg` availability before any repair dry-run.
+- Produce temp repaired outputs in a controlled temp area for dry-run verification.
 - Run the full verify battery against temp outputs.
-- Do not replace originals.
-
-Phase A3: Repair-in-place opt-in
-
+- Do not replace originals during dry-run mode.
 - Backup original outside the active library.
 - Write temp in same filesystem as final target.
 - Journal intent before moving anything.
@@ -612,12 +620,28 @@ Reviewers must challenge the design and implementation with these questions:
    - Add fixtures and documentation.
    - Run task review after each task and final adversarial review.
 
-6. Milestone A2/A3: repair dry-run then opt-in repair
+6. Milestone A2: triage and evidence planning
+   - Keep the media library read-only.
+   - Add the treatment-plan contract with `candidateWorkflow`, confidence, risk, freshness, blocked reasons, required evidence, required policy gates, and rationale codes.
+   - Keep `executionAuthorization.authorized=false`, `authority=none`, and `reason=A2_READ_ONLY` for every A2 plan.
+   - Fail closed to review when evidence or identity freshness is stale, missing, unknown, malformed, or hand-edited.
+   - Expose exhaustive summary counts by workflow, risk, workflow-by-risk, authorization, and blocked reason.
+   - Prove no treatment candidate has execution authorization in A2.
+
+7. Milestone A3: repair dry-run then opt-in repair
    - Requires A1 telemetry and fixture confidence.
+   - Consumes A2 `repairDryRunCandidate` plans as input only.
+   - Defines a separate dry-run verification contract before creating temp outputs.
+   - Defines a separate write authorization contract before any repair-in-place path exists.
    - Requires rollback guide before implementation.
    - Requires ffmpeg availability strategy.
 
-7. Milestone B: Import Brain
+8. Milestone A4: reacquire orchestration
+   - Consumes only unrecoverable/high-risk candidates with decode evidence.
+   - Requires recycle bin configuration, album-wide scope disclosure, and Lidarr search dry-run evidence.
+   - Defines its own execution authorization contract and cannot inherit A2 authorization.
+
+9. Milestone B: Import Brain
    - Separate spec refinement.
    - Separate implementation plan.
    - AI adjudication only after deterministic prefilter and safety gate contracts are tested.
