@@ -8,6 +8,7 @@ using NzbDrone.Core.Configuration;
 using NzbDrone.Core.ImportLists;
 using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Music;
 using NzbDrone.Core.Parser;
 using NzbDrone.Core.Parser.Model;
@@ -31,6 +32,8 @@ namespace Brainarr.Tests
         private readonly Mock<IParsingService> _parsingServiceMock;
         private readonly Mock<IArtistService> _artistServiceMock;
         private readonly Mock<IAlbumService> _albumServiceMock;
+        private readonly Mock<IMediaFileService> _mediaFileServiceMock;
+        private readonly Mock<IAudioTagService> _audioTagServiceMock;
         private readonly Mock<IBrainarrOrchestrator> _orchestratorMock;
         private readonly Logger _logger;
 
@@ -42,6 +45,8 @@ namespace Brainarr.Tests
             _parsingServiceMock = new Mock<IParsingService>();
             _artistServiceMock = new Mock<IArtistService>();
             _albumServiceMock = new Mock<IAlbumService>();
+            _mediaFileServiceMock = new Mock<IMediaFileService>();
+            _audioTagServiceMock = new Mock<IAudioTagService>();
             _orchestratorMock = new Mock<IBrainarrOrchestrator>();
             _logger = TestLogger.CreateNullLogger();
         }
@@ -57,6 +62,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger,
                 _orchestratorMock.Object);
 
@@ -76,6 +83,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger);
 
             // Assert - Should not throw and should create instance
@@ -115,6 +124,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger,
                 _orchestratorMock.Object);
 
@@ -131,12 +142,14 @@ namespace Brainarr.Tests
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     null, _importListStatusServiceMock.Object, _configServiceMock.Object,
                     _parsingServiceMock.Object, _artistServiceMock.Object, _albumServiceMock.Object,
+                    _mediaFileServiceMock.Object, _audioTagServiceMock.Object,
                     _logger, _orchestratorMock.Object));
 
             Assert.Throws<ArgumentNullException>(() =>
                 new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
                     _httpClientMock.Object, _importListStatusServiceMock.Object, _configServiceMock.Object,
                     _parsingServiceMock.Object, null, _albumServiceMock.Object,
+                    _mediaFileServiceMock.Object, _audioTagServiceMock.Object,
                     _logger, _orchestratorMock.Object));
         }
 
@@ -151,6 +164,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger);
 
             // Assert
@@ -186,6 +201,8 @@ namespace Brainarr.Tests
                 _parsingServiceMock.Object,
                 _artistServiceMock.Object,
                 _albumServiceMock.Object,
+                _mediaFileServiceMock.Object,
+                _audioTagServiceMock.Object,
                 _logger,
                 _orchestratorMock.Object);
 

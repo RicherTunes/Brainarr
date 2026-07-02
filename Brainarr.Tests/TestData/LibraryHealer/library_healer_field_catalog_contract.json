@@ -1,0 +1,398 @@
+{
+  "schemaVersion": 1,
+  "action": "healer/getfindings",
+  "fields": [
+    {
+      "field": "items[].albumId",
+      "sensitivity": "local_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Lidarr album ids are local library identifiers."
+    },
+    {
+      "field": "items[].artistId",
+      "sensitivity": "local_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Lidarr artist ids are local library identifiers."
+    },
+    {
+      "field": "items[].id",
+      "sensitivity": "redacted_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Finding ids are stable correlation tokens for local diagnostics."
+    },
+    {
+      "field": "items[].label",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed diagnostic label vocabulary."
+    },
+    {
+      "field": "items[].modifiedUtc",
+      "sensitivity": "private_file_fact",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "File timestamps can fingerprint local library content."
+    },
+    {
+      "field": "items[].observedAtUtc",
+      "sensitivity": "private_file_fact",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Observation times can reveal local scan cadence."
+    },
+    {
+      "field": "items[].path",
+      "sensitivity": "redacted_path_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Redacted display paths can still contain filename-level clues."
+    },
+    {
+      "field": "items[].pathHash",
+      "sensitivity": "redacted_path_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Stable path hashes can correlate the same private file across reports."
+    },
+    {
+      "field": "items[].probe.AudioCodec",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Probe codec tokens are diagnostic-only until probe collection owns an allowlisted vocabulary."
+    },
+    {
+      "field": "items[].probe.Container",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Probe container tokens are diagnostic-only until probe collection owns an allowlisted vocabulary."
+    },
+    {
+      "field": "items[].probe.DurationSeconds",
+      "sensitivity": "private_file_fact",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Durations can help identify specific tracks."
+    },
+    {
+      "field": "items[].probe.ErrorMessage",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Probe error text is redacted but remains diagnostic-only."
+    },
+    {
+      "field": "items[].probe.ErrorType",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Probe error tokens are diagnostic-only."
+    },
+    {
+      "field": "items[].probe.ProbeAttempted",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean probe status."
+    },
+    {
+      "field": "items[].probe.ProbeSucceeded",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean probe status."
+    },
+    {
+      "field": "items[].reasons[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed diagnostic reason-code vocabulary."
+    },
+    {
+      "field": "items[].size",
+      "sensitivity": "private_file_fact",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "File sizes can fingerprint local library content."
+    },
+    {
+      "field": "items[].tagReader.DurationSeconds",
+      "sensitivity": "private_file_fact",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Durations can help identify specific tracks."
+    },
+    {
+      "field": "items[].tagReader.ErrorMessage",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Tag reader error text is redacted but remains diagnostic-only."
+    },
+    {
+      "field": "items[].tagReader.ErrorType",
+      "sensitivity": "private_diagnostic",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Tag reader error tokens are diagnostic-only."
+    },
+    {
+      "field": "items[].tagReader.Metadata.AlbumPresent",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean tag-presence evidence."
+    },
+    {
+      "field": "items[].tagReader.Metadata.AnyMusicBrainzIdPresent",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean MusicBrainz tag-presence evidence."
+    },
+    {
+      "field": "items[].tagReader.Metadata.ArtistPresent",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean tag-presence evidence."
+    },
+    {
+      "field": "items[].tagReader.Metadata.MissingFields[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed missing-field vocabulary."
+    },
+    {
+      "field": "items[].tagReader.Metadata.TitlePresent",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean tag-presence evidence."
+    },
+    {
+      "field": "items[].tagReader.ReadAttempted",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean tag-reader status."
+    },
+    {
+      "field": "items[].tagReader.ReadSucceeded",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean tag-reader status."
+    },
+    {
+      "field": "items[].trackFileId",
+      "sensitivity": "local_identifier",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": false,
+      "aiPrompt": false,
+      "reason": "Lidarr TrackFile ids are local library identifiers."
+    },
+    {
+      "field": "items[].treatmentPlan.blockedReasons[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed treatment blocked-reason vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.candidateWorkflow",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed treatment workflow vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.confidence",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Deterministic planner confidence."
+    },
+    {
+      "field": "items[].treatmentPlan.evidenceFreshness",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed freshness vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.executionAuthorization.authority",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed authorization authority vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.executionAuthorization.authorized",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Boolean authorization state."
+    },
+    {
+      "field": "items[].treatmentPlan.executionAuthorization.reason",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed authorization reason vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.identityFreshness",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed freshness vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.rationaleCodes[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed treatment rationale vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.requiredEvidence[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed required-evidence vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.requiredPolicyGates[]",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed required-policy-gate vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.risk",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed treatment risk vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.safetyLevel",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Fixed treatment safety-level vocabulary."
+    },
+    {
+      "field": "items[].treatmentPlan.schemaVersion",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Treatment contract version."
+    },
+    {
+      "field": "summary.authorization.authorized",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate count."
+    },
+    {
+      "field": "summary.authorization.unauthorized",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate count."
+    },
+    {
+      "field": "summary.blockedReasons",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate blocked-reason counts keyed by fixed vocabulary."
+    },
+    {
+      "field": "summary.byRisk",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate risk counts keyed by fixed vocabulary."
+    },
+    {
+      "field": "summary.byWorkflow",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate workflow counts keyed by fixed vocabulary."
+    },
+    {
+      "field": "summary.byWorkflowByRisk",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate workflow/risk counts keyed by fixed vocabulary."
+    },
+    {
+      "field": "summary.total",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate count."
+    }
+  ]
+}
