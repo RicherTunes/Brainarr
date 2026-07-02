@@ -1,5 +1,7 @@
 # Normalize line endings and prevent future CRLF churn
 * text=auto
+.gitattributes text eol=lf
+ext-common-sha.txt text eol=lf
 
 # Enforce LF for code and project files
 *.cs text eol=lf
