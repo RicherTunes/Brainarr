@@ -20,16 +20,12 @@ namespace Brainarr.Tests
     {
         private readonly Mock<IHttpClient> _httpClientMock;
         private readonly Mock<IProviderFactory> _providerFactoryMock;
-        private readonly Mock<IRetryPolicy> _retryPolicyMock;
-        private readonly Mock<IRateLimiter> _rateLimiterMock;
         private readonly Logger _logger;
 
         public ProviderManagerCovTests()
         {
             _httpClientMock = new Mock<IHttpClient>();
             _providerFactoryMock = new Mock<IProviderFactory>();
-            _retryPolicyMock = new Mock<IRetryPolicy>();
-            _rateLimiterMock = new Mock<IRateLimiter>();
             _logger = TestLogger.CreateNullLogger();
         }
 
@@ -40,8 +36,6 @@ namespace Brainarr.Tests
                 _httpClientMock.Object,
                 _providerFactoryMock.Object,
                 modelDetection,
-                _retryPolicyMock.Object,
-                _rateLimiterMock.Object,
                 _logger);
         }
 
