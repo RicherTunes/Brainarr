@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
+using Codes = Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
@@ -15,18 +16,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
 /// </summary>
 internal static class BrainarrHealthDiagnostics
 {
-    /// <summary>
-    /// Well-known error codes emitted by Brainarr diagnostics.
-    /// </summary>
-    public static class ErrorCodes
-    {
-        public const string AuthFailed = "AUTH_FAILED";
-        public const string ConnectionFailed = "CONNECTION_FAILED";
-        public const string ModelNotFound = "MODEL_NOT_FOUND";
-        public const string RateLimited = "RATE_LIMITED";
-        public const string Timeout = "TIMEOUT";
-        public const string ProviderInitFailed = "PROVIDER_INIT_FAILED";
-    }
 
     /// <summary>
     /// Well-known authentication methods for LLM providers.
@@ -72,7 +61,7 @@ internal static class BrainarrHealthDiagnostics
                     provider: providerName,
                     authMethod: authMethod,
                     model: model,
-                    errorCode: ErrorCodes.AuthFailed);
+                    errorCode: Codes.AuthFailed);
         }
         catch (OperationCanceledException)
         {
@@ -87,7 +76,7 @@ internal static class BrainarrHealthDiagnostics
                 provider: providerName,
                 authMethod: authMethod,
                 model: model,
-                errorCode: ErrorCodes.Timeout);
+                errorCode: Codes.Timeout);
         }
         catch (Exception ex)
         {
@@ -98,7 +87,7 @@ internal static class BrainarrHealthDiagnostics
                 provider: providerName,
                 authMethod: authMethod,
                 model: model,
-                errorCode: ErrorCodes.ConnectionFailed);
+                errorCode: Codes.ConnectionFailed);
         }
     }
 
@@ -124,7 +113,7 @@ internal static class BrainarrHealthDiagnostics
                 errorMessage ?? $"Model '{model}' not found",
                 provider: providerName,
                 model: model,
-                errorCode: ErrorCodes.ModelNotFound);
+                errorCode: Codes.ModelNotFound);
     }
 
     /// <summary>
@@ -195,14 +184,14 @@ internal static class BrainarrHealthDiagnostics
     private static string ResolveErrorCode(ProviderMetrics metrics)
     {
         if (metrics.IsAuthValid == false)
-            return ErrorCodes.AuthFailed;
+            return Codes.AuthFailed;
 
         if (metrics.IsRateLimitNearExhaustion)
-            return ErrorCodes.RateLimited;
+            return Codes.RateLimited;
 
         if (metrics.ConsecutiveFailures >= 5)
-            return ErrorCodes.ConnectionFailed;
+            return Codes.ConnectionFailed;
 
-        return ErrorCodes.ConnectionFailed;
+        return Codes.ConnectionFailed;
     }
 }

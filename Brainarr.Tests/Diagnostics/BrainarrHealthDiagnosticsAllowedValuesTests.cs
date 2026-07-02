@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Codes = Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -18,12 +19,12 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 {
     private static readonly HashSet<string> AllowedErrorCodes = new(StringComparer.Ordinal)
     {
-        BrainarrHealthDiagnostics.ErrorCodes.AuthFailed,
-        BrainarrHealthDiagnostics.ErrorCodes.ConnectionFailed,
-        BrainarrHealthDiagnostics.ErrorCodes.ModelNotFound,
-        BrainarrHealthDiagnostics.ErrorCodes.RateLimited,
-        BrainarrHealthDiagnostics.ErrorCodes.Timeout,
-        BrainarrHealthDiagnostics.ErrorCodes.ProviderInitFailed,
+        Codes.AuthFailed,
+        Codes.ConnectionFailed,
+        Codes.ModelNotFound,
+        Codes.RateLimited,
+        Codes.Timeout,
+        Codes.ProviderInitFailed,
     };
 
     private static readonly HashSet<string> AllowedAuthMethods = new(StringComparer.Ordinal)
@@ -73,7 +74,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(failure)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.AuthFailed);
+        result.ErrorCode.Should().Be(Codes.AuthFailed);
     }
 
     [Fact]
@@ -86,7 +87,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(exception)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.ConnectionFailed);
+        result.ErrorCode.Should().Be(Codes.ConnectionFailed);
     }
 
     [Fact]
@@ -99,7 +100,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(timeout)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.Timeout);
+        result.ErrorCode.Should().Be(Codes.Timeout);
     }
 
     // --- CheckModelAvailability ---
@@ -126,7 +127,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckModelAvailability(notFound)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.ModelNotFound);
+        result.ErrorCode.Should().Be(Codes.ModelNotFound);
     }
 
     // --- FromMetrics ---
@@ -236,7 +237,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "FromMetrics(unhealthy-auth)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.AuthFailed);
+        result.ErrorCode.Should().Be(Codes.AuthFailed);
     }
 
     [Fact]
@@ -257,7 +258,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "FromMetrics(unhealthy-failures)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(BrainarrHealthDiagnostics.ErrorCodes.ConnectionFailed);
+        result.ErrorCode.Should().Be(Codes.ConnectionFailed);
     }
 
     [Fact]
@@ -276,14 +277,14 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
     // --- Constants non-empty ---
 
     [Fact]
-    public void ErrorCodes_AreNotEmpty()
+    public void CommonErrorCodes_AreNotEmpty()
     {
-        BrainarrHealthDiagnostics.ErrorCodes.AuthFailed.Should().NotBeNullOrWhiteSpace();
-        BrainarrHealthDiagnostics.ErrorCodes.ConnectionFailed.Should().NotBeNullOrWhiteSpace();
-        BrainarrHealthDiagnostics.ErrorCodes.ModelNotFound.Should().NotBeNullOrWhiteSpace();
-        BrainarrHealthDiagnostics.ErrorCodes.RateLimited.Should().NotBeNullOrWhiteSpace();
-        BrainarrHealthDiagnostics.ErrorCodes.Timeout.Should().NotBeNullOrWhiteSpace();
-        BrainarrHealthDiagnostics.ErrorCodes.ProviderInitFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.AuthFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.ConnectionFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.ModelNotFound.Should().NotBeNullOrWhiteSpace();
+        Codes.RateLimited.Should().NotBeNullOrWhiteSpace();
+        Codes.Timeout.Should().NotBeNullOrWhiteSpace();
+        Codes.ProviderInitFailed.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
