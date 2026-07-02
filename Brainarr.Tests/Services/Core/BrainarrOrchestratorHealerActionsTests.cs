@@ -1522,8 +1522,9 @@ public sealed class BrainarrOrchestratorHealerActionsTests
 
         public bool Cleared { get; private set; }
 
-        public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
+        public bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
         {
+            return true;
         }
 
         public IReadOnlyList<LibraryHealerFinding> GetRecent(int limit)

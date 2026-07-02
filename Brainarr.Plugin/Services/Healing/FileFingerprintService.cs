@@ -7,7 +7,7 @@ public sealed class FileFingerprintService : IFileFingerprintService
     private static readonly TimeSpan DefaultExistenceTimeout = TimeSpan.FromSeconds(5);
 
     private readonly Func<string, bool>? _existsProbe;
-    private readonly SemaphoreSlim _existsGate = new(1, 1);
+    private SemaphoreSlim _existsGate = new(1, 1);
 
     public FileFingerprintService()
     {
@@ -35,9 +35,10 @@ public sealed class FileFingerprintService : IFileFingerprintService
             ? null
             : System.Diagnostics.Stopwatch.StartNew();
 
+        var gate = Volatile.Read(ref _existsGate);
         try
         {
-            if (!_existsGate.Wait(boundedTimeout, cancellationToken))
+            if (!gate.Wait(boundedTimeout, cancellationToken))
             {
                 return TimeoutEvidence();
             }
@@ -64,7 +65,7 @@ public sealed class FileFingerprintService : IFileFingerprintService
                         }
                         finally
                         {
-                            _existsGate.Release();
+                            gate.Release();
                         }
                     },
                     CancellationToken.None,
@@ -72,13 +73,27 @@ public sealed class FileFingerprintService : IFileFingerprintService
                     TaskScheduler.Default);
                 releaseInTask = true;
 
-                return SafeAsyncHelper.RunSafeSync(() => existsTask.WaitAsync(probeTimeout, cancellationToken));
+                try
+                {
+                    return SafeAsyncHelper.RunSafeSync(() => existsTask.WaitAsync(probeTimeout, cancellationToken));
+                }
+                catch (TimeoutException)
+                {
+                    // The probe hung past its own timeout and is still holding `gate` (it will
+                    // eventually Release() it in its finally, whenever it finally completes/never
+                    // does). Abandon the stale gate and swap in a fresh one so subsequent
+                    // CheckExists calls are not starved waiting behind a probe that may never
+                    // return, mirroring the busy-signal/slot-abandon treatment LidarrAudioTagSymptomReader
+                    // uses for its read gate.
+                    Interlocked.CompareExchange(ref _existsGate, new SemaphoreSlim(1, 1), gate);
+                    return TimeoutEvidence();
+                }
             }
             finally
             {
                 if (!releaseInTask)
                 {
-                    _existsGate.Release();
+                    gate.Release();
                 }
             }
         }

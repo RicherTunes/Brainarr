@@ -247,4 +247,48 @@ public sealed class FileFingerprintServiceTests
         }
     }
 
+    [Fact]
+    public void CheckExists_WhenProbeHangs_DoesNotStarveSubsequentChecks()
+    {
+        using var releaseHungProbe = new ManualResetEventSlim(false);
+        var callCount = 0;
+        var service = new FileFingerprintService(_ =>
+        {
+            if (Interlocked.Increment(ref callCount) == 1)
+            {
+                // The first probe hangs well past its own timeout and never returns -- e.g. a
+                // stuck File.Exists() against a dead network mount. It keeps holding the gate
+                // slot forever (its `finally { gate.Release(); }` never runs).
+                releaseHungProbe.Wait();
+                return true;
+            }
+
+            // A later, unrelated probe is healthy and should be able to run to completion
+            // instead of being starved behind the permanently-stuck first probe's gate slot.
+            return true;
+        });
+
+        try
+        {
+            var first = service.CheckExists("hung.flac", TimeSpan.FromMilliseconds(25), CancellationToken.None);
+            first.CheckAttempted.Should().BeTrue();
+            first.CheckSucceeded.Should().BeFalse();
+            first.ErrorType.Should().Be(nameof(TimeoutException));
+
+            var stopwatch = System.Diagnostics.Stopwatch.StartNew();
+            var second = service.CheckExists("second.flac", TimeSpan.FromSeconds(2), CancellationToken.None);
+            stopwatch.Stop();
+
+            second.CheckAttempted.Should().BeTrue();
+            stopwatch.Elapsed.Should().BeLessThan(
+                TimeSpan.FromSeconds(1),
+                "a probe hung past its timeout must not starve subsequent checks behind its gate slot");
+            second.CheckSucceeded.Should().BeTrue("the second probe is healthy and must not inherit the first probe's hang");
+            second.Exists.Should().BeTrue();
+        }
+        finally
+        {
+            releaseHungProbe.Set();
+        }
+    }
 }
