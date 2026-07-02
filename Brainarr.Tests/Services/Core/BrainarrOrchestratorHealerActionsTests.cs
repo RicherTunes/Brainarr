@@ -1194,7 +1194,9 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             new[] { "TAG_READER_ZERO_DURATION" },
             new TagReaderEvidence(true, true, 0, null, null),
             null,
-            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
         var handler = new LibraryHealerActionHandler(Mock.Of<ILibraryHealerScanRunner>(), new FakeFindingStore(new[] { finding }));
         var orchestrator = CreateOrchestrator(handler, providerFactory, providerInvoker, promptBuilder);
 
@@ -1436,7 +1438,9 @@ public sealed class BrainarrOrchestratorHealerActionsTests
             new[] { "TAG_READER_ZERO_DURATION" },
             new TagReaderEvidence(true, true, 0, null, null),
             null,
-            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static LibraryHealerFinding MetadataFinding(string id, int trackFileId)
@@ -1472,7 +1476,9 @@ public sealed class BrainarrOrchestratorHealerActionsTests
                     AnyMusicBrainzIdPresent: false,
                     MissingFields: new[] { "title", "musicBrainzId" })),
             null,
-            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc));
+            new DateTime(2026, 6, 30, 1, 2, 3, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static Task<object> RunOnDedicatedThread(Func<object> action)

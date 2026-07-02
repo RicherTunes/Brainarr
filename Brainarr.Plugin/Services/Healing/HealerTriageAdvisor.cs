@@ -18,6 +18,11 @@ public static class HealerTriageAdvisor
             return Malformed(state);
         }
 
+        if (state.MalformedRecord)
+        {
+            return Malformed(state);
+        }
+
         if (!IsCurrent(state.EvidenceFreshness))
         {
             return Review(
@@ -36,11 +41,6 @@ public static class HealerTriageAdvisor
                 new[] { HealerTreatmentVocab.BlockedReason.IdentityFreshnessNotCurrent },
                 new[] { HealerTreatmentVocab.RequiredEvidence.FreshPathIdentity },
                 Rationale(finding));
-        }
-
-        if (state.MalformedRecord)
-        {
-            return Malformed(state);
         }
 
         if (!Enum.IsDefined(typeof(LibraryHealerLabel), finding.Label))

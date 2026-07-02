@@ -28,7 +28,7 @@ A1 cannot:
 ## Actions
 
 - `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain and the cursor is safe to use.
-- `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans. It supports optional read-only triage filters: `workflow`, `risk`, `blockedReason`, and `authorized`. `workflow`, `risk`, and `blockedReason` accept comma-separated, case-insensitive values. Unknown treatment filter values are ignored; if no supplied values are recognized, that filter is not applied. `authorized` accepts `true` or `false`; malformed boolean values are ignored. Recognized filters apply before the output `limit`, and the `summary` describes only the returned filtered findings.
+- `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, `affectedTrackCount` when a finding coalesces more than one track file, and summary counts for the returned treatment plans. It supports optional read-only triage filters: `workflow`, `risk`, `blockedReason`, and `authorized`. `workflow`, `risk`, and `blockedReason` accept comma-separated, case-insensitive values. Unknown treatment filter values are ignored; if no supplied values are recognized, that filter is not applied. `authorized` accepts `true` or `false`; malformed boolean values are ignored. Recognized filters apply before the output `limit`, and the `summary` describes only the returned filtered findings.
 - `healer/getfieldcatalog`: returns static field-sensitivity metadata for the `healer/getfindings` output contract. It is read-only and does not scan files, read findings, mutate Lidarr, or contact providers.
 - `healer/clearfindings`: clears Brainarr-owned findings.
 
@@ -60,9 +60,11 @@ The action's `maxSeconds` value is enforced through candidate-gathering budget c
 
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
+If a storage root is offline or otherwise fails the root-level availability check, the scan coalesces the root into a single `NeedsHumanReview` finding with `STORAGE_ROOT_OFFLINE` rather than emitting one finding per missing track file. That finding reports `affectedTrackCount` so operators can see the blast radius without flooding the review queue.
+
 ## A2 Scope
 
-A2 adds a read-only treatment plan to each finding returned by `healer/getfindings`. The plan includes `candidateWorkflow`, confidence, risk, freshness, fixed blocked reasons, required evidence, required policy gates, rationale codes, and `executionAuthorization.authorized=false`. The response `summary` counts workflows, risks, workflow-by-risk, authorization state, and all non-zero blocked reasons for the returned findings.
+A2 adds a read-only treatment plan to each finding returned by `healer/getfindings`. The plan includes `candidateWorkflow`, confidence, risk, freshness, fixed blocked reasons, required evidence, required policy gates, rationale codes, and `executionAuthorization.authorized=false`. The response `summary` counts workflows, risks, workflow-by-risk, authorization state, and all non-zero blocked reasons for the returned findings. Persisted freshness values are allowlisted; missing, malformed, stale, or hand-edited values fail closed to `unknown` and require human review.
 
 A2 does not repair, retag, reacquire, rescan, delete, replace, import, run `ffmpeg`, or call AI providers. Its treatment plans are advisory evidence planning only; future mutating milestones must define separate authorization, preflight, journal, backup, and rollback contracts.
 
@@ -76,7 +78,7 @@ The first field-sensitivity catalog is available through `healer/getfieldcatalog
 
 ## Next Milestones
 
-A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, storage/root health audits, host conformance, redaction verification, field-sensitivity expansion for future exports and AI packets, classifier replay benches, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
+A2.5 should continue hardening the read-only evidence layer before any repair dry-run work. The highest-ROI pulls are revalidation, schema migration, provenance, TTL, read-only kill switch, fingerprint policy, Lidarr state diffing, recurrent storage/root health conformance, host conformance, redaction verification, field-sensitivity expansion for future exports and AI packets, classifier replay benches, filter expansion for freshness/review lifecycle, probe collection, targeted decode verification, fixture truth tables, risk-prioritized review queues, Lidarr configuration conformance, ownership-boundary mapping, and edition/variant protected scopes.
 
 A3 may add repair dry-runs and verified repair-in-place only after a separate design review, dry-run verification contract, crash-recovery journal, fixture matrix, rollback guide, and explicit opt-in. A3 must define its own execution authorization contract; it cannot inherit A2 treatment plans as permission to write.
 
