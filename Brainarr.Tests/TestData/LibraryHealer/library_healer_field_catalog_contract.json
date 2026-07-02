@@ -3,6 +3,14 @@
   "action": "healer/getfindings",
   "fields": [
     {
+      "field": "items[].affectedTrackCount",
+      "sensitivity": "public",
+      "localDiagnosticExport": true,
+      "shareableSupportExport": true,
+      "aiPrompt": true,
+      "reason": "Aggregate count of tracks collapsed into a coalesced storage-root finding; null for per-file findings."
+    },
+    {
       "field": "items[].albumId",
       "sensitivity": "local_identifier",
       "localDiagnosticExport": true,

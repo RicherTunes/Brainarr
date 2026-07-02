@@ -40,4 +40,14 @@ public sealed record LibraryHealerFinding(
     IReadOnlyList<string> InternalReasonCodes,
     TagReaderEvidence TagReader,
     ProbeEvidence? Probe,
-    DateTime ObservedAtUtc);
+    DateTime ObservedAtUtc,
+    // Freshness reflects the file's actual on-disk state vs. Lidarr's recorded state at scan time
+    // (unchanged -> current, drifted -> stale, gone -> missing, unprobeable -> unknown). It is
+    // computed read-only during the scan and persisted so the triage advisor can consume it. The
+    // defaults keep legacy/hand-built findings at "current" so persisted records without these
+    // fields deserialize unchanged.
+    string EvidenceFreshness = HealerTreatmentVocab.Freshness.Current,
+    string IdentityFreshness = HealerTreatmentVocab.Freshness.Current,
+    // Populated only for coalesced storage-root-outage findings: how many per-file findings were
+    // collapsed into this one. Null for ordinary per-file findings.
+    int? AffectedTrackCount = null);
