@@ -71,6 +71,26 @@ public sealed class HealerTriageFreshnessTests
     }
 
     [Fact]
+    public void Advise_ShouldPreferMalformedRecord_WhenMalformedFindingAlsoHasUnknownFreshness()
+    {
+        var plan = HealerTriageAdvisor.Advise(
+            HealerTriageAdvisorTests.Finding(
+                LibraryHealerLabel.TagReaderSymptom,
+                new[] { "TAG_READER_ZERO_DURATION" },
+                new TagReaderEvidence(true, true, 0, null, null),
+                null),
+            new HealerFindingFreshness(
+                HealerTreatmentVocab.Freshness.Unknown,
+                HealerTreatmentVocab.Freshness.Unknown,
+                MalformedRecord: true));
+
+        plan.CandidateWorkflow.Should().Be(HealerTreatmentVocab.Workflow.Review);
+        plan.BlockedReasons.Should().Contain(HealerTreatmentVocab.BlockedReason.MalformedFindingRecord);
+        plan.BlockedReasons.Should().NotContain(HealerTreatmentVocab.BlockedReason.EvidenceFreshnessNotCurrent);
+        plan.RequiredEvidence.Should().Equal(HealerTreatmentVocab.RequiredEvidence.None);
+    }
+
+    [Fact]
     public void Advise_ShouldReturnReview_WhenPersistedFindingHasMissingTagReader()
     {
         var plan = HealerTriageAdvisor.Advise(new LibraryHealerFinding(

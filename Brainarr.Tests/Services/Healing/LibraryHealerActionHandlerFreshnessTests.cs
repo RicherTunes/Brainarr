@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
@@ -34,6 +35,22 @@ public sealed class LibraryHealerActionHandlerFreshnessTests
 
         plan.GetProperty("evidenceFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Current);
         plan.GetProperty("identityFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Current);
+    }
+
+    [Fact]
+    public void GetFindings_ShouldFailClosed_WhenPersistedFindingHasNoFreshnessFields()
+    {
+        var finding = DeserializeOldShapeFindingWithoutFreshnessFields(StoredFinding(
+            evidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            identityFreshness: HealerTreatmentVocab.Freshness.Current));
+
+        var plan = ProjectSinglePlan(finding);
+
+        plan.GetProperty("evidenceFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        plan.GetProperty("identityFreshness").GetString().Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        plan.GetProperty("candidateWorkflow").GetString().Should().Be(HealerTreatmentVocab.Workflow.Review);
+        JsonStrings(plan.GetProperty("blockedReasons"))
+            .Should().Contain(HealerTreatmentVocab.BlockedReason.EvidenceFreshnessNotCurrent);
     }
 
     private static JsonElement ProjectSinglePlan(LibraryHealerFinding finding)
@@ -76,6 +93,16 @@ public sealed class LibraryHealerActionHandlerFreshnessTests
             ObservedAtUtc: new DateTime(2026, 7, 1, 1, 0, 0, DateTimeKind.Utc),
             EvidenceFreshness: evidenceFreshness,
             IdentityFreshness: identityFreshness);
+    }
+
+    private static LibraryHealerFinding DeserializeOldShapeFindingWithoutFreshnessFields(LibraryHealerFinding finding)
+    {
+        var node = JsonSerializer.SerializeToNode(finding)
+            ?? throw new InvalidOperationException("Unable to serialize finding.");
+        node.AsObject().Remove("EvidenceFreshness");
+        node.AsObject().Remove("IdentityFreshness");
+        return node.Deserialize<LibraryHealerFinding>()
+            ?? throw new InvalidOperationException("Unable to deserialize old-shape finding.");
     }
 
     private static IReadOnlyList<string> JsonStrings(JsonElement element)
