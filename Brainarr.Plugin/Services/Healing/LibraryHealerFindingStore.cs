@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Hosting;
 using Lidarr.Plugin.Common.Services.Storage;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
@@ -58,13 +59,13 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             return;
         }
 
-        Task.Run(async () =>
+        SafeAsyncHelper.RunSafeSync(async () =>
         {
             foreach (var finding in sanitized)
             {
                 await _store.SetAsync(finding.Id, finding).ConfigureAwait(false);
             }
-        }).GetAwaiter().GetResult();
+        });
     }
 
     public IReadOnlyList<LibraryHealerFinding> GetRecent(int limit)
@@ -84,13 +85,12 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
     public void Clear()
     {
-        Task.Run(async () => await _store.ClearAsync().ConfigureAwait(false))
-            .GetAwaiter().GetResult();
+        SafeAsyncHelper.RunSafeSync(async () => await _store.ClearAsync().ConfigureAwait(false));
     }
 
     private List<LibraryHealerFinding> EnumerateAll()
     {
-        return Task.Run(async () =>
+        return SafeAsyncHelper.RunSafeSync(async () =>
         {
             var all = new List<LibraryHealerFinding>();
             var enumerator = _store.EnumerateAsync().GetAsyncEnumerator();
@@ -110,7 +110,7 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             }
 
             return all;
-        }).GetAwaiter().GetResult();
+        });
     }
 
     private static LibraryHealerFinding Sanitize(LibraryHealerFinding finding)
