@@ -85,8 +85,10 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 return;
             }
 
-            _findingStore.SaveBatch(findings);
-            persistedFindings = findings.Count;
+            // Trust the store's actual result, not the batch size: a failed write must report
+            // zero persisted rather than silently claiming the findings reached disk.
+            var saved = _findingStore.SaveBatch(findings);
+            persistedFindings = saved ? findings.Count : 0;
         }
 
         try

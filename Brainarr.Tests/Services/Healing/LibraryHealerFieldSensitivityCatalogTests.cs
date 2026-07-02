@@ -167,7 +167,7 @@ public sealed class LibraryHealerFieldSensitivityCatalogTests
     {
         public bool Touched { get; private set; }
 
-        public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
+        public bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
         {
             Touched = true;
             throw new XunitException("healer/getfieldcatalog must not persist findings");

@@ -2,16 +2,24 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Hosting;
 using Lidarr.Plugin.Common.Services.Storage;
+using NLog;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Logging;
 using NzbDrone.Core.ImportLists.Brainarr.Utils;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
 public interface ILibraryHealerFindingStore
 {
-    void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings);
+    /// <summary>
+    /// Persists a batch of findings. Returns <c>true</c> only when the batch is known to have
+    /// reached disk; returns <c>false</c> (without throwing) when the underlying write failed,
+    /// so callers must not report the batch as persisted.
+    /// </summary>
+    bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings);
 
     IReadOnlyList<LibraryHealerFinding> GetRecent(int limit);
 
@@ -27,10 +35,12 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
     private const int MaxRecentLimit = 500;
     private const string PathContainingMessageRedaction = "<path-containing message redacted>";
 
+    private readonly Logger _logger;
     private readonly JsonFileStore<string, LibraryHealerFinding> _store;
 
-    public LibraryHealerFindingStore(string? dataPath = null)
+    public LibraryHealerFindingStore(string? dataPath = null, Logger? logger = null)
     {
+        _logger = logger ?? LogManager.GetCurrentClassLogger();
         var root = dataPath ?? PluginConfigRoots.Resolve("Brainarr");
         Directory.CreateDirectory(root);
         _store = new JsonFileStore<string, LibraryHealerFinding>(
@@ -40,14 +50,19 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
                 MaxEntries = MaxEntries,
                 KeyNormalizer = static key => NormalizeKey(key),
                 KeyComparer = StringComparer.OrdinalIgnoreCase,
-            });
+                // Findings persistence must not lie about success: propagate write failures so
+                // SaveBatch can report zero-persisted instead of silently pretending the batch
+                // reached disk (Common's default is best-effort/no-throw, which is wrong here).
+                ThrowOnSaveFailure = true,
+            },
+            logger: NLogAdapterFactory.CreateILogger(_logger));
     }
 
-    public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
+    public bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
     {
         if (findings is null || findings.Count == 0)
         {
-            return;
+            return true;
         }
 
         var sanitized = findings
@@ -56,17 +71,29 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             .ToList();
         if (sanitized.Count == 0)
         {
-            return;
+            return true;
         }
 
         var entries = sanitized
             .Select(static finding => new KeyValuePair<string, LibraryHealerFinding>(finding.Id, finding))
             .ToList();
 
-        SafeAsyncHelper.RunSafeSync(async () =>
+        try
         {
-            await _store.SetManyAsync(entries).ConfigureAwait(false);
-        });
+            SafeAsyncHelper.RunSafeSync(async () =>
+            {
+                await _store.SetManyAsync(entries).ConfigureAwait(false);
+            });
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            _logger.Warn(
+                ex,
+                "Library healer finding store failed to persist {0} pending finding(s); reporting zero persisted",
+                entries.Count);
+            return false;
+        }
     }
 
     public IReadOnlyList<LibraryHealerFinding> GetRecent(int limit)
@@ -86,7 +113,18 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
 
     public void Clear()
     {
-        SafeAsyncHelper.RunSafeSync(async () => await _store.ClearAsync().ConfigureAwait(false));
+        try
+        {
+            SafeAsyncHelper.RunSafeSync(async () => await _store.ClearAsync().ConfigureAwait(false));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or JsonException)
+        {
+            // Preserve Clear()'s existing best-effort contract: ThrowOnSaveFailure above makes
+            // SetManyAsync/ClearAsync propagate write failures so SaveBatch can observe them, but
+            // callers of Clear() (the healer/clearfindings action) still expect a void, non-throwing
+            // API -- log it instead of changing that contract.
+            _logger.Warn(ex, "Library healer finding store failed to clear persisted findings");
+        }
     }
 
     private List<LibraryHealerFinding> EnumerateAll()
