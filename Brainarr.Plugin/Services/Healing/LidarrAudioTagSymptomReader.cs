@@ -1,4 +1,5 @@
 using NzbDrone.Core.MediaFiles;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.Parser.Model;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
@@ -54,10 +55,7 @@ public sealed class LidarrAudioTagSymptomReader : ITagLibSymptomReader
                 TaskCreationOptions.LongRunning,
                 TaskScheduler.Default);
 
-            var parsed = readTask
-                .WaitAsync(_timeout, cancellationToken)
-                .GetAwaiter()
-                .GetResult();
+            var parsed = SafeAsyncHelper.RunSafeSync(() => readTask.WaitAsync(_timeout, cancellationToken));
 
             return new TagReaderEvidence(
                 true,
