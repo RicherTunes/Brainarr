@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using FluentAssertions;
-using Lidarr.Plugin.Common.Abstractions.Diagnostics;
+using Codes = Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
@@ -19,12 +19,12 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 {
     private static readonly HashSet<string> AllowedErrorCodes = new(StringComparer.Ordinal)
     {
-        DiagnosticErrorCodes.AuthFailed,
-        DiagnosticErrorCodes.ConnectionFailed,
-        DiagnosticErrorCodes.ModelNotFound,
-        DiagnosticErrorCodes.RateLimited,
-        DiagnosticErrorCodes.Timeout,
-        DiagnosticErrorCodes.ProviderInitFailed,
+        Codes.AuthFailed,
+        Codes.ConnectionFailed,
+        Codes.ModelNotFound,
+        Codes.RateLimited,
+        Codes.Timeout,
+        Codes.ProviderInitFailed,
     };
 
     private static readonly HashSet<string> AllowedAuthMethods = new(StringComparer.Ordinal)
@@ -74,7 +74,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(failure)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.AuthFailed);
+        result.ErrorCode.Should().Be(Codes.AuthFailed);
     }
 
     [Fact]
@@ -87,7 +87,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(exception)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.ConnectionFailed);
+        result.ErrorCode.Should().Be(Codes.ConnectionFailed);
     }
 
     [Fact]
@@ -100,7 +100,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckProviderAsync(timeout)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.Timeout);
+        result.ErrorCode.Should().Be(Codes.Timeout);
     }
 
     // --- CheckModelAvailability ---
@@ -127,7 +127,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "CheckModelAvailability(notFound)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.ModelNotFound);
+        result.ErrorCode.Should().Be(Codes.ModelNotFound);
     }
 
     // --- FromMetrics ---
@@ -237,7 +237,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "FromMetrics(unhealthy-auth)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.AuthFailed);
+        result.ErrorCode.Should().Be(Codes.AuthFailed);
     }
 
     [Fact]
@@ -258,7 +258,7 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
 
         AssertAllowedValues(result, "FromMetrics(unhealthy-failures)");
         result.IsHealthy.Should().BeFalse();
-        result.ErrorCode.Should().Be(DiagnosticErrorCodes.ConnectionFailed);
+        result.ErrorCode.Should().Be(Codes.ConnectionFailed);
     }
 
     [Fact]
@@ -277,14 +277,14 @@ public class BrainarrHealthDiagnosticsAllowedValuesTests
     // --- Constants non-empty ---
 
     [Fact]
-    public void ErrorCodes_AreNotEmpty()
+    public void CommonErrorCodes_AreNotEmpty()
     {
-        DiagnosticErrorCodes.AuthFailed.Should().NotBeNullOrWhiteSpace();
-        DiagnosticErrorCodes.ConnectionFailed.Should().NotBeNullOrWhiteSpace();
-        DiagnosticErrorCodes.ModelNotFound.Should().NotBeNullOrWhiteSpace();
-        DiagnosticErrorCodes.RateLimited.Should().NotBeNullOrWhiteSpace();
-        DiagnosticErrorCodes.Timeout.Should().NotBeNullOrWhiteSpace();
-        DiagnosticErrorCodes.ProviderInitFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.AuthFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.ConnectionFailed.Should().NotBeNullOrWhiteSpace();
+        Codes.ModelNotFound.Should().NotBeNullOrWhiteSpace();
+        Codes.RateLimited.Should().NotBeNullOrWhiteSpace();
+        Codes.Timeout.Should().NotBeNullOrWhiteSpace();
+        Codes.ProviderInitFailed.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]

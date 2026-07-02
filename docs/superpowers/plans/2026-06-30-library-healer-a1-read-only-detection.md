@@ -55,7 +55,7 @@
 - Create `Brainarr.Plugin/Services/Healing/LibraryHealerActionHandler.cs`: read-only action DTOs for UI calls.
 - Modify `Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs`: register A1 healing services when Lidarr dependencies are available.
 - Modify `Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs`: accept optional `LibraryHealerActionHandler` and route `healer/*` actions.
-- Modify `Brainarr.Plugin/BrainarrImportList.cs`: constructor injection and service-provider registration for Lidarr media/audio read-only services; no direct healing logic.
+- Modify `Brainarr.Plugin/Brainarr.cs`: constructor injection and service-provider registration for Lidarr media/audio read-only services; no direct healing logic.
 - Create `Brainarr.Tests/Services/Healing/LibraryHealerClassifierTests.cs`.
 - Create `Brainarr.Tests/Services/Healing/PathPrivacyTests.cs`.
 - Create `Brainarr.Tests/Services/Healing/LibraryHealerFindingStoreTests.cs`.
@@ -1721,7 +1721,7 @@ Expected: commit created.
 
 **Files:**
 - Modify: `Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs`
-- Modify: `Brainarr.Plugin/BrainarrImportList.cs`
+- Modify: `Brainarr.Plugin/Brainarr.cs`
 - Modify: tests that construct `Brainarr` directly and need the new constructor arguments
 - Test: `Brainarr.Tests/Services/Healing/LibraryHealerReadOnlyArchitectureTests.cs`
 
@@ -1829,7 +1829,7 @@ Expected before DI changes: architecture tests pass once healing files exist; if
 
 - [ ] **Step 3: Inject Lidarr media/audio services into the plugin provider**
 
-Modify `Brainarr.Plugin/BrainarrImportList.cs`:
+Modify `Brainarr.Plugin/Brainarr.cs`:
 
 ```csharp
 // Add using:
@@ -1938,7 +1938,7 @@ Expected: architecture and DI smoke tests pass.
 Run:
 
 ```powershell
-git add Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs Brainarr.Plugin/BrainarrImportList.cs Brainarr.Tests/Services/Healing/LibraryHealerReadOnlyArchitectureTests.cs Brainarr.Tests/BrainarrDependencyInjectionTests.cs Brainarr.Tests/BrainarrImportListIntegrationTests.cs Brainarr.Tests/ImportList/BrainarrImportListTests.cs Brainarr.Tests/Observability/ObservabilityAdoptionTests.cs
+git add Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs Brainarr.Plugin/Brainarr.cs Brainarr.Tests/Services/Healing/LibraryHealerReadOnlyArchitectureTests.cs Brainarr.Tests/BrainarrDependencyInjectionTests.cs Brainarr.Tests/BrainarrImportListIntegrationTests.cs Brainarr.Tests/ImportList/BrainarrImportListTests.cs Brainarr.Tests/Observability/ObservabilityAdoptionTests.cs
 git commit -m "feat: wire library healer read-only services"
 ```
 
@@ -2089,7 +2089,7 @@ Run:
 
 ```powershell
 git status --short
-git add Brainarr.Plugin/Services/Healing/LibraryHealerLabels.cs Brainarr.Plugin/Services/Healing/LibraryHealerEvidence.cs Brainarr.Plugin/Services/Healing/PathPrivacy.cs Brainarr.Plugin/Services/Healing/LibraryHealerClassifier.cs Brainarr.Plugin/Services/Healing/IFileFingerprintService.cs Brainarr.Plugin/Services/Healing/FileFingerprintService.cs Brainarr.Plugin/Services/Healing/ITagLibSymptomReader.cs Brainarr.Plugin/Services/Healing/LidarrAudioTagSymptomReader.cs Brainarr.Plugin/Services/Healing/LibraryHealerFindingStore.cs Brainarr.Plugin/Services/Healing/LibraryHealerScanRunner.cs Brainarr.Plugin/Services/Healing/LibraryHealerActionHandler.cs Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs Brainarr.Plugin/BrainarrImportList.cs Brainarr.Tests/Services/Healing/PathPrivacyTests.cs Brainarr.Tests/Services/Healing/LibraryHealerClassifierTests.cs Brainarr.Tests/Services/Healing/LidarrAudioTagSymptomReaderTests.cs Brainarr.Tests/Services/Healing/LibraryHealerFindingStoreTests.cs Brainarr.Tests/Services/Healing/LibraryHealerScanRunnerTests.cs Brainarr.Tests/Services/Healing/LibraryHealerReadOnlyArchitectureTests.cs Brainarr.Tests/Services/Core/BrainarrOrchestratorHealerActionsTests.cs docs/library-healer.md docs/README.md
+git add Brainarr.Plugin/Services/Healing/LibraryHealerLabels.cs Brainarr.Plugin/Services/Healing/LibraryHealerEvidence.cs Brainarr.Plugin/Services/Healing/PathPrivacy.cs Brainarr.Plugin/Services/Healing/LibraryHealerClassifier.cs Brainarr.Plugin/Services/Healing/IFileFingerprintService.cs Brainarr.Plugin/Services/Healing/FileFingerprintService.cs Brainarr.Plugin/Services/Healing/ITagLibSymptomReader.cs Brainarr.Plugin/Services/Healing/LidarrAudioTagSymptomReader.cs Brainarr.Plugin/Services/Healing/LibraryHealerFindingStore.cs Brainarr.Plugin/Services/Healing/LibraryHealerScanRunner.cs Brainarr.Plugin/Services/Healing/LibraryHealerActionHandler.cs Brainarr.Plugin/Services/Core/BrainarrOrchestrator.cs Brainarr.Plugin/Services/Core/BrainarrOrchestratorFactory.cs Brainarr.Plugin/Brainarr.cs Brainarr.Tests/Services/Healing/PathPrivacyTests.cs Brainarr.Tests/Services/Healing/LibraryHealerClassifierTests.cs Brainarr.Tests/Services/Healing/LidarrAudioTagSymptomReaderTests.cs Brainarr.Tests/Services/Healing/LibraryHealerFindingStoreTests.cs Brainarr.Tests/Services/Healing/LibraryHealerScanRunnerTests.cs Brainarr.Tests/Services/Healing/LibraryHealerReadOnlyArchitectureTests.cs Brainarr.Tests/Services/Core/BrainarrOrchestratorHealerActionsTests.cs docs/library-healer.md docs/README.md
 git commit -m "fix: harden library healer read-only diagnostics"
 ```
 

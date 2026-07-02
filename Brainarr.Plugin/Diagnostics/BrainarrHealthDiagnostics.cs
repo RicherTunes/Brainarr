@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Diagnostics;
 using Lidarr.Plugin.Common.Abstractions.Llm;
+using Codes = Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
@@ -16,6 +17,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Diagnostics;
 /// </summary>
 internal static class BrainarrHealthDiagnostics
 {
+
     /// <summary>
     /// Well-known authentication methods for LLM providers.
     /// </summary>
@@ -60,7 +62,7 @@ internal static class BrainarrHealthDiagnostics
                     provider: providerName,
                     authMethod: authMethod,
                     model: model,
-                    errorCode: DiagnosticErrorCodes.AuthFailed);
+                    errorCode: Codes.AuthFailed);
         }
         catch (OperationCanceledException)
         {
@@ -75,7 +77,7 @@ internal static class BrainarrHealthDiagnostics
                 provider: providerName,
                 authMethod: authMethod,
                 model: model,
-                errorCode: DiagnosticErrorCodes.Timeout);
+                errorCode: Codes.Timeout);
         }
         catch (Exception ex)
         {
@@ -86,7 +88,7 @@ internal static class BrainarrHealthDiagnostics
                 provider: providerName,
                 authMethod: authMethod,
                 model: model,
-                errorCode: DiagnosticErrorCodes.ConnectionFailed);
+                errorCode: Codes.ConnectionFailed);
         }
     }
 
@@ -112,7 +114,7 @@ internal static class BrainarrHealthDiagnostics
                 errorMessage ?? $"Model '{model}' not found",
                 provider: providerName,
                 model: model,
-                errorCode: DiagnosticErrorCodes.ModelNotFound);
+                errorCode: Codes.ModelNotFound);
     }
 
     /// <summary>
@@ -183,14 +185,14 @@ internal static class BrainarrHealthDiagnostics
     private static string ResolveErrorCode(ProviderMetrics metrics)
     {
         if (metrics.IsAuthValid == false)
-            return DiagnosticErrorCodes.AuthFailed;
+            return Codes.AuthFailed;
 
         if (metrics.IsRateLimitNearExhaustion)
-            return DiagnosticErrorCodes.RateLimited;
+            return Codes.RateLimited;
 
         if (metrics.ConsecutiveFailures >= 5)
-            return DiagnosticErrorCodes.ConnectionFailed;
+            return Codes.ConnectionFailed;
 
-        return DiagnosticErrorCodes.ConnectionFailed;
+        return Codes.ConnectionFailed;
     }
 }
