@@ -14,6 +14,10 @@ namespace Brainarr.Tests.Resilience
             @"\b(?:RunWithRetriesAsync|WithResilienceAsync)\s*(?:<[^>]+>)?\s*\(",
             RegexOptions.Compiled);
 
+        private static readonly Regex LocalRetryWrapperCallPattern = new(
+            @"(?:BrainarrRetryPolicyFactory\s*\.\s*Create\w*\s*\(|new\s+ExponentialBackoffRetryPolicy\s*\()",
+            RegexOptions.Compiled);
+
         [Fact]
         public void Production_code_does_not_call_obsolete_local_retry_apis()
         {
@@ -28,14 +32,57 @@ namespace Brainarr.Tests.Resilience
                 "production call sites must use Lidarr.Plugin.Common RetryPolicyFactory instead of Brainarr's retired local retry helpers");
         }
 
+        [Fact]
+        public void Production_code_does_not_create_brainarr_retry_wrappers()
+        {
+            var root = FindRepositoryRoot();
+            var pluginRoot = Path.Combine(root, "Brainarr.Plugin");
+            var offenders = Directory.EnumerateFiles(pluginRoot, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !IsGeneratedOrBuildOutput(path))
+                .Where(path => !Path.GetRelativePath(root, path).Replace('\\', '/')
+                    .Equals("Brainarr.Plugin/Services/RetryPolicy.cs", StringComparison.OrdinalIgnoreCase))
+                .SelectMany(path => FindForbiddenReferences(root, path, LocalRetryWrapperCallPattern))
+                .ToArray();
+
+            offenders.Should().BeEmpty(
+                "new production retry call sites must use Lidarr.Plugin.Common RetryPolicyFactory directly; Brainarr's retry wrapper is compatibility-only");
+        }
+
+        [Fact]
+        public void Model_detection_uses_common_local_provider_retry_policy()
+        {
+            var root = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(root, "Brainarr.Plugin", "Services", "ModelDetectionService.cs"));
+
+            Regex.Matches(source, @"RetryPolicyFactory\s*\.\s*CreateForLocalProviders\s*\(")
+                .Count
+                .Should().Be(2,
+                    "Ollama and LM Studio model detection must both use Common's local-provider retry preset");
+        }
+
+        [Fact]
+        public void Provider_invoker_uses_common_retry_policy_factory()
+        {
+            var root = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(root, "Brainarr.Plugin", "Services", "Core", "ProviderInvoker.cs"));
+
+            source.Should().Contain("RetryPolicyFactory.Create(",
+                "provider invocation should use the Common retry factory rather than Brainarr-local retry helpers");
+            LocalRetryWrapperCallPattern.IsMatch(source).Should().BeFalse(
+                "provider invocation must not construct Brainarr's compatibility retry wrappers");
+        }
+
         private static IEnumerable<string> FindForbiddenReferences(string root, string path)
+            => FindForbiddenReferences(root, path, ObsoleteRetryInvocationPattern);
+
+        private static IEnumerable<string> FindForbiddenReferences(string root, string path, Regex pattern)
         {
             var inBlockComment = false;
             var lines = File.ReadAllLines(path);
             for (var i = 0; i < lines.Length; i++)
             {
                 var code = StripComments(lines[i], ref inBlockComment);
-                if (ObsoleteRetryInvocationPattern.IsMatch(code))
+                if (pattern.IsMatch(code))
                 {
                     yield return $"{Path.GetRelativePath(root, path)}:{i + 1}: {lines[i].Trim()}";
                 }
