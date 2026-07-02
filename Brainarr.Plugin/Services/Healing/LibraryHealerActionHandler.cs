@@ -284,30 +284,9 @@ public sealed class LibraryHealerActionHandler
             // Surface the real freshness the scan recorded on the finding instead of a hardcoded
             // "current", so the triage advisor actually acts on stale/missing/unknown evidence.
             new HealerFindingFreshness(
-                NormalizeFreshness(finding.EvidenceFreshness),
-                NormalizeFreshness(finding.IdentityFreshness),
+                HealerFreshnessNormalizer.Normalize(finding.EvidenceFreshness),
+                HealerFreshnessNormalizer.Normalize(finding.IdentityFreshness),
                 MalformedRecord: malformedRecord));
-    }
-
-    // Fail closed: an unrecognized (or absent) freshness value is treated as "unknown" rather than
-    // silently assumed "current".
-    private static string NormalizeFreshness(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return HealerTreatmentVocab.Freshness.Unknown;
-        }
-
-        var trimmed = value.Trim();
-        if (string.Equals(trimmed, HealerTreatmentVocab.Freshness.Current, StringComparison.Ordinal)
-            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Stale, StringComparison.Ordinal)
-            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Missing, StringComparison.Ordinal)
-            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Unknown, StringComparison.Ordinal))
-        {
-            return trimmed;
-        }
-
-        return HealerTreatmentVocab.Freshness.Unknown;
     }
 
     private static LibraryHealerFinding EmptyMalformedFinding()

@@ -191,6 +191,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             InternalReasonCodes = LibraryHealerReasonCodes.Normalize(finding.InternalReasonCodes, tagReader.Metadata),
             TagReader = tagReader,
             Probe = probe,
+            EvidenceFreshness = HealerFreshnessNormalizer.Normalize(finding.EvidenceFreshness),
+            IdentityFreshness = HealerFreshnessNormalizer.Normalize(finding.IdentityFreshness),
         };
     }
 

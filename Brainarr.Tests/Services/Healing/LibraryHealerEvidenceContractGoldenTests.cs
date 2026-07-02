@@ -91,7 +91,9 @@ public sealed class LibraryHealerEvidenceContractGoldenTests
                 ErrorType: null,
                 ErrorMessage: null),
             Probe: null,
-            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 0, 0, DateTimeKind.Utc));
+            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 0, 0, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static LibraryHealerFinding TagRepairCandidateFinding()
@@ -127,7 +129,9 @@ public sealed class LibraryHealerEvidenceContractGoldenTests
                     AnyMusicBrainzIdPresent: false,
                     MissingFields: new[] { "title", "musicBrainzId" })),
             Probe: null,
-            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 5, 0, DateTimeKind.Utc));
+            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 5, 0, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static LibraryHealerFinding TaintedStoredFinding()
@@ -158,7 +162,9 @@ public sealed class LibraryHealerEvidenceContractGoldenTests
                 AudioCodec: "ffmpeg -i " + PrivateUnixPath,
                 ErrorType: PrivateUncPath,
                 ErrorMessage: "probe failed " + PrivateWindowsPath + " " + PrivateUncPath + " " + PrivateUnixPath),
-            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 10, 0, DateTimeKind.Utc));
+            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 10, 0, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static LibraryHealerFinding MalformedStoredFinding()
@@ -170,7 +176,9 @@ public sealed class LibraryHealerEvidenceContractGoldenTests
             new[] { "TAG_READER_ZERO_DURATION" },
             TagReader: null!,
             Probe: null,
-            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 15, 0, DateTimeKind.Utc));
+            ObservedAtUtc: new DateTime(2026, 7, 1, 11, 15, 0, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 
     private static string ToCanonicalJson(object value)

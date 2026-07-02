@@ -1,3 +1,5 @@
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using FluentAssertions;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
@@ -398,6 +400,63 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
     }
 
     [Fact]
+    public void SaveBatch_ShouldNormalizeFreshnessBeforePersisting()
+    {
+        var store = CreateStore();
+        const string privatePathFreshness = @"D:\Music\Private Artist\track01.flac";
+        const string mbidLikeFreshness = "550e8400-e29b-41d4-a716-446655440000";
+        var finding = CreateFinding(
+            id: "freshness-sanitize",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "abcdef123456",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc),
+            evidenceFreshness: privatePathFreshness,
+            identityFreshness: mbidLikeFreshness);
+
+        store.SaveBatch(new[] { finding });
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+        persisted.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        persisted.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+
+        var json = File.ReadAllText(StorePath);
+        json.Should().NotContain("Private Artist");
+        json.Should().NotContain(@"D:\Music");
+        json.Should().NotContain("550e8400-e29b-41d4-a716-446655440000");
+    }
+
+    [Fact]
+    public void GetRecent_ShouldFailClosed_WhenPersistedStoreEntryHasNoFreshnessFields()
+    {
+        var value = JsonSerializer.SerializeToNode(CreateFinding(
+            id: "legacy-freshness",
+            redactedPath: "track01.flac#abcdef123456",
+            pathHash: "abcdef123456",
+            observedAtUtc: new DateTime(2026, 6, 30, 12, 0, 0, DateTimeKind.Utc),
+            evidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            identityFreshness: HealerTreatmentVocab.Freshness.Current))?.AsObject()
+            ?? throw new InvalidOperationException("Unable to serialize legacy finding.");
+        value.Remove("EvidenceFreshness");
+        value.Remove("IdentityFreshness");
+
+        var envelope = new JsonObject
+        {
+            ["legacy-freshness"] = new JsonObject
+            {
+                ["value"] = value,
+                ["timestamp"] = "2026-06-30T12:00:00Z",
+            },
+        };
+        File.WriteAllText(StorePath, envelope.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+
+        var persisted = CreateStore().GetRecent(1).Should().ContainSingle().Subject;
+
+        persisted.Id.Should().Be("legacy-freshness");
+        persisted.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        persisted.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+    }
+
+    [Fact]
     public void SaveBatch_ShouldAllowListTagMetadataMissingFields()
     {
         var store = CreateStore();
@@ -674,7 +733,9 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         string? probeAudioCodec = null,
         string? probeErrorType = null,
         TagMetadataEvidence? tagMetadata = null,
-        LibraryHealerLabel label = LibraryHealerLabel.ProbeEvidence)
+        LibraryHealerLabel label = LibraryHealerLabel.ProbeEvidence,
+        string evidenceFreshness = HealerTreatmentVocab.Freshness.Current,
+        string identityFreshness = HealerTreatmentVocab.Freshness.Current)
     {
         return new LibraryHealerFinding(
             id,
@@ -703,6 +764,8 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
                 AudioCodec: probeAudioCodec ?? (probeErrorMessage is null ? "flac" : null),
                 ErrorType: probeErrorType ?? (probeErrorMessage is null ? null : "ProbeError"),
                 ErrorMessage: probeErrorMessage),
-            observedAtUtc);
+            observedAtUtc,
+            EvidenceFreshness: evidenceFreshness,
+            IdentityFreshness: identityFreshness);
     }
 }
