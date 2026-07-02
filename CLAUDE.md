@@ -260,7 +260,7 @@ Brainarr.Plugin/
 │   ├── RateLimiter.cs
 │   ├── RecommendationCache.cs
 │   └── RetryPolicy.cs
-├── Brainarr.cs            # Main Lidarr integration
+├── Brainarr.cs  # Main Lidarr integration
 └── BrainarrSettings.cs    # Configuration UI
 
 Brainarr.Tests/            # Comprehensive test suite
