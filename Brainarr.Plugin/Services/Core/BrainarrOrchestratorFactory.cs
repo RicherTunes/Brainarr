@@ -8,6 +8,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Performance;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Policies;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting.Services;
@@ -20,6 +21,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization;
 using NzbDrone.Core.Music;
 using Lidarr.Plugin.Common.Services.Performance;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using NzbDrone.Core.MediaFiles;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 
@@ -99,6 +101,12 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<ReviewQueueService>(sp => new ReviewQueueService(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<RecommendationHistory>(sp => new RecommendationHistory(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IPerformanceMetrics>(sp => new PerformanceMetrics(sp.GetRequiredService<Logger>()));
+
+        services.TryAddSingleton<IFileFingerprintService, FileFingerprintService>();
+        services.TryAddSingleton<ITagLibSymptomReader, LidarrAudioTagSymptomReader>();
+        services.TryAddSingleton<ILibraryHealerFindingStore>(_ => new LibraryHealerFindingStore());
+        services.TryAddSingleton<ILibraryHealerScanRunner, LibraryHealerScanRunner>();
+        services.TryAddSingleton<LibraryHealerActionHandler>();
 
         services.TryAddSingleton<IPlanCache>(sp =>
         {
@@ -223,7 +231,9 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IRecommendationCoordinator>(),
                 sp.GetRequiredService<ILibraryAwarePromptBuilder>(),
                 sp.GetRequiredService<IStyleCatalogService>(),
-                sp.GetRequiredService<IBreakerRegistry>());
+                sp.GetRequiredService<IBreakerRegistry>(),
+                sp.GetRequiredService<IDuplicateFilterService>(),
+                sp.GetRequiredService<LibraryHealerActionHandler>());
         });
     }
 
@@ -242,18 +252,24 @@ internal static class BrainarrOrchestratorFactory
         IHttpClient httpClient,
         IArtistService artistService,
         IAlbumService albumService,
+        IMediaFileService mediaFileService,
+        IAudioTagService audioTagService,
         Action? persistSettingsCallback = null)
     {
         if (logger is null) throw new ArgumentNullException(nameof(logger));
         if (httpClient is null) throw new ArgumentNullException(nameof(httpClient));
         if (artistService is null) throw new ArgumentNullException(nameof(artistService));
         if (albumService is null) throw new ArgumentNullException(nameof(albumService));
+        if (mediaFileService is null) throw new ArgumentNullException(nameof(mediaFileService));
+        if (audioTagService is null) throw new ArgumentNullException(nameof(audioTagService));
 
         var services = new ServiceCollection();
         services.AddSingleton(logger);
         services.AddSingleton(httpClient);
         services.AddSingleton(artistService);
         services.AddSingleton(albumService);
+        services.AddSingleton(mediaFileService);
+        services.AddSingleton(audioTagService);
 
         ConfigureServices(services);
 
