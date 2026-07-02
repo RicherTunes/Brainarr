@@ -104,7 +104,7 @@ internal static class BrainarrOrchestratorFactory
 
         services.TryAddSingleton<IFileFingerprintService, FileFingerprintService>();
         services.TryAddSingleton<ITagLibSymptomReader, LidarrAudioTagSymptomReader>();
-        services.TryAddSingleton<ILibraryHealerFindingStore>(_ => new LibraryHealerFindingStore());
+        services.TryAddSingleton<ILibraryHealerFindingStore>(sp => new LibraryHealerFindingStore(logger: sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<ILibraryHealerScanRunner, LibraryHealerScanRunner>();
         services.TryAddSingleton<LibraryHealerActionHandler>();
 
