@@ -256,29 +256,13 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         };
     }
 
-    private static bool ShouldRedactPathMaterial(string? value)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var trimmed = value.Trim();
-        return trimmed.IndexOfAny(new[] { '\\', '/' }) >= 0 || HasWindowsRoot(trimmed);
-    }
-
+    // Delegates to the shared predicate so persistence and API projection redact identically.
+    // Historically this had a weaker local copy (no metadata/command-material checks) than the API
+    // projection, which meant a token containing e.g. a bare MusicBrainz id could be redacted in the
+    // API response yet persisted raw to disk. Sharing the predicate closes that divergence.
     private static bool ShouldRedactTokenMaterial(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var trimmed = value.Trim();
-        return ShouldRedactPathMaterial(trimmed)
-            || HasDriveDesignator(trimmed)
-            || ContainsMediaExtension(trimmed)
-            || trimmed.Any(char.IsWhiteSpace);
+        return LibraryHealerTokenRedaction.ShouldRedactTokenMaterial(value);
     }
 
     private static bool ContainsLikelyPath(string? value)

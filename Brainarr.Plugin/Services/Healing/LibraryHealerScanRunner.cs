@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
 using NzbDrone.Core.MediaFiles;
 using NzbDrone.Core.Music;
 
@@ -35,6 +36,15 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
     private readonly IFileFingerprintService _fingerprints;
     private readonly ILibraryHealerFindingStore _findingStore;
     private readonly Func<TimeSpan>? _elapsedProvider;
+    private readonly Func<string, bool> _rootOnlineProbe;
+
+    // Once this many path-unresolved (missing/inconclusive) findings share one storage root, the root
+    // itself becomes the more likely explanation than that many independent per-file faults.
+    private const int RootCoalesceThreshold = 3;
+
+    // Cap on how many distinct roots we will health-check per scan, so one offline-mount scan cannot
+    // fan out into an unbounded number of root probes.
+    private const int MaxRootHealthProbes = 8;
 
     public LibraryHealerScanRunner(
         IArtistService artistService,
@@ -52,7 +62,8 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         ITagLibSymptomReader tagReader,
         IFileFingerprintService fingerprints,
         ILibraryHealerFindingStore findingStore,
-        Func<TimeSpan>? elapsedProvider)
+        Func<TimeSpan>? elapsedProvider,
+        Func<string, bool>? rootOnlineProbe = null)
     {
         _artistService = artistService ?? throw new ArgumentNullException(nameof(artistService));
         _mediaFileService = mediaFileService ?? throw new ArgumentNullException(nameof(mediaFileService));
@@ -60,6 +71,26 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         _fingerprints = fingerprints ?? throw new ArgumentNullException(nameof(fingerprints));
         _findingStore = findingStore ?? throw new ArgumentNullException(nameof(findingStore));
         _elapsedProvider = elapsedProvider;
+        _rootOnlineProbe = rootOnlineProbe ?? DefaultRootOnlineProbe;
+    }
+
+    // Bounded, read-only reachability check for a storage root. A hung or throwing probe (dead mount)
+    // is treated as offline so the scan cannot stall and the outage is correctly coalesced.
+    private static bool DefaultRootOnlineProbe(string root)
+    {
+        try
+        {
+            var probe = Task.Factory.StartNew(
+                () => Directory.Exists(root),
+                CancellationToken.None,
+                TaskCreationOptions.LongRunning,
+                TaskScheduler.Default);
+            return SafeAsyncHelper.RunSafeSync(() => probe.WaitAsync(TimeSpan.FromSeconds(2)));
+        }
+        catch (Exception)
+        {
+            return false;
+        }
     }
 
     public LibraryHealerScanResult Scan(
@@ -77,6 +108,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var scannedTrackFiles = 0;
         var persistedFindings = 0;
         var findings = new List<LibraryHealerFinding>();
+        var rootGroups = new Dictionary<string, RootGroupAccumulator>(StringComparer.Ordinal);
 
         void SavePendingFindings()
         {
@@ -152,10 +184,13 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 if (finding is not null)
                 {
                     findings.Add(finding);
+                    TrackStorageRootCandidate(rootGroups, finding, candidate.TrackFile.Path);
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
             }
+
+            CoalesceOfflineStorageRoots(findings, rootGroups, cancellationToken);
 
             if (findings.Count > 0)
             {
@@ -326,7 +361,11 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 inconclusiveClassification.InternalReasonCodes,
                 new TagReaderEvidence(false, false, null, null, null),
                 null,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                // The path could not be probed, so we cannot judge whether the recorded evidence
+                // still reflects reality.
+                HealerFreshnessEvaluator.Unprobeable.Evidence,
+                HealerFreshnessEvaluator.Unprobeable.Identity);
         }
 
         if (!existence.Exists)
@@ -347,7 +386,10 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 missingPathClassification.InternalReasonCodes,
                 new TagReaderEvidence(false, false, null, null, null),
                 null,
-                DateTime.UtcNow);
+                DateTime.UtcNow,
+                // The file is confirmed gone at its recorded path.
+                HealerFreshnessEvaluator.Gone.Evidence,
+                HealerFreshnessEvaluator.Gone.Identity);
         }
 
         cancellationToken.ThrowIfCancellationRequested();
@@ -373,6 +415,9 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         var fingerprint = _fingerprints.Read(path);
         cancellationToken.ThrowIfCancellationRequested();
         var pathHash = PathPrivacy.HashPath(path);
+        // Compare Lidarr's recorded state (DB Size/Modified) against the live on-disk probe to derive
+        // real freshness -- read-only, using values the scan already gathered.
+        var freshness = HealerFreshnessEvaluator.ForProbedFile(trackFile.Size, trackFile.Modified, fingerprint);
         return new LibraryHealerFinding(
             "track-" + trackFile.Id + "-" + pathHash,
             new LibraryHealerFileIdentity(
@@ -387,7 +432,9 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             classification.InternalReasonCodes,
             tagReader,
             null,
-            DateTime.UtcNow);
+            DateTime.UtcNow,
+            freshness.Evidence,
+            freshness.Identity);
     }
 
     private static bool IsCancellationEvidence(TagReaderEvidence tagReader)
@@ -432,6 +479,151 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         }
 
         return scannedTrackFiles == 0 ? maxElapsed : TimeSpan.Zero;
+    }
+
+    private static void TrackStorageRootCandidate(
+        Dictionary<string, RootGroupAccumulator> rootGroups,
+        LibraryHealerFinding finding,
+        string? realPath)
+    {
+        if (!IsPathUnresolved(finding))
+        {
+            return;
+        }
+
+        var root = HealerStorageRoot.Extract(realPath);
+        if (root is null)
+        {
+            return;
+        }
+
+        var key = HealerStorageRoot.Key(root);
+        if (!rootGroups.TryGetValue(key, out var group))
+        {
+            group = new RootGroupAccumulator(root, finding);
+            rootGroups[key] = group;
+        }
+
+        group.Count++;
+        group.FindingIds.Add(finding.Id);
+    }
+
+    // A finding is "path-unresolved" when the file could not be confirmed at its recorded path --
+    // either confirmed missing or the probe was inconclusive. These are the findings a single offline
+    // storage root would produce en masse; healthy-file tag/probe findings are never coalesced.
+    private static bool IsPathUnresolved(LibraryHealerFinding finding)
+    {
+        return finding.InternalReasonCodes is not null
+            && finding.InternalReasonCodes.Any(reason =>
+                string.Equals(reason, "FILE_MISSING", StringComparison.Ordinal)
+                || string.Equals(reason, "PATH_PROBE_INCONCLUSIVE", StringComparison.Ordinal));
+    }
+
+    // When many path-unresolved findings share one storage root AND that root is itself
+    // offline/unreachable, collapse them into a single "storage root offline" finding instead of
+    // burying real issues under thousands of per-file entries. A healthy root leaves its per-file
+    // findings untouched. Bounded: at most MaxRootHealthProbes distinct roots are ever probed, one
+    // bounded probe each.
+    private void CoalesceOfflineStorageRoots(
+        List<LibraryHealerFinding> findings,
+        Dictionary<string, RootGroupAccumulator> rootGroups,
+        CancellationToken cancellationToken)
+    {
+        if (rootGroups.Count == 0)
+        {
+            return;
+        }
+
+        var probes = 0;
+        var idsToRemove = new HashSet<string>(StringComparer.Ordinal);
+        var coalesced = new List<LibraryHealerFinding>();
+
+        foreach (var group in rootGroups.Values.OrderByDescending(g => g.Count))
+        {
+            if (group.Count < RootCoalesceThreshold)
+            {
+                continue;
+            }
+
+            if (probes >= MaxRootHealthProbes)
+            {
+                break;
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            probes++;
+
+            bool online;
+            try
+            {
+                online = _rootOnlineProbe(group.RootPath);
+            }
+            catch (Exception)
+            {
+                online = false;
+            }
+
+            if (online)
+            {
+                continue;
+            }
+
+            foreach (var id in group.FindingIds)
+            {
+                idsToRemove.Add(id);
+            }
+
+            coalesced.Add(BuildCoalescedRootFinding(group));
+        }
+
+        if (idsToRemove.Count == 0)
+        {
+            return;
+        }
+
+        findings.RemoveAll(finding => idsToRemove.Contains(finding.Id));
+        findings.AddRange(coalesced);
+    }
+
+    private static LibraryHealerFinding BuildCoalescedRootFinding(RootGroupAccumulator group)
+    {
+        var representative = group.Representative;
+        var rootHash = PathPrivacy.HashPath(group.RootPath);
+        return new LibraryHealerFinding(
+            "storage-root-" + rootHash,
+            new LibraryHealerFileIdentity(
+                representative.File.TrackFileId,
+                representative.File.ArtistId,
+                representative.File.AlbumId,
+                PathPrivacy.Redact(group.RootPath),
+                rootHash,
+                null,
+                null),
+            LibraryHealerLabel.PathInconsistency,
+            new[] { "PATH_PROBE_INCONCLUSIVE", "STORAGE_ROOT_OFFLINE" },
+            new TagReaderEvidence(false, false, null, null, null),
+            null,
+            DateTime.UtcNow,
+            HealerFreshnessEvaluator.Unprobeable.Evidence,
+            HealerFreshnessEvaluator.Unprobeable.Identity,
+            group.Count);
+    }
+
+    private sealed class RootGroupAccumulator
+    {
+        public RootGroupAccumulator(string rootPath, LibraryHealerFinding representative)
+        {
+            RootPath = rootPath;
+            Representative = representative;
+        }
+
+        public string RootPath { get; }
+
+        public LibraryHealerFinding Representative { get; }
+
+        public List<string> FindingIds { get; } = new();
+
+        public int Count { get; set; }
     }
 
     private sealed record Candidate(int ArtistId, TrackFile TrackFile);

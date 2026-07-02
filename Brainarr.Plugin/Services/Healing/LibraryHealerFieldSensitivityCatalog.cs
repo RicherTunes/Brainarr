@@ -7,6 +7,7 @@ public static class LibraryHealerFieldSensitivityCatalog
 
     private static readonly IReadOnlyList<LibraryHealerFieldSensitivityEntry> Entries =
     [
+        Public("items[].affectedTrackCount", "Aggregate count of tracks collapsed into a coalesced storage-root finding; null for per-file findings."),
         LocalIdentifier("items[].albumId", "Lidarr album ids are local library identifiers."),
         LocalIdentifier("items[].artistId", "Lidarr artist ids are local library identifiers."),
         RedactedIdentifier("items[].id", "Finding ids are stable correlation tokens for local diagnostics."),
