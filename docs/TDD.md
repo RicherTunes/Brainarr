@@ -33,10 +33,10 @@
 
 ```text
 Brainarr.Plugin/
-├── BrainarrImportList.cs                 # Main Lidarr integration
+├── Brainarr.cs                           # Main Lidarr integration
 ├── BrainarrSettings.cs                   # Configuration UI and validation
 ├── Configuration/
-│   ├── Constants.cs                      # Configuration constants
+│   ├── BrainarrConstants.cs              # Configuration constants
 │   ├── ProviderConfiguration.cs          # Base provider configuration
 │   ├── ProviderSettings.cs               # Settings framework
 │   └── Providers/                        # Provider-specific configurations

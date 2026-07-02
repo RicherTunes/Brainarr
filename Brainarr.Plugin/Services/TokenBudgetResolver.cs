@@ -133,7 +133,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// <summary>
         /// Token budget resolved for a specific provider/model/strategy combination.
         /// </summary>
-        public sealed record PromptBudget
+        internal sealed record PromptBudget
         {
             public int ContextTokens { get; init; }
             public int PromptTokens { get; init; }

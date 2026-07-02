@@ -71,7 +71,7 @@ state is canonical; if you find your old WIP for them on the recovery
 branch, discard it:
 
 - Brainarr.Plugin/Configuration/Enums.cs (ZaiCoding enum + expanded GLM catalog)
-- Brainarr.Plugin/Configuration/Constants.cs (ZaiCoding constants)
+- Brainarr.Plugin/Configuration/BrainarrConstants.cs (ZaiCoding constants)
 - Brainarr.Plugin/Configuration/BrainarrSettingsValidator.cs (ZaiCoding validator)
 - Brainarr.Plugin/Configuration/ModelIdMapper.cs (zaicoding case)
 - Brainarr.Plugin/Configuration/ModelIdMappingValidator.cs

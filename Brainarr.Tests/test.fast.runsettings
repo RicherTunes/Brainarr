@@ -31,7 +31,7 @@
           <!-- Exclude patterns must be comma-separated in a single element -->
           <Exclude>[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Providers.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Services.Resilience.*,[Lidarr.Plugin.Brainarr]NzbDrone.Core.ImportLists.Brainarr.Models.Responses.*,[Lidarr.Plugin.Brainarr]Brainarr.Plugin.Models.ProviderResponses.*</Exclude>
           <!-- Exclude files from coverage in fast CI to keep gate deterministic -->
-          <ExcludeByFile>**/Services/Providers/*.cs,**/Services/Enrichment/*.cs,**/Services/Cost/*.cs,**/Services/Security/*.cs,**/Services/Performance/*.cs,**/Services/NLogWrapper.cs,**/Services/ModelDetectionService.cs,**/Services/Telemetry/*.cs,**/Services/Core/AIService.cs,**/Services/Core/ProviderManager.cs,**/BrainarrImportList.cs</ExcludeByFile>
+          <ExcludeByFile>**/Services/Providers/*.cs,**/Services/Enrichment/*.cs,**/Services/Cost/*.cs,**/Services/Security/*.cs,**/Services/Performance/*.cs,**/Services/NLogWrapper.cs,**/Services/ModelDetectionService.cs,**/Services/Telemetry/*.cs,**/Services/Core/AIService.cs,**/Services/Core/ProviderManager.cs,**/Brainarr.cs</ExcludeByFile>
         </Configuration>
       </DataCollector>
     </DataCollectors>

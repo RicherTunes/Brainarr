@@ -101,14 +101,14 @@ namespace Brainarr.Tests
         }
 
         // Source line 29: MaxRecommendations = BrainarrConstants.DefaultRecommendations;
-        // Proof: grep -n "DefaultRecommendations" Brainarr.Plugin/Configuration/Constants.cs
+        // Proof: grep -n "DefaultRecommendations" Brainarr.Plugin/Configuration/BrainarrConstants.cs
         //   33:        public const int DefaultRecommendations = 20;
         [Fact]
         public void MaxRecommendations_Default_Is20()
         {
             var s = Create();
             s.MaxRecommendations.Should().Be(20,
-                "because DefaultRecommendations = 20 (Constants.cs:33)");
+                "because DefaultRecommendations = 20 (BrainarrConstants.cs:33)");
         }
 
         // Source line 35: EnableIterativeRefinement = true;
@@ -138,25 +138,25 @@ namespace Brainarr.Tests
         #region Defaults — AI, Timeout, and Throttling
 
         // Source line 64: CacheDuration = TimeSpan.FromHours(BrainarrConstants.MinRefreshIntervalHours);
-        // Proof: grep -n "MinRefreshIntervalHours" Brainarr.Plugin/Configuration/Constants.cs
+        // Proof: grep -n "MinRefreshIntervalHours" Brainarr.Plugin/Configuration/BrainarrConstants.cs
         //   83:        public const int MinRefreshIntervalHours = 6;
         [Fact]
         public void CacheDuration_Default_Is6Hours()
         {
             var s = Create();
             s.CacheDuration.Should().Be(TimeSpan.FromHours(6),
-                "because MinRefreshIntervalHours = 6 (Constants.cs:83)");
+                "because MinRefreshIntervalHours = 6 (BrainarrConstants.cs:83)");
         }
 
         // Source line 102: AIRequestTimeoutSeconds = BrainarrConstants.DefaultAITimeout;
-        // Proof: grep -n "DefaultAITimeout" Brainarr.Plugin/Configuration/Constants.cs
+        // Proof: grep -n "DefaultAITimeout" Brainarr.Plugin/Configuration/BrainarrConstants.cs
         //   37:        public const int DefaultAITimeout = 30;
         [Fact]
         public void AIRequestTimeoutSeconds_Default_Is30()
         {
             var s = Create();
             s.AIRequestTimeoutSeconds.Should().Be(30,
-                "because DefaultAITimeout = 30 (Constants.cs:37)");
+                "because DefaultAITimeout = 30 (BrainarrConstants.cs:37)");
         }
 
         // Source line 74: IterativeMaxIterations { get; set; } = 3;
