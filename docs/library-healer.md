@@ -27,7 +27,7 @@ A1 cannot:
 
 ## Actions
 
-- `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain.
+- `healer/scan`: runs one bounded read-only diagnostic batch and stores current findings. It defaults to 100 files, caps at 500 files, supports `artistId`, `afterTrackFileId`, and `maxSeconds`, and returns `truncated=true` plus `nextAfterTrackFileId` when more files remain and the cursor is safe to use.
 - `healer/getfindings`: returns recent findings with redacted paths, an advisory A2 treatment plan per finding, and summary counts for the returned treatment plans. It supports optional read-only triage filters: `workflow`, `risk`, `blockedReason`, and `authorized`. `workflow`, `risk`, and `blockedReason` accept comma-separated, case-insensitive values. Unknown treatment filter values are ignored; if no supplied values are recognized, that filter is not applied. `authorized` accepts `true` or `false`; malformed boolean values are ignored. Recognized filters apply before the output `limit`, and the `summary` describes only the returned filtered findings.
 - `healer/getfieldcatalog`: returns static field-sensitivity metadata for the `healer/getfindings` output contract. It is read-only and does not scan files, read findings, mutate Lidarr, or contact providers.
 - `healer/clearfindings`: clears Brainarr-owned findings.
@@ -42,7 +42,7 @@ The default scan and A2 triage projection do not contact AI providers and do not
 
 Default action output returns `basename#hash`, where `hash` is the first 12 hex characters of a SHA-256 hash of the normalized full path. This lets repeated findings correlate without exposing full local folder structure in screenshots or logs.
 
-The persisted finding store uses the same redacted path shape for shareable evidence. Raw media paths may be read in process to open the file, but A1 should not persist them in diagnostic records.
+The persisted finding store uses the same redacted path shape for local diagnostic evidence. Raw media paths may be read in process to open the file, but A1 should not persist them in diagnostic records.
 
 A1 sanitizes path-like values at both the store boundary and the action boundary. This includes stale or hand-edited values that already look like `name#hash` but still contain Windows, UNC, or relative path material before the hash.
 
@@ -50,13 +50,13 @@ The A2 action projection treats persisted findings as tainted input. Suspicious 
 
 ## Scan Behavior
 
-Scans are bounded and resumable. Whole-library scans enumerate all target artists before applying the global track-file cursor so low-ID files from later artists are not skipped. Requested-artist scans may stop after one lookahead item so the action can report truncation without scanning more than the configured batch.
+Scans are bounded and resumable. Whole-library scans enumerate all target artists before applying the global track-file cursor so low-ID files from later artists are not skipped, while retaining only the bounded low-ID lookahead needed for the current batch. If `maxSeconds` expires during whole-library candidate gathering, A1 stops before fetching more artist file lists, reports `truncated=true`, and omits `nextAfterTrackFileId` because unseen artists may still contain lower track-file IDs. Requested-artist scans may stop after one lookahead item so the action can report truncation without scanning more than the configured batch.
 
 Confirmed missing paths are recorded as `PathInconsistency` with `FILE_MISSING` evidence, redacted path identity, and Lidarr's last known file size and modified timestamp. Inconclusive path probes, including timeouts, access denied results, invalid paths, unavailable parents, and transient storage/import churn, are recorded as `NeedsHumanReview` with `PATH_PROBE_INCONCLUSIVE` plus the specific reason. A1 does not invoke TagLib or run a full file fingerprint read for confirmed missing or inconclusive path probes.
 
 Files with a positive TagLib duration but missing core tags are recorded as `TagMetadataIssue`. The stored metadata evidence is limited to booleans and generic missing-field names such as `title`, `album`, or `musicBrainzId`; it does not store artist names, album titles, track titles, or raw MusicBrainz values. Persistence and `healer/getfindings` output recompute missing fields from the booleans only, normalize reason codes through the fixed diagnostic vocabulary, downgrade stale metadata labels when the booleans are complete, and redact metadata-bearing error messages, so stale or malformed diagnostic records cannot return arbitrary tag values.
 
-The action's `maxSeconds` value is enforced through the runner's bounded operation timeouts, not by canceling the scan token. If the scan budget expires while a path probe is waiting, A1 records the probe as a timeout finding for human review; an external cancellation token remains an abort signal and does not persist partial findings.
+The action's `maxSeconds` value is enforced through candidate-gathering budget checks and the runner's bounded path-probe timeouts, not by canceling the scan token. Synchronous Lidarr host calls that enumerate files or read tags cannot be preempted mid-call, so the budget is checked between those calls. If the scan budget expires while a path probe is waiting, A1 records the probe as a timeout finding for human review; an external cancellation token remains an abort signal and does not persist partial findings.
 
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
