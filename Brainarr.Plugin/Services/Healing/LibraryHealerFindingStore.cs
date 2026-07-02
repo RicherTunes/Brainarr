@@ -59,12 +59,13 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
             return;
         }
 
+        var entries = sanitized
+            .Select(static finding => new KeyValuePair<string, LibraryHealerFinding>(finding.Id, finding))
+            .ToList();
+
         SafeAsyncHelper.RunSafeSync(async () =>
         {
-            foreach (var finding in sanitized)
-            {
-                await _store.SetAsync(finding.Id, finding).ConfigureAwait(false);
-            }
+            await _store.SetManyAsync(entries).ConfigureAwait(false);
         });
     }
 
