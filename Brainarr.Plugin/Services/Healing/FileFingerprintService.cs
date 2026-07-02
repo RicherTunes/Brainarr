@@ -1,3 +1,5 @@
+using NzbDrone.Core.ImportLists.Brainarr.Utils;
+
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
 public sealed class FileFingerprintService : IFileFingerprintService
@@ -70,10 +72,7 @@ public sealed class FileFingerprintService : IFileFingerprintService
                     TaskScheduler.Default);
                 releaseInTask = true;
 
-                return existsTask
-                    .WaitAsync(probeTimeout, cancellationToken)
-                    .GetAwaiter()
-                    .GetResult();
+                return SafeAsyncHelper.RunSafeSync(() => existsTask.WaitAsync(probeTimeout, cancellationToken));
             }
             finally
             {

@@ -133,9 +133,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     return GetDefaultOllamaOptions();
                 }
 
-                var models = _modelDetection.DetectOllamaModelsAsync(baseUrl)
-                    .GetAwaiter()
-                    .GetResult();
+                var models = SafeAsyncHelper.RunSafeSync(() => _modelDetection.DetectOllamaModelsAsync(baseUrl));
 
                 if (models != null && models.Any())
                 {
