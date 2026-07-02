@@ -44,7 +44,7 @@ Brainarr/
 ├── Brainarr.Plugin/          # Main plugin project
 │   ├── Configuration/        # Settings and provider configs
 │   ├── Services/            # Core services and providers
-│   └── BrainarrImportList.cs # Main integration point
+│   └── Brainarr.cs           # Main integration point
 ├── Brainarr.Tests/          # Unit and integration tests
 ├── ext/                     # External dependencies (gitignored)
 │   └── Lidarr/             # Lidarr source checkout
