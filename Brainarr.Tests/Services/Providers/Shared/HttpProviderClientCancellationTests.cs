@@ -18,23 +18,16 @@ namespace Brainarr.Tests.Services.Providers.Shared
     public class HttpProviderClientCancellationTests
     {
         /// <summary>
-        /// A fake IHttpClient that delays for a configurable duration before returning.
-        /// Used to simulate a slow-loris LLM API response.
+        /// Minimal fake IHttpClient that lets each test control the async HTTP outcome.
         /// </summary>
-        private sealed class SlowFakeHttpClient : IHttpClient
+        private sealed class FakeHttpClient : IHttpClient
         {
-            private readonly TimeSpan _delay;
+            private readonly Func<HttpRequest, Task<HttpResponse>> _executeAsync;
 
-            public SlowFakeHttpClient(TimeSpan delay) => _delay = delay;
+            public FakeHttpClient(Func<HttpRequest, Task<HttpResponse>> executeAsync)
+                => _executeAsync = executeAsync;
 
-            public Task<HttpResponse> ExecuteAsync(HttpRequest request)
-            {
-                return Task.Run(async () =>
-                {
-                    await Task.Delay(_delay).ConfigureAwait(false);
-                    return new HttpResponse(request, new HttpHeader(), "{}", HttpStatusCode.OK);
-                });
-            }
+            public Task<HttpResponse> ExecuteAsync(HttpRequest request) => _executeAsync(request);
 
             // ---- Stub implementations of the rest of IHttpClient (not used) ----
             public HttpResponse Execute(HttpRequest request)
@@ -68,26 +61,34 @@ namespace Brainarr.Tests.Services.Providers.Shared
         [Fact]
         public async Task ExecuteWithCt_WhenTokenCancelled_AbortsWithin500ms()
         {
-            // Arrange: slow IHttpClient stub that takes 30s to respond
-            var slowClient = new SlowFakeHttpClient(TimeSpan.FromSeconds(30));
-            using var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(200));
+            var started = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var neverCompletes = new TaskCompletionSource<HttpResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var slowClient = new FakeHttpClient(_ =>
+            {
+                started.SetResult(null);
+                return neverCompletes.Task;
+            });
+            using var cts = new CancellationTokenSource();
             var request = new HttpRequest("https://example.invalid/");
 
-            // Act + Assert: should throw OperationCanceledException well under 30s.
-            // Use 2s ceiling (not 500ms) to tolerate thread-pool starvation under full-suite load.
+            var pending = HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(1));
+
             var sw = Stopwatch.StartNew();
-            Func<Task> act = () => HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
+            cts.Cancel();
+
+            Func<Task> act = () => pending;
             await act.Should().ThrowAsync<OperationCanceledException>();
             sw.Stop();
-            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(5),
-                "cancellation must abort the request, not wait for the full 30-second timeout");
+            sw.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(1),
+                "synchronous cancellation must abort the request without waiting for the underlying HTTP task");
         }
 
         [Fact]
         public async Task ExecuteWithCt_WhenTokenAlreadyCancelled_ThrowsImmediately()
         {
-            // Arrange: pre-cancelled token
-            var slowClient = new SlowFakeHttpClient(TimeSpan.FromSeconds(30));
+            var slowClient = new FakeHttpClient(_ =>
+                new TaskCompletionSource<HttpResponse>(TaskCreationOptions.RunContinuationsAsynchronously).Task);
             using var cts = new CancellationTokenSource();
             cts.Cancel();
             var request = new HttpRequest("https://example.invalid/");
@@ -100,8 +101,8 @@ namespace Brainarr.Tests.Services.Providers.Shared
         [Fact]
         public async Task ExecuteWithCt_WhenNotCancelled_ReturnsResponse()
         {
-            // Arrange: fast response, no cancellation
-            var fastClient = new SlowFakeHttpClient(TimeSpan.FromMilliseconds(10));
+            var fastClient = new FakeHttpClient(req =>
+                Task.FromResult(new HttpResponse(req, new HttpHeader(), "{}", HttpStatusCode.OK)));
             var request = new HttpRequest("https://example.invalid/");
 
             // Act
@@ -119,7 +120,8 @@ namespace Brainarr.Tests.Services.Providers.Shared
             // the WhenAny race regardless of scheduling. (The previous version armed a 10s timer and
             // relied on a 10ms response beating it — which flaked under heavy parallel load when
             // thread-pool starvation delayed the response past 10s. Determinism instead of a race.)
-            var fastClient = new SlowFakeHttpClient(TimeSpan.FromMilliseconds(10));
+            var fastClient = new FakeHttpClient(req =>
+                Task.FromResult(new HttpResponse(req, new HttpHeader(), "{}", HttpStatusCode.OK)));
             using var cts = new CancellationTokenSource();
             var request = new HttpRequest("https://example.invalid/");
 
