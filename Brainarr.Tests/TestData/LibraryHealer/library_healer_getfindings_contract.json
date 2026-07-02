@@ -1,0 +1,281 @@
+{
+  "items": [
+    {
+      "albumId": 20,
+      "artistId": 10,
+      "id": "repair-candidate",
+      "label": "TagReaderSymptom",
+      "modifiedUtc": "2026-07-01T10:00:00Z",
+      "observedAtUtc": "2026-07-01T11:00:00Z",
+      "path": "repair.flac#111111111111",
+      "pathHash": "111111111111",
+      "probe": null,
+      "reasons": [
+        "TAG_READER_ZERO_DURATION"
+      ],
+      "size": 123456,
+      "tagReader": {
+        "DurationSeconds": 0,
+        "ErrorMessage": null,
+        "ErrorType": null,
+        "Metadata": null,
+        "ReadAttempted": true,
+        "ReadSucceeded": true
+      },
+      "trackFileId": 101,
+      "treatmentPlan": {
+        "blockedReasons": [
+          "PROBE_EVIDENCE_MISSING",
+          "FULL_DECODE_EVIDENCE_MISSING",
+          "BACKUP_POLICY_MISSING",
+          "JOURNAL_POLICY_MISSING",
+          "REPAIR_DRY_RUN_NOT_IMPLEMENTED"
+        ],
+        "candidateWorkflow": "repairDryRunCandidate",
+        "confidence": 0.55,
+        "evidenceFreshness": "current",
+        "executionAuthorization": {
+          "authority": "none",
+          "authorized": false,
+          "reason": "A2_READ_ONLY"
+        },
+        "identityFreshness": "current",
+        "rationaleCodes": [
+          "TAG_READER_DURATION_ZERO",
+          "NO_PROBE_EVIDENCE"
+        ],
+        "requiredEvidence": [
+          "FFPROBE_STREAM_EVIDENCE",
+          "FULL_DECODE_CLEAN",
+          "TAGLIB_REREAD_AFTER_REWRAP"
+        ],
+        "requiredPolicyGates": [
+          "BACKUP_POLICY_APPROVED",
+          "JOURNAL_POLICY_APPROVED"
+        ],
+        "risk": "medium",
+        "safetyLevel": "readOnly",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "albumId": 21,
+      "artistId": 10,
+      "id": "tag-repair-candidate",
+      "label": "TagMetadataIssue",
+      "modifiedUtc": "2026-07-01T10:05:00Z",
+      "observedAtUtc": "2026-07-01T11:05:00Z",
+      "path": "metadata.flac#222222222222",
+      "pathHash": "222222222222",
+      "probe": null,
+      "reasons": [
+        "TAG_READER_DURATION_POSITIVE",
+        "TAG_METADATA_MISSING",
+        "TAG_MISSING_TITLE",
+        "TAG_MISSING_MUSICBRAINZID"
+      ],
+      "size": 223456,
+      "tagReader": {
+        "DurationSeconds": 245.2,
+        "ErrorMessage": null,
+        "ErrorType": null,
+        "Metadata": {
+          "AlbumPresent": true,
+          "AnyMusicBrainzIdPresent": false,
+          "ArtistPresent": true,
+          "MissingFields": [
+            "title",
+            "musicBrainzId"
+          ],
+          "TitlePresent": false
+        },
+        "ReadAttempted": true,
+        "ReadSucceeded": true
+      },
+      "trackFileId": 102,
+      "treatmentPlan": {
+        "blockedReasons": [
+          "CANONICAL_METADATA_VALIDATION_MISSING",
+          "TAG_WRITE_BACKUP_POLICY_MISSING",
+          "TAG_REPAIR_NOT_IMPLEMENTED"
+        ],
+        "candidateWorkflow": "tagRepairCandidate",
+        "confidence": 0.65,
+        "evidenceFreshness": "current",
+        "executionAuthorization": {
+          "authority": "none",
+          "authorized": false,
+          "reason": "A2_READ_ONLY"
+        },
+        "identityFreshness": "current",
+        "rationaleCodes": [
+          "TAG_METADATA_MISSING_TITLE",
+          "TAG_METADATA_MISSING_MUSICBRAINZ_ID"
+        ],
+        "requiredEvidence": [
+          "CANONICAL_METADATA_VALIDATION",
+          "MUSICBRAINZ_RELEASE_VALIDATION"
+        ],
+        "requiredPolicyGates": [
+          "BACKUP_POLICY_APPROVED"
+        ],
+        "risk": "medium",
+        "safetyLevel": "readOnly",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "albumId": 22,
+      "artistId": 11,
+      "id": "\u003Cpath-containing value redacted\u003E",
+      "label": "TagReaderSymptom",
+      "modifiedUtc": "2026-07-01T10:10:00Z",
+      "observedAtUtc": "2026-07-01T11:10:00Z",
+      "path": "track01.flac#968c15db86de",
+      "pathHash": "\u003Cpath-containing value redacted\u003E",
+      "probe": {
+        "AudioCodec": "\u003Cpath-containing value redacted\u003E",
+        "Container": "\u003Cpath-containing value redacted\u003E",
+        "DurationSeconds": null,
+        "ErrorMessage": "\u003Cevidence error message redacted\u003E",
+        "ErrorType": "\u003Cpath-containing value redacted\u003E",
+        "ProbeAttempted": true,
+        "ProbeSucceeded": false
+      },
+      "reasons": [
+        "TAG_READER_FAILED"
+      ],
+      "size": 323456,
+      "tagReader": {
+        "DurationSeconds": null,
+        "ErrorMessage": "\u003Cevidence error message redacted\u003E",
+        "ErrorType": "\u003Cpath-containing value redacted\u003E",
+        "Metadata": null,
+        "ReadAttempted": true,
+        "ReadSucceeded": false
+      },
+      "trackFileId": 103,
+      "treatmentPlan": {
+        "blockedReasons": [
+          "PROBE_EVIDENCE_MISSING",
+          "FULL_DECODE_EVIDENCE_MISSING",
+          "BACKUP_POLICY_MISSING",
+          "JOURNAL_POLICY_MISSING",
+          "REPAIR_DRY_RUN_NOT_IMPLEMENTED"
+        ],
+        "candidateWorkflow": "repairDryRunCandidate",
+        "confidence": 0.55,
+        "evidenceFreshness": "current",
+        "executionAuthorization": {
+          "authority": "none",
+          "authorized": false,
+          "reason": "A2_READ_ONLY"
+        },
+        "identityFreshness": "current",
+        "rationaleCodes": [
+          "TAG_READER_READ_FAILED"
+        ],
+        "requiredEvidence": [
+          "FFPROBE_STREAM_EVIDENCE",
+          "FULL_DECODE_CLEAN",
+          "TAGLIB_REREAD_AFTER_REWRAP"
+        ],
+        "requiredPolicyGates": [
+          "BACKUP_POLICY_APPROVED",
+          "JOURNAL_POLICY_APPROVED"
+        ],
+        "risk": "medium",
+        "safetyLevel": "readOnly",
+        "schemaVersion": 1
+      }
+    },
+    {
+      "albumId": 0,
+      "artistId": 0,
+      "id": "malformed-record",
+      "label": "NeedsHumanReview",
+      "modifiedUtc": null,
+      "observedAtUtc": "2026-07-01T11:15:00Z",
+      "path": "",
+      "pathHash": "",
+      "probe": null,
+      "reasons": [
+        "MALFORMED_FINDING_RECORD"
+      ],
+      "size": null,
+      "tagReader": {
+        "DurationSeconds": null,
+        "ErrorMessage": null,
+        "ErrorType": null,
+        "Metadata": null,
+        "ReadAttempted": false,
+        "ReadSucceeded": false
+      },
+      "trackFileId": 0,
+      "treatmentPlan": {
+        "blockedReasons": [
+          "MALFORMED_FINDING_RECORD"
+        ],
+        "candidateWorkflow": "review",
+        "confidence": 0.1,
+        "evidenceFreshness": "current",
+        "executionAuthorization": {
+          "authority": "none",
+          "authorized": false,
+          "reason": "A2_READ_ONLY"
+        },
+        "identityFreshness": "current",
+        "rationaleCodes": [
+          "MALFORMED_FINDING_RECORD"
+        ],
+        "requiredEvidence": [
+          "NONE"
+        ],
+        "requiredPolicyGates": [
+          "NONE"
+        ],
+        "risk": "high",
+        "safetyLevel": "readOnly",
+        "schemaVersion": 1
+      }
+    }
+  ],
+  "summary": {
+    "authorization": {
+      "authorized": 0,
+      "unauthorized": 4
+    },
+    "blockedReasons": {
+      "BACKUP_POLICY_MISSING": 2,
+      "CANONICAL_METADATA_VALIDATION_MISSING": 1,
+      "FULL_DECODE_EVIDENCE_MISSING": 2,
+      "JOURNAL_POLICY_MISSING": 2,
+      "MALFORMED_FINDING_RECORD": 1,
+      "PROBE_EVIDENCE_MISSING": 2,
+      "REPAIR_DRY_RUN_NOT_IMPLEMENTED": 2,
+      "TAG_REPAIR_NOT_IMPLEMENTED": 1,
+      "TAG_WRITE_BACKUP_POLICY_MISSING": 1
+    },
+    "byRisk": {
+      "high": 1,
+      "medium": 3
+    },
+    "byWorkflow": {
+      "repairDryRunCandidate": 2,
+      "review": 1,
+      "tagRepairCandidate": 1
+    },
+    "byWorkflowByRisk": {
+      "repairDryRunCandidate": {
+        "medium": 2
+      },
+      "review": {
+        "high": 1
+      },
+      "tagRepairCandidate": {
+        "medium": 1
+      }
+    },
+    "total": 4
+  }
+}
