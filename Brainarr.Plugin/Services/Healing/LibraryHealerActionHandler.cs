@@ -281,7 +281,33 @@ public sealed class LibraryHealerActionHandler
                 TagReader = tagReader,
                 Probe = probe,
             },
-            HealerFindingFreshness.Current with { MalformedRecord = malformedRecord });
+            // Surface the real freshness the scan recorded on the finding instead of a hardcoded
+            // "current", so the triage advisor actually acts on stale/missing/unknown evidence.
+            new HealerFindingFreshness(
+                NormalizeFreshness(finding.EvidenceFreshness),
+                NormalizeFreshness(finding.IdentityFreshness),
+                MalformedRecord: malformedRecord));
+    }
+
+    // Fail closed: an unrecognized (or absent) freshness value is treated as "unknown" rather than
+    // silently assumed "current".
+    private static string NormalizeFreshness(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return HealerTreatmentVocab.Freshness.Unknown;
+        }
+
+        var trimmed = value.Trim();
+        if (string.Equals(trimmed, HealerTreatmentVocab.Freshness.Current, StringComparison.Ordinal)
+            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Stale, StringComparison.Ordinal)
+            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Missing, StringComparison.Ordinal)
+            || string.Equals(trimmed, HealerTreatmentVocab.Freshness.Unknown, StringComparison.Ordinal))
+        {
+            return trimmed;
+        }
+
+        return HealerTreatmentVocab.Freshness.Unknown;
     }
 
     private static LibraryHealerFinding EmptyMalformedFinding()
@@ -349,6 +375,7 @@ public sealed class LibraryHealerActionHandler
             trackFileId = finding.File.TrackFileId,
             artistId = finding.File.ArtistId,
             albumId = finding.File.AlbumId,
+            affectedTrackCount = finding.AffectedTrackCount,
             path = finding.File.RedactedPath,
             pathHash = finding.File.PathHash,
             size = finding.File.Size,
@@ -470,20 +497,10 @@ public sealed class LibraryHealerActionHandler
             : EvidenceErrorMessageRedaction;
     }
 
+    // Delegates to the shared predicate so API projection and persistence redact identically.
     private static bool ShouldRedactTokenMaterial(string? value)
     {
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return false;
-        }
-
-        var trimmed = value.Trim();
-        return ContainsLikelyPath(trimmed)
-            || HasDriveDesignator(trimmed)
-            || ContainsMediaExtension(trimmed)
-            || LibraryHealerSensitiveText.ContainsMetadataMaterial(trimmed)
-            || LibraryHealerSensitiveText.ContainsCommandMaterial(trimmed)
-            || trimmed.Any(char.IsWhiteSpace);
+        return LibraryHealerTokenRedaction.ShouldRedactTokenMaterial(value);
     }
 
     private static bool ContainsUnsafeDisplayPathMaterial(string? value)

@@ -161,7 +161,7 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
                 tagReaderErrorMessage: @"TagLib failed reading Very Private Artist\Album\track01.flac",
                 observedAtUtc: start),
             CreateFinding(
-                id: "artist-friend-relative",
+                id: "buddy-and-pal-relative",
                 redactedPath: "track02.flac#abcdef123457",
                 pathHash: "callerhash002",
                 tagReaderErrorMessage: @"TagLib failed reading Artist & Friend\Album\track01.flac",
@@ -192,7 +192,7 @@ public sealed class LibraryHealerFindingStoreTests : IDisposable
         persisted.Should().HaveCount(5);
         persisted.Single(finding => finding.Id == "very-private-relative")
             .TagReader.ErrorMessage.Should().Be(genericRedaction);
-        persisted.Single(finding => finding.Id == "artist-friend-relative")
+        persisted.Single(finding => finding.Id == "buddy-and-pal-relative")
             .TagReader.ErrorMessage.Should().Be(genericRedaction);
         persisted.Single(finding => finding.Id == "unicode-posix-relative")
             .Probe!.ErrorMessage.Should().Be(genericRedaction);

@@ -9,6 +9,7 @@ internal static class LibraryHealerReasonCodes
         "FILE_EXISTS",
         "FILE_MISSING",
         "PATH_PROBE_INCONCLUSIVE",
+        "STORAGE_ROOT_OFFLINE",
         "PATH_EMPTY",
         "PATH_IS_DIRECTORY",
         "PATH_PARENT_UNAVAILABLE",
