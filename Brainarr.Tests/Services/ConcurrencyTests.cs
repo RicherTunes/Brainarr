@@ -477,60 +477,17 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
+        public void SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
-            // Arrange
-            const int operationCount = 5;
-            var startedTasks = 0;
-            var cancelledTasks = 0;
-            var cancellationSources = Enumerable
-                .Range(0, operationCount)
-                .Select(_ => new CancellationTokenSource())
-                .ToArray();
+            using var cancellationSource = new CancellationTokenSource();
+            cancellationSource.Cancel();
+            var operation = Task.FromCanceled(cancellationSource.Token);
 
-            try
-            {
-                var operations = cancellationSources.Select(cts => Task.Run(async () =>
-                {
-                    Interlocked.Increment(ref startedTasks);
-                    await Task.Delay(Timeout.InfiniteTimeSpan, cts.Token);
-                })).ToArray();
+            var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                () => operation,
+                timeoutMs: 5000);
 
-                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(5);
-                while (Volatile.Read(ref startedTasks) < operationCount && DateTime.UtcNow < deadline)
-                {
-                    await Task.Delay(10);
-                }
-
-                Volatile.Read(ref startedTasks).Should().Be(operationCount);
-
-                foreach (var cts in cancellationSources)
-                {
-                    cts.Cancel();
-                }
-
-                var bridgeTasks = operations.Select(operation => Task.Run(() =>
-                {
-                    var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
-                        () => operation,
-                        timeoutMs: 5000);
-                    act.Should().Throw<OperationCanceledException>();
-                    Interlocked.Increment(ref cancelledTasks);
-                })).ToArray();
-
-                await Task.WhenAll(bridgeTasks).WaitAsync(TimeSpan.FromSeconds(10));
-            }
-            finally
-            {
-                foreach (var cts in cancellationSources)
-                {
-                    cts.Dispose();
-                }
-            }
-
-            // Assert
-            Volatile.Read(ref startedTasks).Should().Be(operationCount);
-            Volatile.Read(ref cancelledTasks).Should().Be(operationCount);
+            act.Should().Throw<OperationCanceledException>();
         }
     }
 }

@@ -67,7 +67,7 @@ namespace Brainarr.Tests.Services.Tokenization
         public void FallbackWarn_FiresOnce_AcrossRegistryInstances()
         {
             // Real-usage finding (F1): the tokenizer-fallback WARN ("no tokenizer registered for
-            // zaicoding:glm-4.5-air") re-fired on every run. Lidarr re-instantiates BrainarrImportList
+            // zaicoding:glm-4.5-air") re-fired on every run. Lidarr re-instantiates Brainarr
             // — and thus a fresh DI ServiceProvider + a fresh ModelTokenizerRegistry — per operation,
             // so an instance-scoped WarnOnce gate reset every run. The gate must be process-wide
             // (WarnOnce's documented private-static usage) so the WARN fires once and subsequent

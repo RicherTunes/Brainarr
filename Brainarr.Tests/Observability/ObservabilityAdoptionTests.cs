@@ -60,11 +60,11 @@ namespace Brainarr.Tests.Observability
         }
 
         // ------------------------------------------------------------------ //
-        // Test 1: BrainarrImportList.Fetch() pushes and clears PluginLogContext
+        // Test 1: Brainarr.Fetch() pushes and clears PluginLogContext
         // ------------------------------------------------------------------ //
 
         [Fact]
-        public void BrainarrImportList_Fetch_PushesLogContext()
+        public void Brainarr_Fetch_PushesLogContext()
         {
             // Arrange
             PluginLogContext.Current.Should().BeNull("no scope should be active before Fetch");
