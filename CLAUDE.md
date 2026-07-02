@@ -243,7 +243,7 @@ The implemented architecture includes:
 ```text
 Brainarr.Plugin/
 ├── Configuration/          # Provider settings and validation
-│   ├── Constants.cs
+│   ├── BrainarrConstants.cs
 │   ├── ProviderConfiguration.cs
 │   └── Providers/          # Per-provider configuration classes
 ├── Services/
@@ -260,7 +260,7 @@ Brainarr.Plugin/
 │   ├── RateLimiter.cs
 │   ├── RecommendationCache.cs
 │   └── RetryPolicy.cs
-├── BrainarrImportList.cs  # Main Lidarr integration
+├── Brainarr.cs  # Main Lidarr integration
 └── BrainarrSettings.cs    # Configuration UI
 
 Brainarr.Tests/            # Comprehensive test suite
