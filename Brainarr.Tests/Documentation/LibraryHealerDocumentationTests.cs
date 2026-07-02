@@ -31,6 +31,10 @@ namespace Brainarr.Tests.Documentation
             doc.Should().Contain("basename#hash");
             doc.Should().Contain("first 12 hex characters");
             doc.Should().Contain("field-sensitivity catalog");
+            doc.Should().Contain("affectedTrackCount");
+            doc.Should().Contain("STORAGE_ROOT_OFFLINE");
+            doc.Should().Contain("fail closed");
+            doc.Should().Contain("unknown");
 
             doc.Should().Contain("A1 cannot:");
             doc.Should().Contain("- repair files;");
