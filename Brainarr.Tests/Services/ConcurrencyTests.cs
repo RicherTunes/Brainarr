@@ -477,17 +477,40 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public void SyncAsyncBridge_WithTimeout_CancelsCorrectly()
+        public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
-            using var cancellationSource = new CancellationTokenSource();
-            cancellationSource.Cancel();
-            var operation = Task.FromCanceled(cancellationSource.Token);
+            const int operationCount = 5;
+            var enteredBridge = 0;
+            using var allBridgeCallsEntered = new CountdownEvent(operationCount);
+            var completions = Enumerable
+                .Range(0, operationCount)
+                .Select(_ => new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously))
+                .ToArray();
 
-            var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
-                () => operation,
-                timeoutMs: 5000);
+            var bridgeTasks = completions.Select(completion => Task.Run(() =>
+            {
+                Interlocked.Increment(ref enteredBridge);
+                allBridgeCallsEntered.Signal();
 
-            act.Should().Throw<OperationCanceledException>();
+                var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                    () => completion.Task,
+                    timeoutMs: 5000);
+
+                act.Should().Throw<OperationCanceledException>();
+            })).ToArray();
+
+            allBridgeCallsEntered
+                .Wait(TimeSpan.FromSeconds(5))
+                .Should()
+                .BeTrue("all bridge callers should reach RunSafeSync before cancellation is released");
+
+            foreach (var completion in completions)
+            {
+                completion.SetCanceled();
+            }
+
+            await Task.WhenAll(bridgeTasks).WaitAsync(TimeSpan.FromSeconds(10));
+            Volatile.Read(ref enteredBridge).Should().Be(operationCount);
         }
     }
 }
