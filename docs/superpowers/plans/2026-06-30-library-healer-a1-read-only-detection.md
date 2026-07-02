@@ -29,7 +29,7 @@
 
 ## Current Integration Facts
 
-- `BrainarrImportList.RequestAction(string action, IDictionary<string,string> query)` delegates to `IBrainarrOrchestrator.HandleAction(action, query, Settings)`.
+- `Brainarr.RequestAction(string action, IDictionary<string,string> query)` delegates to `IBrainarrOrchestrator.HandleAction(action, query, Settings)`.
 - `BrainarrOrchestrator.HandleAction` already routes action strings such as `review/getqueue`, `metrics/get`, and `planning/getgapplan`.
 - `BrainarrOrchestratorFactory.ConfigureServices(IServiceCollection)` is the central DI registration point for Brainarr services.
 - `ReviewQueueService` is a useful persistence pattern: it stores plugin-owned JSON under `PluginConfigRoots.Resolve("Brainarr")` with Common `JsonFileStore`.
@@ -1894,7 +1894,7 @@ services.TryAddSingleton<LibraryHealerActionHandler>();
 healerActionHandler: sp.GetService<LibraryHealerActionHandler>()
 ```
 
-`IAudioTagService` and `IMediaFileService` must be provided by `BrainarrImportList` at runtime and by mocks in tests. Do not introduce service locator lookups inside healing services.
+`IAudioTagService` and `IMediaFileService` must be provided by `Brainarr` at runtime and by mocks in tests. Do not introduce service locator lookups inside healing services.
 
 - [ ] **Step 5: Add DI smoke test**
 

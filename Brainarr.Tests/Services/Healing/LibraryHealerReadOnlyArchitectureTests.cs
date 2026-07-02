@@ -136,7 +136,7 @@ public class LibraryHealerReadOnlyArchitectureTests
     }
 
     [Fact]
-    public void BrainarrImportList_ShouldRouteHealerActions_WhenConstructedWithHostServices()
+    public void Brainarr_ShouldRouteHealerActions_WhenConstructedWithHostServices()
     {
         using var brainarr = new NzbDrone.Core.ImportLists.Brainarr.Brainarr(
             Mock.Of<IHttpClient>(),
