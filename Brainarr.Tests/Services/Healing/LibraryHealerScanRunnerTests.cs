@@ -973,7 +973,7 @@ public sealed class LibraryHealerScanRunnerTests
     }
 
     [Fact]
-    public void Scan_ShouldScanAtLeastOneCandidate_WhenTimeBudgetExpiresBeforeFirstScan()
+    public void Scan_ShouldScanAlreadyGatheredCandidate_WhenTimeBudgetExpiresBeforeFirstScan()
     {
         var artistService = new Mock<IArtistService>(MockBehavior.Strict);
         var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
@@ -1001,13 +1001,54 @@ public sealed class LibraryHealerScanRunnerTests
 
         result.Status.Should().Be(LibraryHealerScanStatus.Completed);
         result.TotalArtists.Should().Be(2);
-        result.AvailableTrackFiles.Should().Be(2);
+        result.AvailableTrackFiles.Should().Be(1);
         result.ScannedTrackFiles.Should().Be(1);
         result.Truncated.Should().BeTrue();
-        result.NextAfterTrackFileId.Should().Be(1);
+        result.NextAfterTrackFileId.Should().BeNull();
         mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
-        mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Once);
-        tagReader.Paths.Should().Equal(firstPath);
+        mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Never);
+        tagReader.Paths.Should().Equal(secondPath);
+    }
+
+    [Fact]
+    public void Scan_ShouldStopCandidateGatheringAfterBudgetAndAvoidUnsafeCursor_WhenWholeLibraryEnumerationExceedsBudget()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var store = new RecordingFindingStore();
+        var elapsed = TimeSpan.Zero;
+        var alreadyGatheredPath = PathFor(200);
+        var unseenLowerPath = PathFor(1);
+
+        artistService.Setup(x => x.GetAllArtists())
+            .Returns(new List<Artist> { new() { Id = 1 }, new() { Id = 2 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Callback(() => elapsed = TimeSpan.FromSeconds(2))
+            .Returns(new List<TrackFile> { TrackFile(200, alreadyGatheredPath) });
+        mediaFileService.Setup(x => x.GetFilesByArtist(2))
+            .Returns(new List<TrackFile> { TrackFile(1, unseenLowerPath) });
+        tagReader.Responses[alreadyGatheredPath] = new TagReaderEvidence(true, true, 0, null, null);
+        tagReader.Responses[unseenLowerPath] = new TagReaderEvidence(true, true, 0, null, null);
+
+        var result = CreateRunner(
+                artistService,
+                mediaFileService,
+                tagReader,
+                store: store,
+                elapsedProvider: () => elapsed)
+            .Scan(new LibraryHealerScanRequest(MaxFiles: 1, MaxSeconds: 1));
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+        result.TotalArtists.Should().Be(2);
+        result.AvailableTrackFiles.Should().Be(1);
+        result.ScannedTrackFiles.Should().Be(1);
+        result.Truncated.Should().BeTrue();
+        result.NextAfterTrackFileId.Should().BeNull(
+            "a global track-file cursor would skip unseen lower IDs when whole-library enumeration stops early");
+        tagReader.Paths.Should().Equal(alreadyGatheredPath);
+        mediaFileService.Verify(x => x.GetFilesByArtist(1), Times.Once);
+        mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Never);
     }
 
     private static ILibraryHealerScanRunner CreateRunner(
