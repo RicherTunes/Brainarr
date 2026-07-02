@@ -145,7 +145,7 @@ Sanitization removes:
 
 ## Implementation Areas
 
-### 1. Main Entry Point (BrainarrImportList)
+### 1. Main Entry Point (Brainarr)
 
 ```csharp
 public override async Task<IList<ImportListItemInfo>> Fetch()
