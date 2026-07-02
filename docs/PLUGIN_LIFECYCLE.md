@@ -121,7 +121,7 @@ ImportListSyncService triggers
     ↓
 Calls Fetch() on each import list
     ↓
-BrainarrImportList.Fetch() executes
+Brainarr.Fetch() executes
     ↓
 Returns List<ImportListItemInfo>
     ↓

@@ -39,7 +39,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Tokenization
         private readonly ConcurrentDictionary<string, ITokenizer> _tokenizers;
         private readonly ITokenizer _defaultTokenizer;
         private readonly Logger? _logger;
-        // STATIC (process/ALC-wide) on purpose: Lidarr re-instantiates BrainarrImportList — and thus a
+        // STATIC (process/ALC-wide) on purpose: Lidarr re-instantiates Brainarr — and thus a
         // fresh DI ServiceProvider + a fresh ModelTokenizerRegistry — per operation, so an instance-scoped
         // gate re-fired the "no tokenizer registered" WARN every run. WarnOnce is explicitly documented for
         // this `private static readonly` usage; a shared gate dedupes the WARN across instances/runs.
