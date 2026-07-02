@@ -341,7 +341,7 @@ public sealed class LibraryHealerEvidenceContractGoldenTests
             _findings = findings;
         }
 
-        public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
+        public bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
         {
             throw new XunitException("healer/getfindings must not persist findings");
         }

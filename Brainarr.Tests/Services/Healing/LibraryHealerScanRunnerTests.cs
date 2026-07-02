@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Brainarr.Tests.Helpers;
 using FluentAssertions;
 using Moq;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
@@ -7,6 +8,10 @@ using NzbDrone.Core.Music;
 
 namespace Brainarr.Tests.Services.Healing;
 
+// SavePendingFindings_WhenStoreWriteFails_ReportsZeroPersisted_AndLogs uses the shared
+// TestLogger (a real NLog Logger backed by a process-wide MemoryTarget), so this class must be
+// serialized against every other test that mutates LogManager.Configuration.
+[Collection("LoggingTests")]
 public sealed class LibraryHealerScanRunnerTests
 {
     [Fact]
@@ -479,6 +484,59 @@ public sealed class LibraryHealerScanRunnerTests
             actionJson.Should().Contain("PathInconsistency");
             AssertNoPrivateMissingPathMaterial(storeJson);
             AssertNoPrivateMissingPathMaterial(actionJson);
+        }
+        finally
+        {
+            if (Directory.Exists(tempRoot))
+            {
+                Directory.Delete(tempRoot, recursive: true);
+            }
+        }
+    }
+
+    [Fact]
+    public void SavePendingFindings_WhenStoreWriteFails_ReportsZeroPersisted_AndLogs()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var path = PathFor(1);
+        var tempRoot = Path.Combine(Path.GetTempPath(), "brainarr-healer-save-fail-" + Guid.NewGuid().ToString("N"));
+
+        try
+        {
+            Directory.CreateDirectory(tempRoot);
+
+            // Force the real store's underlying write to fail without mocking JsonFileStore:
+            // occupy the exact target file path with a directory. JsonFileStore.LoadInitial's
+            // File.Exists(...) is false for a directory (safe empty start), but Save()'s atomic
+            // File.Replace/File.Move can never land a real file there -- it throws
+            // IOException/UnauthorizedAccessException, which LibraryHealerFindingStore now
+            // surfaces as a failed SaveBatch instead of silently reporting success.
+            var storeFilePath = Path.Combine(tempRoot, "library_healer_findings.json");
+            Directory.CreateDirectory(storeFilePath);
+
+            var logger = TestLogger.Create();
+            TestLogger.ClearLoggedMessages();
+            var store = new LibraryHealerFindingStore(tempRoot, logger);
+
+            artistService.Setup(x => x.GetAllArtists())
+                .Returns(new List<Artist> { new() { Id = 1 } });
+            mediaFileService.Setup(x => x.GetFilesByArtist(1))
+                .Returns(new List<TrackFile> { TrackFile(1, path) });
+            tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+
+            var result = CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+            result.Status.Should().Be(LibraryHealerScanStatus.Completed);
+            result.ScannedTrackFiles.Should().Be(1);
+            result.PersistedFindings.Should().Be(0, "the write failed, so nothing actually reached disk");
+
+            var logged = TestLogger.GetLoggedMessages();
+            logged.Should().Contain(
+                line => line.StartsWith("WARN", StringComparison.Ordinal),
+                "a failed write must be observable, not silent");
         }
         finally
         {
@@ -1188,7 +1246,9 @@ public sealed class LibraryHealerScanRunnerTests
 
         public Exception? ThrowOnSave { get; init; }
 
-        public void SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
+        public bool SaveSucceeds { get; init; } = true;
+
+        public bool SaveBatch(IReadOnlyList<LibraryHealerFinding> findings)
         {
             SaveAttempts++;
             if (ThrowOnSave is not null)
@@ -1196,7 +1256,13 @@ public sealed class LibraryHealerScanRunnerTests
                 throw ThrowOnSave;
             }
 
+            if (!SaveSucceeds)
+            {
+                return false;
+            }
+
             AllSaved.AddRange(findings);
+            return true;
         }
 
         public IReadOnlyList<LibraryHealerFinding> GetRecent(int limit)
