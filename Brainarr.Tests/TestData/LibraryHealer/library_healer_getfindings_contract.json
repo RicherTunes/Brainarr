@@ -1,6 +1,7 @@
 {
   "items": [
     {
+      "affectedTrackCount": null,
       "albumId": 20,
       "artistId": 10,
       "id": "repair-candidate",
@@ -59,6 +60,7 @@
       }
     },
     {
+      "affectedTrackCount": null,
       "albumId": 21,
       "artistId": 10,
       "id": "tag-repair-candidate",
@@ -125,6 +127,7 @@
       }
     },
     {
+      "affectedTrackCount": null,
       "albumId": 22,
       "artistId": 11,
       "id": "\u003Cpath-containing value redacted\u003E",
@@ -190,6 +193,7 @@
       }
     },
     {
+      "affectedTrackCount": null,
       "albumId": 0,
       "artistId": 0,
       "id": "malformed-record",

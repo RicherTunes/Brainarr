@@ -1109,6 +1109,122 @@ public sealed class LibraryHealerScanRunnerTests
         mediaFileService.Verify(x => x.GetFilesByArtist(2), Times.Never);
     }
 
+    [Fact]
+    public void Scan_ShouldRecordCurrentFreshness_WhenProbeMatchesRecordedState()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\zero.flac";
+        var modified = new DateTime(2026, 6, 20, 1, 2, 3, DateTimeKind.Utc);
+
+        artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path, 111, modified) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+        fingerprints.Responses[path] = new FileFingerprint(true, 111, modified);
+
+        CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Current);
+        finding.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Current);
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordStaleFreshness_WhenProbeDiffersFromRecordedState()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\drifted.flac";
+        var modified = new DateTime(2026, 6, 20, 1, 2, 3, DateTimeKind.Utc);
+
+        artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path, 111, modified) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+        fingerprints.Responses[path] = new FileFingerprint(true, 999, modified.AddHours(5));
+
+        CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Stale);
+        finding.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Stale);
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordMissingFreshness_ForMissingFile()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\gone.flac";
+
+        artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path, 111) });
+        fingerprints.ExistenceResponses[path] = new FileExistenceEvidence(true, true, false, null, null);
+
+        CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Missing);
+        finding.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Missing);
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordUnknownFreshness_ForInconclusiveProbe()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\denied.flac";
+
+        artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path, 111) });
+        fingerprints.ExistenceResponses[path] =
+            new FileExistenceEvidence(true, false, false, "PATH_ACCESS_DENIED", "Access denied");
+
+        CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        finding.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+    }
+
+    [Fact]
+    public void Scan_ShouldRecordUnknownFreshness_WhenExistsButFingerprintUnreadable()
+    {
+        var artistService = new Mock<IArtistService>(MockBehavior.Strict);
+        var mediaFileService = new Mock<IMediaFileService>(MockBehavior.Strict);
+        var tagReader = new RecordingTagReader();
+        var fingerprints = new RecordingFingerprintService();
+        var store = new RecordingFindingStore();
+        var path = @"D:\Music\Private Artist\opaque.flac";
+
+        artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
+        mediaFileService.Setup(x => x.GetFilesByArtist(1))
+            .Returns(new List<TrackFile> { TrackFile(1, path, 111) });
+        tagReader.Responses[path] = new TagReaderEvidence(true, true, 0, null, null);
+        fingerprints.Responses[path] = new FileFingerprint(true, null, null);
+
+        CreateRunner(artistService, mediaFileService, tagReader, fingerprints, store).Scan();
+
+        var finding = store.AllSaved.Should().ContainSingle().Subject;
+        finding.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        finding.IdentityFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+    }
+
     private static ILibraryHealerScanRunner CreateRunner(
         Mock<IArtistService> artistService,
         Mock<IMediaFileService> mediaFileService,
