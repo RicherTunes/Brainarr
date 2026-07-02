@@ -140,7 +140,7 @@ The plugin's assembly version comes **only** from the repo-root `VERSION` file: 
 
 **Why the sentinel exists**: the gitlink is invisible in a plain `git diff` (it shows only `-Subproject commit <sha>`), so the sentinel makes the pinned version greppable, reviewable in PRs, and assertable in tests (`VersionContractTests` cross-checks it against `plugin.json` / `manifest.json` `commonVersion`). Seeing `ext-common-sha.txt` dirtied in `git status` after a submodule bump is expected — commit it together with the gitlink.
 
-**To bump the pin**: `pwsh ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --sha-from-submodule --stage` (or the `.ps1` variant) reads the submodule HEAD, rewrites `ext-common-sha.txt`, and stages both so they can't drift. Re-pin **manually** when Common's main advances — there is no scheduled auto-bump workflow on the Gitea-primary copy (the GitHub mirror workflow `bump-common.yml` is GitHub-only and out of Actions credits).
+**To bump the pin**: `pwsh ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --sha-from-submodule --stage` (or the `.ps1` variant) reads the submodule HEAD, rewrites `ext-common-sha.txt`, and stages both so they can't drift. Re-pin **manually** when Common's main advances — there is no scheduled auto-bump workflow on the Gitea-primary copy; the plugin-root GitHub workflow is only a guarded CI mirror.
 
 ## Common helpers in use
 
