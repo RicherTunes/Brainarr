@@ -1,0 +1,103 @@
+{
+  "schemaVersion": 1,
+  "vocab": {
+    "AuthorizationAuthority": {
+      "None": "none"
+    },
+    "AuthorizationReason": {
+      "A2ReadOnly": "A2_READ_ONLY"
+    },
+    "BlockedReason": {
+      "A2ReadOnly": "A2_READ_ONLY",
+      "AlbumWideScopeNotDisclosed": "ALBUM_WIDE_SCOPE_NOT_DISCLOSED",
+      "BackupPolicyMissing": "BACKUP_POLICY_MISSING",
+      "CanonicalMetadataValidationMissing": "CANONICAL_METADATA_VALIDATION_MISSING",
+      "EvidenceConflict": "EVIDENCE_CONFLICT",
+      "EvidenceFreshnessNotCurrent": "EVIDENCE_FRESHNESS_NOT_CURRENT",
+      "FullDecodeEvidenceMissing": "FULL_DECODE_EVIDENCE_MISSING",
+      "HumanReviewRequired": "HUMAN_REVIEW_REQUIRED",
+      "IdentityFreshnessNotCurrent": "IDENTITY_FRESHNESS_NOT_CURRENT",
+      "JournalPolicyMissing": "JOURNAL_POLICY_MISSING",
+      "LidarrSearchDryRunNotImplemented": "LIDARR_SEARCH_DRY_RUN_NOT_IMPLEMENTED",
+      "MalformedFindingRecord": "MALFORMED_FINDING_RECORD",
+      "None": "NONE",
+      "PathProbeInconclusive": "PATH_PROBE_INCONCLUSIVE",
+      "PathStateStaleOrMissing": "PATH_STATE_STALE_OR_MISSING",
+      "ProbeEvidenceMissing": "PROBE_EVIDENCE_MISSING",
+      "RecycleBinPolicyMissing": "RECYCLE_BIN_POLICY_MISSING",
+      "RepairDryRunNotImplemented": "REPAIR_DRY_RUN_NOT_IMPLEMENTED",
+      "RollbackGuideMissing": "ROLLBACK_GUIDE_MISSING",
+      "TagRepairNotImplemented": "TAG_REPAIR_NOT_IMPLEMENTED",
+      "TagWriteBackupPolicyMissing": "TAG_WRITE_BACKUP_POLICY_MISSING",
+      "TaglibRereadAfterRewrapMissing": "TAGLIB_REREAD_AFTER_REWRAP_MISSING",
+      "UnknownFindingLabel": "UNKNOWN_FINDING_LABEL"
+    },
+    "Freshness": {
+      "Current": "current",
+      "Missing": "missing",
+      "Stale": "stale",
+      "Unknown": "unknown"
+    },
+    "Rationale": {
+      "DecodeFatal": "DECODE_FATAL",
+      "DecodeMateriallyShort": "DECODE_MATERIALLY_SHORT",
+      "EvidenceConflict": "EVIDENCE_CONFLICT",
+      "FalsePositive": "FALSE_POSITIVE",
+      "FileMissing": "FILE_MISSING",
+      "MalformedFindingRecord": "MALFORMED_FINDING_RECORD",
+      "NoProbeEvidence": "NO_PROBE_EVIDENCE",
+      "None": "NONE",
+      "PathProbeInconclusive": "PATH_PROBE_INCONCLUSIVE",
+      "ProbeFailed": "PROBE_FAILED",
+      "ProbeSucceeded": "PROBE_SUCCEEDED",
+      "StaleFileIdentity": "STALE_FILE_IDENTITY",
+      "TagMetadataMissingAlbum": "TAG_METADATA_MISSING_ALBUM",
+      "TagMetadataMissingArtist": "TAG_METADATA_MISSING_ARTIST",
+      "TagMetadataMissingMusicBrainzId": "TAG_METADATA_MISSING_MUSICBRAINZ_ID",
+      "TagMetadataMissingTitle": "TAG_METADATA_MISSING_TITLE",
+      "TagReaderDurationZero": "TAG_READER_DURATION_ZERO",
+      "TagReaderReadFailed": "TAG_READER_READ_FAILED",
+      "UnknownFindingLabel": "UNKNOWN_FINDING_LABEL"
+    },
+    "RequiredEvidence": {
+      "CanonicalMetadataValidation": "CANONICAL_METADATA_VALIDATION",
+      "FfmpegAvailable": "FFMPEG_AVAILABLE",
+      "FfprobeStreamEvidence": "FFPROBE_STREAM_EVIDENCE",
+      "FreshFileFingerprint": "FRESH_FILE_FINGERPRINT",
+      "FreshPathIdentity": "FRESH_PATH_IDENTITY",
+      "FullDecodeClean": "FULL_DECODE_CLEAN",
+      "FullDecodeFatal": "FULL_DECODE_FATAL",
+      "LidarrSearchDryRunResult": "LIDARR_SEARCH_DRY_RUN_RESULT",
+      "MusicBrainzReleaseValidation": "MUSICBRAINZ_RELEASE_VALIDATION",
+      "None": "NONE",
+      "TaglibRereadAfterRewrap": "TAGLIB_REREAD_AFTER_REWRAP"
+    },
+    "RequiredPolicyGate": {
+      "AlbumWideScopeAccepted": "ALBUM_WIDE_SCOPE_ACCEPTED",
+      "BackupPolicyApproved": "BACKUP_POLICY_APPROVED",
+      "ExplicitOperatorOptIn": "EXPLICIT_OPERATOR_OPT_IN",
+      "JournalPolicyApproved": "JOURNAL_POLICY_APPROVED",
+      "None": "NONE",
+      "RecycleBinConfigured": "RECYCLE_BIN_CONFIGURED",
+      "RollbackGuidePublished": "ROLLBACK_GUIDE_PUBLISHED"
+    },
+    "Risk": {
+      "Critical": "critical",
+      "High": "high",
+      "Low": "low",
+      "Medium": "medium",
+      "None": "none"
+    },
+    "SafetyLevel": {
+      "ReadOnly": "readOnly"
+    },
+    "Workflow": {
+      "None": "none",
+      "ReacquireCandidate": "reacquireCandidate",
+      "ReleaseReviewCandidate": "releaseReviewCandidate",
+      "RepairDryRunCandidate": "repairDryRunCandidate",
+      "Review": "review",
+      "TagRepairCandidate": "tagRepairCandidate"
+    }
+  }
+}

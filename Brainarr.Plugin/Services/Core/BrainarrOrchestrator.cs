@@ -18,6 +18,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -65,6 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly ReviewQueueActionHandler _reviewQueueHandler;
         private readonly ReviewActionAuditService _auditService;
         private readonly LibraryGapPlannerService _gapPlannerService;
+        private readonly LibraryHealerActionHandler _healerActionHandler;
         private readonly ProviderLifecycleService _providerLifecycle;
         private readonly ConfigurationValidator _configValidator;
         private readonly RecommendationGenerator _recommendationGenerator;
@@ -101,7 +103,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             NzbDrone.Core.ImportLists.Brainarr.Services.ILibraryAwarePromptBuilder promptBuilder = null,
             IStyleCatalogService styleCatalog = null,
             IBreakerRegistry breakerRegistry = null,
-            IDuplicateFilterService duplicateFilter = null)
+            IDuplicateFilterService duplicateFilter = null,
+            LibraryHealerActionHandler healerActionHandler = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -147,6 +150,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _auditService = new ReviewActionAuditService(logger);
             _reviewQueueHandler = new ReviewQueueActionHandler(_reviewQueue, _history, _styleCatalog, new RecommendationTriageAdvisor(), _persistSettingsCallback, logger, _auditService);
             _gapPlannerService = new LibraryGapPlannerService();
+            _healerActionHandler = healerActionHandler;
             _observability = new ObservabilityService(_reviewQueue, _metrics, GetProviderStatus, logger);
             _breakerRegistry = breakerRegistry ?? throw new ArgumentNullException(nameof(breakerRegistry),
                 "IBreakerRegistry must be injected via DI. Use PassThroughBreakerRegistry.CreateMock().Object in tests.");
@@ -421,7 +425,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         public object HandleAction(string action, IDictionary<string, string> query, BrainarrSettings settings)
         {
-            _logger.Debug($"Handling UI action: {action}");
+            var isHealerAction = action != null && action.StartsWith("healer/", StringComparison.OrdinalIgnoreCase);
+            _logger.Debug($"Handling UI action: {(isHealerAction ? "healer/*" : action)}");
+
+            if (isHealerAction)
+            {
+                if (_healerActionHandler == null)
+                {
+                    return new { error = "Library Healer is not available in this runtime" };
+                }
+
+                try
+                {
+                    return _healerActionHandler.Handle(action, query);
+                }
+                catch (Exception ex)
+                {
+                    var redactedError = LibraryHealerActionHandler.SanitizeBoundaryString(ex.Message) ?? ex.GetType().Name;
+                    _logger.Error($"Error handling healer action: {redactedError}");
+                    return new { error = redactedError };
+                }
+            }
 
             try
             {
