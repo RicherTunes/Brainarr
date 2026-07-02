@@ -15,8 +15,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IHttpClient _httpClient;
         private readonly IProviderFactory _providerFactory;
         private readonly ModelDetectionService _modelDetection;
-        private readonly IRetryPolicy _retryPolicy;
-        private readonly IRateLimiter _rateLimiter;
         private readonly Logger _logger;
         private readonly object _initializationLock = new object();
         private IAIProvider? _currentProvider;
@@ -26,15 +24,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IHttpClient httpClient,
             IProviderFactory providerFactory,
             ModelDetectionService modelDetection,
-            IRetryPolicy retryPolicy,
-            IRateLimiter rateLimiter,
             Logger logger)
         {
             _httpClient = httpClient;
             _providerFactory = providerFactory;
             _modelDetection = modelDetection;
-            _retryPolicy = retryPolicy;
-            _rateLimiter = rateLimiter;
             _logger = logger;
         }
 

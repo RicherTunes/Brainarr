@@ -17,8 +17,6 @@ namespace Brainarr.Tests.Services.Core
         {
             var http = new Mock<IHttpClient>();
             var factory = new Mock<IProviderFactory>();
-            var retry = new Mock<IRetryPolicy>();
-            var limiter = new Mock<IRateLimiter>();
             Logger logger = TestLogger.CreateNullLogger();
 
             var detection = new ModelDetectionService(http.Object, logger);
@@ -27,8 +25,6 @@ namespace Brainarr.Tests.Services.Core
                 http.Object,
                 factory.Object,
                 detection,
-                retry.Object,
-                limiter.Object,
                 logger);
         }
 

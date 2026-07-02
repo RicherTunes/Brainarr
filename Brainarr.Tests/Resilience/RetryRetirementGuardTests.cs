@@ -72,6 +72,18 @@ namespace Brainarr.Tests.Resilience
                 "provider invocation must not construct Brainarr's compatibility retry wrappers");
         }
 
+        [Fact]
+        public void Provider_manager_does_not_keep_dead_retry_or_limiter_dependencies()
+        {
+            var root = FindRepositoryRoot();
+            var source = File.ReadAllText(Path.Combine(root, "Brainarr.Plugin", "Services", "Core", "ProviderManager.cs"));
+
+            source.Should().NotContain("IRetryPolicy",
+                "ProviderManager should not retain the retired retry abstraction when it does not execute provider calls");
+            source.Should().NotContain("IRateLimiter",
+                "ProviderManager should not retain an unused limiter dependency");
+        }
+
         private static IEnumerable<string> FindForbiddenReferences(string root, string path)
             => FindForbiddenReferences(root, path, ObsoleteRetryInvocationPattern);
 
