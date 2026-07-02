@@ -2,6 +2,7 @@ using System;
 using System.Diagnostics;
 using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Abstractions.Diagnostics;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Codes = Lidarr.Plugin.Common.Abstractions.Diagnostics.DiagnosticErrorCodes;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
