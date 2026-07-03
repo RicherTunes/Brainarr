@@ -211,6 +211,17 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 var artists = _artistService.GetAllArtists();
                 var albums = _albumService.GetAllAlbums();
 
+                // Group albums by ArtistMetadataId (a plain int column) ONCE instead of re-scanning all
+                // albums per matching artist via Album.ArtistId. Album.ArtistId dereferences a
+                // LazyLoaded<Artist> that GetAllAlbums() leaves unloaded, so the old
+                // .Where(a => a.ArtistId == artist.Id) fired a per-row DB round trip for every album on
+                // every matching artist (N+1 -> OOM at large-library scale). album.ArtistId == the Id of
+                // the artist whose ArtistMetadataId == album.ArtistMetadataId, so this is equivalent.
+                var albumsByMetadataId = albums
+                    .Where(a => a != null)
+                    .GroupBy(a => a.ArtistMetadataId)
+                    .ToDictionary(g => g.Key, g => (IReadOnlyList<Album>)g.ToList());
+
                 var normalizedRecArtist = NormalizeName(recommendation.Artist);
                 var normalizedRecAlbum = NormalizeName(recommendation.Album);
 
@@ -219,7 +230,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                     var normalizedArtist = NormalizeName(artist.Name);
                     if (CalculateSimilarity(normalizedRecArtist, normalizedArtist) > 0.8)
                     {
-                        var artistAlbums = albums.Where(a => a.ArtistId == artist.Id);
+                        var artistAlbums = albumsByMetadataId.TryGetValue(artist.ArtistMetadataId, out var byMetadata)
+                            ? byMetadata
+                            : (IReadOnlyList<Album>)Array.Empty<Album>();
                         foreach (var album in artistAlbums)
                         {
                             var normalizedAlbum = NormalizeName(album.Title);

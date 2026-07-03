@@ -267,8 +267,19 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var analysis = new CollectionDepthAnalysis();
 
-            // Group albums by artist
-            var albumsByArtist = albums.GroupBy(a => a.ArtistId).ToList();
+            // ArtistMetadataId -> Artist.Id (both plain eager int columns) so TopCollectedArtists can
+            // keep reporting real Artist.Ids without ever reading Album.ArtistId.
+            var artistIdByMetadataId = artists
+                .Where(a => a != null)
+                .GroupBy(a => a.ArtistMetadataId)
+                .ToDictionary(g => g.Key, g => g.First().Id);
+
+            // Group albums by ArtistMetadataId (a plain int column), NOT Album.ArtistId. Album.ArtistId
+            // dereferences a LazyLoaded<Artist> that GetAllAlbums() leaves unloaded, so grouping ALL
+            // albums by it fires a per-row ArtistRepository.Query() DB round trip per album (N+1 -> OOM
+            // at large-library scale). Grouping is bijective with the old ArtistId grouping, so counts
+            // and group ordering are unchanged.
+            var albumsByArtist = albums.GroupBy(a => a.ArtistMetadataId).ToList();
 
             // Analyze completionist behavior
             var artistsWithManyAlbums = albumsByArtist.Where(g => g.Count() >= 5).ToList();
@@ -303,7 +314,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 .Take(5)
                 .Select(g => new ArtistDepth
                 {
-                    ArtistId = g.Key,
+                    ArtistId = artistIdByMetadataId.TryGetValue(g.Key, out var resolvedArtistId) ? resolvedArtistId : g.Key,
                     AlbumCount = g.Count(),
                     IsComplete = g.Count() >= 8 // Threshold for "complete" collection
                 })
@@ -439,13 +450,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private List<string> GetTopArtistsByAlbumCount(List<Artist> artists, List<Album> albums)
         {
-            var artistsById = artists.ToDictionary(a => a.Id);
+            // Key on ArtistMetadataId (a plain eager int column on both Artist and Album) rather than
+            // Album.ArtistId, which dereferences a LazyLoaded<Artist> that GetAllAlbums() leaves
+            // unloaded -- grouping ALL albums by it fires a per-row DB round trip per album (N+1 -> OOM
+            // at large-library scale). Same pattern as LibraryContextBuilder.BuildProfile.
+            var artistNameByMetadataId = artists
+                .Where(a => a != null)
+                .GroupBy(a => a.ArtistMetadataId)
+                .ToDictionary(g => g.Key, g => g.First().Name);
 
             return albums
-                .GroupBy(a => a.ArtistId)
+                .GroupBy(a => a.ArtistMetadataId)
                 .OrderByDescending(g => g.Count())
                 .Take(20)
-                .Select(g => artistsById.TryGetValue(g.Key, out var artist) ? artist.Name : null)
+                .Select(g => artistNameByMetadataId.TryGetValue(g.Key, out var name) ? name : null)
                 .Where(n => !string.IsNullOrEmpty(n))
                 .ToList();
         }

@@ -171,13 +171,16 @@ namespace Brainarr.Tests
                 relaxed: false);
 
             var album = CreateAlbum(100, "Jazz Album", artistId: 500);
-            album.Artist.Value.Name = "Miles Davis"; // Set via Artist.Value.Name path
+            album.ArtistMetadataId = 500;
+            // The artist name is resolved from the materialized artists list via ArtistMetadataId,
+            // NOT by dereferencing the album's LazyLoaded<Artist> (the N+1 hazard).
+            var artist = new Artist { Id = 500, ArtistMetadataId = 500, Name = "Miles Davis" };
 
             var albums = new List<Album> { album };
 
             // Act
             var result = service.Sample(
-                Array.Empty<Artist>(),
+                new List<Artist> { artist },
                 albums,
                 styleContext,
                 selection,
@@ -188,7 +191,7 @@ namespace Brainarr.Tests
 
             // Assert
             result.Albums.Should().ContainSingle("because one album was provided");
-            result.Albums[0].ArtistName.Should().Be("Miles Davis", "because artist name is resolved from album.Artist.Value.Name (line 615)");
+            result.Albums[0].ArtistName.Should().Be("Miles Davis", "because artist name is resolved from the materialized artists list via ArtistMetadataId");
         }
 
         [Fact]
@@ -222,15 +225,15 @@ namespace Brainarr.Tests
                 relaxed: false);
 
             var album = CreateAlbum(100, "Blues Album", artistId: 600);
-            album.Artist = null!; // Clear Artist so it falls back to ArtistMetadata
-            // ArtistMetadata is not initialized by Album ctor; we must set the LazyLoaded explicitly
-            album.ArtistMetadata = new ArtistMetadata { Name = "B.B. King" };
+            album.ArtistMetadataId = 600;
+            // Resolution comes from the artists list via ArtistMetadataId -- no album lazy-load.
+            var artist = new Artist { Id = 600, ArtistMetadataId = 600, Name = "B.B. King" };
 
             var albums = new List<Album> { album };
 
             // Act
             var result = service.Sample(
-                Array.Empty<Artist>(),
+                new List<Artist> { artist },
                 albums,
                 styleContext,
                 selection,
@@ -240,7 +243,7 @@ namespace Brainarr.Tests
                 CancellationToken.None);
 
             // Assert
-            result.Albums[0].ArtistName.Should().Be("B.B. King", "because artist name is resolved from album.ArtistMetadata.Value.Name when Artist is null (line 615)");
+            result.Albums[0].ArtistName.Should().Be("B.B. King", "because artist name is resolved from the materialized artists list via ArtistMetadataId");
         }
 
         [Fact]
@@ -275,19 +278,17 @@ namespace Brainarr.Tests
                 selected: new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "electronic" },
                 relaxed: false);
 
-            // Create album with no artist name available
-            // Note: do NOT null album.Artist — Album.ArtistId getter reads from Artist.Value.Id,
-            // so nulling Artist would zero out ArtistId. Instead, leave Artist (preserving Id=777)
-            // but clear its Name and don't set ArtistMetadata, forcing the "Artist {id}" fallback.
+            // Album's artist resolves (via ArtistMetadataId) to an artist with NO name, so the
+            // resolver falls back to the "Artist {id}" form -- without touching any album lazy-load.
             var album = CreateAlbum(100, "Electronic Album", artistId: 777);
-            album.Artist.Value.Name = null;
-            album.ArtistMetadata = null!;
+            album.ArtistMetadataId = 777;
+            var artist = new Artist { Id = 777, ArtistMetadataId = 777, Name = null };
 
             var albums = new List<Album> { album };
 
             // Act
             var result = service.Sample(
-                Array.Empty<Artist>(),
+                new List<Artist> { artist },
                 albums,
                 styleContext,
                 selection,
@@ -299,7 +300,7 @@ namespace Brainarr.Tests
             // Assert - synthetic artist created with fallback name
             result.Artists.Should().ContainSingle("because album should create synthetic artist");
             result.Artists[0].ArtistId.Should().Be(777, "because synthetic artist uses album's artist ID");
-            result.Artists[0].Name.Should().Be("Artist 777", "because artist name falls back to ID when not resolvable (line 80)");
+            result.Artists[0].Name.Should().Be("Artist 777", "because artist name falls back to ID when not resolvable");
         }
 
         #endregion

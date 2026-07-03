@@ -314,12 +314,17 @@ namespace Brainarr.Tests.Services.Prompting
                 relaxed: false);
 
             var album = CreateAlbum(100, "Test Album", artistId: 999);
+            album.ArtistMetadataId = 999;
+            // Artist exists in the library but is not sampled (target artist count = 0), so the album
+            // still brings along a synthetic artist. Its id/name resolve from the artists list via
+            // ArtistMetadataId (a nameless artist -> "Artist {id}" fallback), not an album lazy-load.
+            var artist = new Artist { Id = 999, ArtistMetadataId = 999, Name = null };
 
             var albums = new List<Album> { album };
 
             // Act
             var result = service.Sample(
-                Array.Empty<Artist>(),
+                new List<Artist> { artist },
                 albums,
                 styleContext,
                 selection,
@@ -367,12 +372,15 @@ namespace Brainarr.Tests.Services.Prompting
                 relaxed: false);
 
             var album = CreateAlbum(100, "Test Album", artistId: 888);
+            album.ArtistMetadataId = 888;
+            // Nameless artist in the library -> "Artist {id}" fallback, resolved via ArtistMetadataId.
+            var artist = new Artist { Id = 888, ArtistMetadataId = 888, Name = null };
 
             var albums = new List<Album> { album };
 
             // Act
             var result = service.Sample(
-                Array.Empty<Artist>(),
+                new List<Artist> { artist },
                 albums,
                 styleContext,
                 selection,
