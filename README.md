@@ -40,6 +40,7 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 
 - **Prometheus metrics** — `metrics/prometheus` endpoint exposes latency histograms, error counters, and 429 rates per `{provider}:{model}`.
 - **Built-in Observability UI** — lightweight HTML preview under Advanced settings showing last 15 minutes of data.
+- **Cost visibility action** — `cost/get` reports in-process usage estimates for provider calls; unknown model pricing is surfaced as unpriced, while local/subscription/CLI providers report known $0 marginal cost.
 - **Structured logging** — run-summary logs with attainment %, provider success, confidence-floor gate counts, and token-budget diagnostics.
 
 ### Security
@@ -205,6 +206,8 @@ A fingerprinted LRU cache with a sliding TTL keeps recent plans warm. When you c
 Token budgeting uses a registry-plus-tokenizer model. When a tokenizer is missing we fall back to an estimator, emit a one-time warning, and log `tokenizer.fallback`; learn how to tighten drift in [tokenization & estimates](./docs/tokenization-and-estimates.md).
 
 Telemetry is built in: metrics such as `prompt.plan_cache_*`, `prompt.headroom_violation`, and tokenizer fallbacks surface in Lidarr's Prometheus endpoint. The [metrics reference](./docs/METRICS_REFERENCE.md) and [troubleshooting](./docs/troubleshooting.md) explain how to interpret them.
+
+Cost visibility is exposed through the `cost/get` provider action. Brainarr tracks estimated prompt and completion tokens for real provider calls, including top-up passes, and reports unknown cloud pricing as unpriced instead of fabricating a dollar amount. Treat these values as operational estimates; your provider's billing page remains authoritative.
 
 Out of the box Brainarr stays purely local through Ollama/LM Studio, including iterative refinement defaults that backfill sparse runs. If you opt into cloud providers, they share the same configuration surface—see [configuration](./docs/configuration.md) for how to enable each one.
 
