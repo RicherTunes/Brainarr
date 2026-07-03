@@ -71,7 +71,6 @@ Brainarr.Plugin/
 │   ├── ProviderHealth.cs               # Health monitoring
 │   ├── RateLimiter.cs                  # API rate limiting
 │   ├── RecommendationCache.cs          # Response caching
-│   ├── RetryPolicy.cs                  # Failure handling
 │   ├── ServiceResult.cs                # Result wrapper
 │   └── StructuredLogger.cs             # Enhanced logging
 
@@ -96,7 +95,7 @@ Brainarr.Tests/                          # Comprehensive test suite
 
 - `ProviderHealth`: Real-time health monitoring with metrics
 - `RateLimiter`: Per-provider rate limiting with configurable limits
-- `RetryPolicy`: Exponential backoff retry with circuit breaker patterns
+- `Lidarr.Plugin.Common` retry policies: Exponential backoff retry shared with the plugin ecosystem
 
 **Data Management:**
 
@@ -128,7 +127,7 @@ Brainarr.Tests/                          # Comprehensive test suite
 - Provider factory pattern for extensible provider management
 - Registry pattern for provider capabilities and configuration
 - Health monitoring with real-time metrics tracking
-- Exponential backoff retry with circuit breaker patterns
+- Exponential backoff retry through `Lidarr.Plugin.Common` resilience policies
 - Intelligent caching system to reduce API costs
 - Comprehensive validation for all provider configurations
 

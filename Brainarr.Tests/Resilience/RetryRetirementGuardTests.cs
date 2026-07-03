@@ -14,7 +14,7 @@ namespace Brainarr.Tests.Resilience
             @"\b(?:RunWithRetriesAsync|WithResilienceAsync)\s*(?:<[^>]+>)?\s*\(",
             RegexOptions.Compiled);
 
-        private static readonly Regex LocalRetryWrapperCallPattern = new(
+        private static readonly Regex DirectRetryConstructionPattern = new(
             @"(?:BrainarrRetryPolicyFactory\s*\.\s*Create\w*\s*\(|new\s+ExponentialBackoffRetryPolicy\s*\()",
             RegexOptions.Compiled);
 
@@ -33,26 +33,48 @@ namespace Brainarr.Tests.Resilience
         }
 
         [Fact]
-        public void Production_code_does_not_create_brainarr_retry_wrappers()
+        public void Production_code_uses_common_retry_factory_instead_of_direct_policy_construction()
         {
             var root = FindRepositoryRoot();
             var pluginRoot = Path.Combine(root, "Brainarr.Plugin");
             var offenders = Directory.EnumerateFiles(pluginRoot, "*.cs", SearchOption.AllDirectories)
                 .Where(path => !IsGeneratedOrBuildOutput(path))
-                .Where(path => !Path.GetRelativePath(root, path).Replace('\\', '/')
-                    .Equals("Brainarr.Plugin/Services/RetryPolicy.cs", StringComparison.OrdinalIgnoreCase))
-                .SelectMany(path => FindForbiddenReferences(root, path, LocalRetryWrapperCallPattern))
+                .SelectMany(path => FindForbiddenReferences(root, path, DirectRetryConstructionPattern))
                 .ToArray();
 
             offenders.Should().BeEmpty(
-                "new production retry call sites must use Lidarr.Plugin.Common RetryPolicyFactory directly; Brainarr's retry wrapper is compatibility-only");
+                "production retry call sites must use Lidarr.Plugin.Common RetryPolicyFactory rather than local factories or direct policy construction");
+        }
+
+        [Fact]
+        public void Brainarr_local_retry_compatibility_surface_is_retired()
+        {
+            var root = FindRepositoryRoot();
+            var localRetryFile = Path.Combine(root, "Brainarr.Plugin", "Services", "RetryPolicy.cs");
+
+            File.Exists(localRetryFile).Should().BeFalse(
+                "Brainarr retry/backoff types shadow Common's retry exception types and keep a duplicate retry seam alive");
+        }
+
+        [Fact]
+        public void Production_code_does_not_reference_brainarr_retry_abstraction()
+        {
+            var root = FindRepositoryRoot();
+            var pluginRoot = Path.Combine(root, "Brainarr.Plugin");
+            var offenders = Directory.EnumerateFiles(pluginRoot, "*.cs", SearchOption.AllDirectories)
+                .Where(path => !IsGeneratedOrBuildOutput(path))
+                .SelectMany(path => FindForbiddenReferences(root, path, new Regex(@"\bBrainarrRetryPolicyFactory\b|\bnew\s+ExponentialBackoffRetryPolicy\s*\(|\bclass\s+ExponentialBackoffRetryPolicy\b|\binterface\s+IRetryPolicy\b|\bclass\s+RetryExhaustedException\b", RegexOptions.Compiled)))
+                .ToArray();
+
+            offenders.Should().BeEmpty(
+                "Brainarr must not define or construct its retired retry wrapper; production retry execution must be through Lidarr.Plugin.Common retry policies");
         }
 
         [Fact]
         public void Model_detection_uses_common_local_provider_retry_policy()
         {
             var root = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(root, "Brainarr.Plugin", "Services", "ModelDetectionService.cs"));
+            var source = ReadCodeWithoutComments(Path.Combine(root, "Brainarr.Plugin", "Services", "ModelDetectionService.cs"));
 
             Regex.Matches(source, @"RetryPolicyFactory\s*\.\s*CreateForLocalProviders\s*\(")
                 .Count
@@ -64,12 +86,12 @@ namespace Brainarr.Tests.Resilience
         public void Provider_invoker_uses_common_retry_policy_factory()
         {
             var root = FindRepositoryRoot();
-            var source = File.ReadAllText(Path.Combine(root, "Brainarr.Plugin", "Services", "Core", "ProviderInvoker.cs"));
+            var source = ReadCodeWithoutComments(Path.Combine(root, "Brainarr.Plugin", "Services", "Core", "ProviderInvoker.cs"));
 
             source.Should().Contain("RetryPolicyFactory.Create(",
                 "provider invocation should use the Common retry factory rather than Brainarr-local retry helpers");
-            LocalRetryWrapperCallPattern.IsMatch(source).Should().BeFalse(
-                "provider invocation must not construct Brainarr's compatibility retry wrappers");
+            DirectRetryConstructionPattern.IsMatch(source).Should().BeFalse(
+                "provider invocation must not bypass the Common retry factory with direct retry-policy construction");
         }
 
         [Fact]
@@ -99,6 +121,13 @@ namespace Brainarr.Tests.Resilience
                     yield return $"{Path.GetRelativePath(root, path)}:{i + 1}: {lines[i].Trim()}";
                 }
             }
+        }
+
+        private static string ReadCodeWithoutComments(string path)
+        {
+            var inBlockComment = false;
+            return string.Join(Environment.NewLine, File.ReadLines(path)
+                .Select(line => StripComments(line, ref inBlockComment)));
         }
 
         private static string StripComments(string line, ref bool inBlockComment)
