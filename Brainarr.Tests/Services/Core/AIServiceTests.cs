@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Lidarr.Plugin.Common.Services.Resilience;
 using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;

@@ -5,6 +5,7 @@ using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
+using Lidarr.Plugin.Common.Services.Resilience;
 using Moq;
 using NLog;
 using Brainarr.Tests.Helpers;
@@ -144,7 +145,16 @@ namespace Brainarr.Tests.Services
         public async Task RetryPolicy_ConcurrentExecutions_MaintainsIndependentState()
         {
             // Arrange
-            var retryPolicy = new ExponentialBackoffRetryPolicy(_logger, 3, TimeSpan.FromMilliseconds(10));
+            var retryPolicy = new ExponentialBackoffRetryPolicy(
+                Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
+                new RetryPolicyOptions
+            {
+                MaxRetries = 3,
+                InitialDelay = TimeSpan.FromMilliseconds(10),
+                MaxDelay = TimeSpan.FromMilliseconds(100),
+                UseJitter = false,
+                ShouldRetry = Lidarr.Plugin.Common.Utilities.RetryUtilities.IsRetryableException
+            });
             var executionCounts = new Dictionary<string, int>();
             var lockObj = new object();
 
