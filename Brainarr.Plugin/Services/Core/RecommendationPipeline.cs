@@ -287,7 +287,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var before = items.Count;
             var filtered = items
-                .Where(i => i != null && !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
+                .Where(i => i == null || !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
                 .ToList();
 
             var dropped = before - filtered.Count;
@@ -309,7 +309,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
             var before = items.Count;
             var filtered = items
-                .Where(i => i != null && !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
+                .Where(i => i == null || !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
                 .ToList();
 
             var dropped = before - filtered.Count;
