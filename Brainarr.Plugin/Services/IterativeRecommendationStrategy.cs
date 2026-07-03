@@ -9,6 +9,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.Music;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Cost;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services
@@ -36,6 +37,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly Logger _logger;
         private readonly ILibraryAwarePromptBuilder _promptBuilder;
         private readonly IProviderInvoker _providerInvoker;
+        private readonly ITokenCostEstimator _tokenCostEstimator;
 
         // Maximum number of iterations to prevent infinite loops
         // Default minimum success rate to continue iterations; tuned dynamically per sampling strategy
@@ -45,11 +47,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         // so a genuinely stuck provider can't loop indefinitely even under aggressive top-up.
         private const int ESCALATION_ITERATION_CEILING = 20;
 
-        public IterativeRecommendationStrategy(Logger logger, ILibraryAwarePromptBuilder promptBuilder, IProviderInvoker providerInvoker = null)
+        public IterativeRecommendationStrategy(
+            Logger logger,
+            ILibraryAwarePromptBuilder promptBuilder,
+            IProviderInvoker providerInvoker = null,
+            ITokenCostEstimator tokenCostEstimator = null)
         {
             _logger = logger;
             _promptBuilder = promptBuilder;
             _providerInvoker = providerInvoker ?? new ProviderInvoker();
+            _tokenCostEstimator = tokenCostEstimator ?? new TokenCostEstimator(logger);
         }
 
         /// <summary>
@@ -191,7 +198,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                         validationReasons,
                         rejectedExamplesFromValidation);
                 }
-                try { tokenEstimates.Add(_promptBuilder.EstimateTokens(prompt, modelKey)); }
+                var promptTokensForCost = 0;
+                try { promptTokensForCost = _promptBuilder.EstimateTokens(prompt, modelKey); tokenEstimates.Add(promptTokensForCost); }
                 catch (OperationCanceledException) { throw; } // Propagate cancellation
                 catch (Exception) { /* Token estimation failure is non-critical */ }
 
@@ -199,8 +207,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 {
                     // Get recommendations from AI
                     _logger.Debug($"Iteration {iteration}: Attempting to connect to AI provider for recommendations...");
+                    var callStopwatch = System.Diagnostics.Stopwatch.StartNew();
                     var recommendations = await _providerInvoker.InvokeAsync(provider, prompt, _logger, cancellationToken, operationLabel: "TopUp.Provider.GetRecommendations");
+                    callStopwatch.Stop();
                     _logger.Debug($"Iteration {iteration}: Received {recommendations?.Count ?? 0} recommendations from AI provider");
+
+                    // Cost tracking: this is a SEPARATE real provider round trip from the
+                    // initial-batch call in RecommendationGenerator — top-up iterations hit
+                    // the provider directly via _providerInvoker, not through
+                    // RecommendationGenerator.GenerateRecommendationsAsync, so they need
+                    // their own TrackUsage here or top-up usage would silently go
+                    // untracked (undercounting real cost). One call here per loop
+                    // iteration = one real HTTP round trip, matching the same
+                    // one-per-real-call contract as the initial-batch integration point.
+                    try
+                    {
+                        var costModelId = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId(
+                            settings.Provider, settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty);
+                        _tokenCostEstimator.TrackUsage(
+                            settings.Provider,
+                            costModelId,
+                            promptTokensForCost,
+                            NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationGenerator.EstimateCompletionTokens(
+                                recommendations?.Count ?? 0, shouldRecommendArtists),
+                            callStopwatch.Elapsed);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Non-critical: Failed to track token cost usage for top-up iteration");
+                    }
 
                     if (!recommendations.Any())
                     {

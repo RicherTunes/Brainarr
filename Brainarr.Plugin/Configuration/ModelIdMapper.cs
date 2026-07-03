@@ -4,6 +4,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 {
     public static class ModelIdMapper
     {
+        /// <summary>
+        /// Convenience overload taking the <see cref="AIProvider"/> enum directly (its
+        /// lowercased name is exactly the string key this mapper switches on for every
+        /// provider that has a case below; providers without one fall through to the
+        /// pass-through default, which is also correct — they have no label/raw-id split).
+        /// </summary>
+        public static string ToRawId(AIProvider provider, string label) =>
+            ToRawId(provider.ToString().ToLowerInvariant(), label);
+
         public static string ToRawId(string provider, string label)
         {
             var p = (provider ?? string.Empty).Trim().ToLowerInvariant();
