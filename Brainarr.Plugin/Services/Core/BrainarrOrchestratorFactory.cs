@@ -7,6 +7,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Performance;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Cost;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Prompting;
@@ -101,6 +102,7 @@ internal static class BrainarrOrchestratorFactory
         services.TryAddSingleton<ReviewQueueService>(sp => new ReviewQueueService(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<RecommendationHistory>(sp => new RecommendationHistory(sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<IPerformanceMetrics>(sp => new PerformanceMetrics(sp.GetRequiredService<Logger>()));
+        services.TryAddSingleton<ITokenCostEstimator>(sp => new TokenCostEstimator(sp.GetRequiredService<Logger>()));
 
         services.TryAddSingleton<IFileFingerprintService, FileFingerprintService>();
         services.TryAddSingleton<ITagLibSymptomReader, LidarrAudioTagSymptomReader>();
@@ -171,7 +173,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<Logger>()));
         services.TryAddSingleton<ITopUpPlanner>(sp => new TopUpPlanner(
                 sp.GetRequiredService<Logger>(),
-                sp.GetRequiredService<IDuplicateFilterService>()));
+                sp.GetRequiredService<IDuplicateFilterService>(),
+                sp.GetRequiredService<ITokenCostEstimator>()));
         // WS4.2: Use CommonBreakerRegistry which delegates to Common's AdvancedCircuitBreaker
         services.TryAddSingleton<IBreakerRegistry, CommonBreakerRegistry>();
 
@@ -233,7 +236,8 @@ internal static class BrainarrOrchestratorFactory
                 sp.GetRequiredService<IStyleCatalogService>(),
                 sp.GetRequiredService<IBreakerRegistry>(),
                 sp.GetRequiredService<IDuplicateFilterService>(),
-                sp.GetRequiredService<LibraryHealerActionHandler>());
+                sp.GetRequiredService<LibraryHealerActionHandler>(),
+                sp.GetRequiredService<ITokenCostEstimator>());
         });
     }
 

@@ -61,7 +61,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             int expectedResponseTokens = 500)
         {
             var promptTokens = EstimateTokenCount(prompt);
+            return EstimateCostFromTokenCounts(provider, model, promptTokens, expectedResponseTokens);
+        }
 
+        /// <summary>
+        /// Calculates the estimated cost from already-known token counts, without
+        /// re-tokenizing prompt/response text. Used by callers on the real request path
+        /// (e.g. <see cref="TrackUsage(AIProvider, string, int, int, TimeSpan)"/>) that
+        /// already have precise token estimates from upstream (prompt-builder budgeting,
+        /// completion-size heuristics) and shouldn't fabricate text just to re-derive them.
+        /// </summary>
+        private CostEstimate EstimateCostFromTokenCounts(
+            AIProvider provider,
+            string model,
+            int promptTokens,
+            int responseTokens)
+        {
             if (!_pricingData.TryGetValue(provider, out var pricing))
             {
                 _logger.Warn($"No pricing data available for provider {provider}");
@@ -70,16 +85,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                     Provider = provider,
                     Model = model,
                     PromptTokens = promptTokens,
-                    ResponseTokens = expectedResponseTokens,
+                    ResponseTokens = responseTokens,
                     EstimatedCost = 0,
-                    CostBreakdown = "Pricing data not available"
+                    IsPriceKnown = false,
+                    CostBreakdown = $"Pricing data not available for provider {provider} — cost not estimated to avoid an inaccurate number."
                 };
             }
 
             var modelPricing = GetModelPricing(pricing, model);
 
+            if (modelPricing == null)
+            {
+                // Unknown/unrecognized model: surface honestly rather than guessing a
+                // number. A stale or overly-generic fallback here previously reported a
+                // confidently-wrong dollar figure for any model the pricing table hadn't
+                // been updated for yet (see CLAUDE.md "Cost visibility panel" section).
+                _logger.Debug($"No pricing entry matched model '{model}' for provider {provider}; reporting as unpriced.");
+                return new CostEstimate
+                {
+                    Provider = provider,
+                    Model = model,
+                    PromptTokens = promptTokens,
+                    ResponseTokens = responseTokens,
+                    EstimatedCost = 0,
+                    IsPriceKnown = false,
+                    CostBreakdown = $"Pricing unknown for model '{model}' ({provider}) — cost not estimated to avoid a fabricated number."
+                };
+            }
+
             var promptCost = (promptTokens / 1000.0m) * modelPricing.InputPricePer1K;
-            var responseCost = (expectedResponseTokens / 1000.0m) * modelPricing.OutputPricePer1K;
+            var responseCost = (responseTokens / 1000.0m) * modelPricing.OutputPricePer1K;
             var totalCost = promptCost + responseCost;
 
             return new CostEstimate
@@ -87,10 +122,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 Provider = provider,
                 Model = model,
                 PromptTokens = promptTokens,
-                ResponseTokens = expectedResponseTokens,
+                ResponseTokens = responseTokens,
                 EstimatedCost = totalCost,
+                IsPriceKnown = true,
                 CostBreakdown = $"Input: ${promptCost:F6} ({promptTokens} tokens) + " +
-                               $"Output: ${responseCost:F6} ({expectedResponseTokens} tokens)",
+                               $"Output: ${responseCost:F6} ({responseTokens} tokens)",
                 PricePerMillionTokens = modelPricing.InputPricePer1K * 1000,
                 Currency = "USD"
             };
@@ -109,7 +145,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             var promptTokens = EstimateTokenCount(prompt);
             var responseTokens = EstimateTokenCount(response);
 
-            var estimate = EstimateCost(provider, model, prompt, responseTokens);
+            return TrackUsageFromTokenCounts(provider, model, promptTokens, responseTokens, duration);
+        }
+
+        /// <summary>
+        /// Tracks actual usage from already-known prompt/completion token counts. This is
+        /// the integration point for callers on the real recommendation path (e.g.
+        /// <c>RecommendationGenerator</c>) that call a parsed-recommendations provider API
+        /// (no raw response text is ever available) but already have accurate token
+        /// estimates: prompt tokens from the prompt builder's own budgeting, completion
+        /// tokens from the existing per-item completion-size heuristic. Avoids fabricating
+        /// a synthetic "response" string just to re-tokenize it.
+        /// </summary>
+        public UsageReport TrackUsage(
+            AIProvider provider,
+            string model,
+            int promptTokens,
+            int completionTokens,
+            TimeSpan duration)
+        {
+            return TrackUsageFromTokenCounts(provider, model, promptTokens, completionTokens, duration);
+        }
+
+        private UsageReport TrackUsageFromTokenCounts(
+            AIProvider provider,
+            string model,
+            int promptTokens,
+            int responseTokens,
+            TimeSpan duration)
+        {
+            var estimate = EstimateCostFromTokenCounts(provider, model, promptTokens, responseTokens);
 
             var report = new UsageReport
             {
@@ -120,6 +185,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 ResponseTokens = responseTokens,
                 TotalTokens = promptTokens + responseTokens,
                 EstimatedCost = estimate.EstimatedCost,
+                IsPriceKnown = estimate.IsPriceKnown,
                 Duration = duration,
                 TokensPerSecond = responseTokens / Math.Max(1, duration.TotalSeconds)
             };
@@ -152,9 +218,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             {
                 StartDate = startDate,
                 EndDate = endDate,
+                // Unpriced reports always carry EstimatedCost == 0, so this sum reflects
+                // only known-priced usage by construction — it is never inflated by a
+                // fabricated number for models the pricing table doesn't recognize.
                 TotalCost = reports.Sum(r => r.EstimatedCost),
                 TotalTokens = reports.Sum(r => r.TotalTokens),
                 TotalRequests = reports.Count,
+                UnpricedRequestCount = reports.Count(r => !r.IsPriceKnown),
                 AverageTokensPerRequest = reports.Average(r => r.TotalTokens),
                 AverageCostPerRequest = reports.Average(r => r.EstimatedCost),
                 ProviderBreakdown = reports
@@ -164,7 +234,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                         Provider = g.Key,
                         TotalCost = g.Sum(r => r.EstimatedCost),
                         TotalTokens = g.Sum(r => r.TotalTokens),
-                        RequestCount = g.Count()
+                        RequestCount = g.Count(),
+                        UnpricedRequestCount = g.Count(r => !r.IsPriceKnown)
                     })
                     .ToList(),
                 PeakUsageHour = reports
@@ -210,24 +281,67 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
             };
         }
 
+        // Pricing snapshot refreshed 2026-07 (publicly listed per-provider API pricing at
+        // time of writing). Pricing tables go stale by nature — new models ship faster
+        // than this table gets updated — so the honesty net in GetModelPricing/EstimateCost
+        // is the durable fix: an unrecognized model surfaces as unpriced (IsPriceKnown =
+        // false, cost = 0) rather than silently reusing a guessed number. Treat entries
+        // below as "best known at last refresh," not a guarantee.
+        //
+        // IMPORTANT (found in self-review): keys must be specific enough to avoid
+        // GetModelPricing's partial-match (Contains-based) fallback silently attributing
+        // an OLDER/DIFFERENT model's price to a newer, differently-priced one that merely
+        // shares a prefix. Brainarr's own ModelIdMapper mints forward-looking raw ids like
+        // "claude-opus-4-7" / "claude-sonnet-4-6" that share a prefix with real
+        // "claude-sonnet-4-20250514" — a bare "claude-sonnet-4" key would (via
+        // model.Contains(key)) wrongly price both identically. Prefer exact/dated keys for
+        // any family where a same-prefix, differently-priced sibling could plausibly exist;
+        // an unmatched sibling then correctly falls through to unpriced instead of
+        // inheriting a neighboring model's number.
         private Dictionary<AIProvider, ProviderPricing> InitializePricingData()
         {
-            // Pricing as of 2024 - should be configurable/updatable
             return new Dictionary<AIProvider, ProviderPricing>
             {
                 [AIProvider.OpenAI] = new ProviderPricing
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
+                        // Current-generation
+                        ["gpt-5-nano"] = new ModelPricing { InputPricePer1K = 0.00005m, OutputPricePer1K = 0.0004m },
+                        ["gpt-5-mini"] = new ModelPricing { InputPricePer1K = 0.00025m, OutputPricePer1K = 0.002m },
+                        ["gpt-5"] = new ModelPricing { InputPricePer1K = 0.00125m, OutputPricePer1K = 0.01m },
+                        ["gpt-4o"] = new ModelPricing { InputPricePer1K = 0.0025m, OutputPricePer1K = 0.01m },
+                        ["gpt-4o-mini"] = new ModelPricing { InputPricePer1K = 0.00015m, OutputPricePer1K = 0.0006m },
+                        ["gpt-4.1-nano"] = new ModelPricing { InputPricePer1K = 0.0001m, OutputPricePer1K = 0.0004m },
+                        ["gpt-4.1-mini"] = new ModelPricing { InputPricePer1K = 0.0004m, OutputPricePer1K = 0.0016m },
+                        ["gpt-4.1"] = new ModelPricing { InputPricePer1K = 0.002m, OutputPricePer1K = 0.008m },
+                        ["o1-mini"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.012m },
+                        ["o1"] = new ModelPricing { InputPricePer1K = 0.015m, OutputPricePer1K = 0.06m },
+                        ["o3-mini"] = new ModelPricing { InputPricePer1K = 0.0011m, OutputPricePer1K = 0.0044m },
+                        ["o4-mini"] = new ModelPricing { InputPricePer1K = 0.0011m, OutputPricePer1K = 0.0044m },
+                        // Legacy (still selectable/billable)
                         ["gpt-4-turbo"] = new ModelPricing { InputPricePer1K = 0.01m, OutputPricePer1K = 0.03m },
                         ["gpt-4"] = new ModelPricing { InputPricePer1K = 0.03m, OutputPricePer1K = 0.06m },
                         ["gpt-3.5-turbo"] = new ModelPricing { InputPricePer1K = 0.0005m, OutputPricePer1K = 0.0015m }
+                        // o1-preview, o3-pro deliberately omitted: pricing not confidently
+                        // known at refresh time — falls through to unpriced rather than a guess.
                     }
                 },
                 [AIProvider.Anthropic] = new ProviderPricing
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
+                        // Real, dated ids as emitted by ModelIdMapper for the legacy/back-compat
+                        // selections. Deliberately NOT keyed as bare "claude-sonnet-4" /
+                        // "claude-opus-4" — see the class-level note above on prefix collisions
+                        // with newer same-family raw ids this codebase's model picker can emit
+                        // (e.g. "claude-sonnet-4-6", "claude-opus-4-7") whose real pricing isn't
+                        // confidently known yet; those correctly fall through to unpriced.
+                        ["claude-sonnet-4-20250514"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["claude-3-7-sonnet"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["claude-3-5-sonnet"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["claude-3-5-haiku"] = new ModelPricing { InputPricePer1K = 0.0008m, OutputPricePer1K = 0.004m },
+                        // Legacy (still selectable/billable)
                         ["claude-3-opus"] = new ModelPricing { InputPricePer1K = 0.015m, OutputPricePer1K = 0.075m },
                         ["claude-3-sonnet"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
                         ["claude-3-haiku"] = new ModelPricing { InputPricePer1K = 0.00025m, OutputPricePer1K = 0.00125m }
@@ -237,14 +351,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
-                        ["gemini-pro"] = new ModelPricing { InputPricePer1K = 0.00025m, OutputPricePer1K = 0.0005m },
-                        ["gemini-ultra"] = new ModelPricing { InputPricePer1K = 0.007m, OutputPricePer1K = 0.021m }
+                        // 2.5 pricing approximated at the <=200k-token / non-thinking tier;
+                        // Gemini's actual tiering is more granular than this table models.
+                        ["gemini-2.5-flash-lite"] = new ModelPricing { InputPricePer1K = 0.0001m, OutputPricePer1K = 0.0004m },
+                        ["gemini-2.5-flash"] = new ModelPricing { InputPricePer1K = 0.0003m, OutputPricePer1K = 0.0025m },
+                        ["gemini-2.5-pro"] = new ModelPricing { InputPricePer1K = 0.00125m, OutputPricePer1K = 0.01m },
+                        ["gemini-2.0-flash"] = new ModelPricing { InputPricePer1K = 0.0001m, OutputPricePer1K = 0.0004m },
+                        ["gemini-1.5-pro"] = new ModelPricing { InputPricePer1K = 0.00125m, OutputPricePer1K = 0.005m },
+                        ["gemini-1.5-flash"] = new ModelPricing { InputPricePer1K = 0.000075m, OutputPricePer1K = 0.0003m }
+                        // gemini-3.x deliberately omitted: not confidently known at refresh time.
                     }
                 },
                 [AIProvider.Perplexity] = new ProviderPricing
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
+                        ["sonar-pro"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["sonar"] = new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m },
+                        // Legacy naming
                         ["llama-3-sonar-large"] = new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m },
                         ["llama-3-sonar-small"] = new ModelPricing { InputPricePer1K = 0.0002m, OutputPricePer1K = 0.0002m }
                     }
@@ -253,6 +377,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
+                        ["llama-3.3-70b"] = new ModelPricing { InputPricePer1K = 0.00059m, OutputPricePer1K = 0.00079m },
+                        ["llama-3.1-8b"] = new ModelPricing { InputPricePer1K = 0.00005m, OutputPricePer1K = 0.00008m },
+                        // Legacy
                         ["mixtral-8x7b"] = new ModelPricing { InputPricePer1K = 0.00027m, OutputPricePer1K = 0.00027m },
                         ["llama2-70b"] = new ModelPricing { InputPricePer1K = 0.00064m, OutputPricePer1K = 0.00064m }
                     }
@@ -261,17 +388,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 {
                     Models = new Dictionary<string, ModelPricing>
                     {
-                        ["deepseek-chat"] = new ModelPricing { InputPricePer1K = 0.00014m, OutputPricePer1K = 0.00028m }
+                        ["deepseek-chat"] = new ModelPricing { InputPricePer1K = 0.00027m, OutputPricePer1K = 0.0011m },
+                        ["deepseek-reasoner"] = new ModelPricing { InputPricePer1K = 0.00055m, OutputPricePer1K = 0.00219m }
                     }
                 },
+                // OpenRouter deliberately has NO blanket "default" entry: it proxies a
+                // marketplace of independently-priced third-party models with no sane
+                // single price. A generic default here is exactly the fabricated-number
+                // failure mode this table refresh fixes — unmapped OpenRouter models
+                // correctly fall through to the unpriced path instead.
                 [AIProvider.OpenRouter] = new ProviderPricing
                 {
-                    Models = new Dictionary<string, ModelPricing>
-                    {
-                        ["default"] = new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m }
-                    }
+                    Models = new Dictionary<string, ModelPricing>()
                 },
-                // Local providers have no API costs
+                // Local providers have no API costs — this is a REAL, known $0 (IsPriceKnown
+                // stays true), not "unknown pricing". Any model name routes to it because a
+                // local backend genuinely costs nothing to call regardless of which model
+                // is loaded.
                 [AIProvider.Ollama] = new ProviderPricing
                 {
                     Models = new Dictionary<string, ModelPricing>
@@ -285,28 +418,72 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                     {
                         ["default"] = new ModelPricing { InputPricePer1K = 0m, OutputPricePer1K = 0m }
                     }
+                },
+                // Subscription/CLI providers bill a flat plan fee (Claude Pro/Max, ChatGPT
+                // subscription), not metered per-token API usage — like local providers, this
+                // is a REAL known $0 marginal cost, not "we don't know the price." ZaiGlm and
+                // ZaiCoding are intentionally excluded here: those ARE metered per-token APIs
+                // (Z.AI PaaS / Coding Plan credits), just not yet in this table (no confident
+                // pricing at refresh time) — they correctly fall through to the
+                // provider-not-found unpriced path rather than being mislabeled as free.
+                [AIProvider.ClaudeCodeSubscription] = new ProviderPricing
+                {
+                    Models = new Dictionary<string, ModelPricing>
+                    {
+                        ["default"] = new ModelPricing { InputPricePer1K = 0m, OutputPricePer1K = 0m }
+                    }
+                },
+                [AIProvider.OpenAICodexSubscription] = new ProviderPricing
+                {
+                    Models = new Dictionary<string, ModelPricing>
+                    {
+                        ["default"] = new ModelPricing { InputPricePer1K = 0m, OutputPricePer1K = 0m }
+                    }
+                },
+                [AIProvider.ClaudeCodeCli] = new ProviderPricing
+                {
+                    Models = new Dictionary<string, ModelPricing>
+                    {
+                        ["default"] = new ModelPricing { InputPricePer1K = 0m, OutputPricePer1K = 0m }
+                    }
                 }
             };
         }
 
+        /// <summary>
+        /// Resolves pricing for a model, or null when the model/provider pairing isn't
+        /// recognized. Returning null (rather than a generic guessed price) is load-bearing
+        /// for the cost-panel honesty guarantee — callers must treat null as "unknown," not
+        /// silently substitute a number.
+        /// </summary>
         private ModelPricing GetModelPricing(ProviderPricing provider, string model)
         {
+            if (string.IsNullOrWhiteSpace(model))
+            {
+                return provider.Models.GetValueOrDefault("default");
+            }
+
             // Try exact match first
             if (provider.Models.TryGetValue(model, out var pricing))
                 return pricing;
 
-            // Try to find partial match (e.g., "gpt-4-turbo-preview" matches "gpt-4-turbo")
+            // Try to find partial match (e.g., "gpt-4-turbo-preview" matches "gpt-4-turbo").
+            // Skip the "default" sentinel key here — it's a deliberate opt-in fallback for
+            // providers where any model has the same known price (local backends), not a
+            // pattern to partial-match against arbitrary model names.
             var partialMatch = provider.Models
-                .Where(kvp => model.Contains(kvp.Key) || kvp.Key.Contains(model))
+                .Where(kvp => kvp.Key != "default" && (model.Contains(kvp.Key) || kvp.Key.Contains(model)))
                 .OrderByDescending(kvp => kvp.Key.Length)
                 .FirstOrDefault();
 
             if (partialMatch.Value != null)
                 return partialMatch.Value;
 
-            // Return default pricing if available
-            return provider.Models.GetValueOrDefault("default") ??
-                   new ModelPricing { InputPricePer1K = 0.001m, OutputPricePer1K = 0.001m };
+            // Only a provider that explicitly declares a "default" (i.e. every model under
+            // it is priced identically — local backends) falls back to it. Everything else
+            // (including OpenRouter's marketplace of independently-priced models) surfaces
+            // as unpriced via the null return.
+            return provider.Models.GetValueOrDefault("default");
         }
 
         // Wave 54 thread-safety fix: UsageHistory is a STATIC List<T> mutated from
@@ -386,6 +563,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         int EstimateTokenCount(string text);
         CostEstimate EstimateCost(AIProvider provider, string model, string prompt, int expectedResponseTokens = 500);
         UsageReport TrackUsage(AIProvider provider, string model, string prompt, string response, TimeSpan duration);
+
+        /// <summary>
+        /// Tracks usage from already-known token counts (no raw response text available —
+        /// e.g. providers whose API returns parsed results, not raw completion text).
+        /// </summary>
+        UsageReport TrackUsage(AIProvider provider, string model, int promptTokens, int completionTokens, TimeSpan duration);
         UsageStatistics GetUsageStatistics(DateTime startDate, DateTime endDate);
         BudgetAlert CheckBudget(decimal monthlyBudget);
     }
@@ -397,6 +580,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public int PromptTokens { get; set; }
         public int ResponseTokens { get; set; }
         public decimal EstimatedCost { get; set; }
+
+        /// <summary>
+        /// False when the model/provider pairing isn't in the pricing table — EstimatedCost
+        /// is a real zero in that case, not "we know it costs nothing." Callers must not
+        /// present EstimatedCost as reliable when this is false.
+        /// </summary>
+        public bool IsPriceKnown { get; set; } = true;
         public string CostBreakdown { get; set; } = string.Empty;
         public decimal PricePerMillionTokens { get; set; }
         public string Currency { get; set; } = string.Empty;
@@ -411,6 +601,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public int ResponseTokens { get; set; }
         public int TotalTokens { get; set; }
         public decimal EstimatedCost { get; set; }
+
+        /// <summary>See <see cref="CostEstimate.IsPriceKnown"/>.</summary>
+        public bool IsPriceKnown { get; set; } = true;
         public TimeSpan Duration { get; set; }
         public double TokensPerSecond { get; set; }
     }
@@ -419,9 +612,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
     {
         public DateTime StartDate { get; set; }
         public DateTime EndDate { get; set; }
+
+        /// <summary>
+        /// Sum of EstimatedCost across all reports in range. Unpriced reports contribute
+        /// exactly 0, so this total is never inflated by a guessed number — see
+        /// <see cref="UnpricedRequestCount"/> for how many requests it excludes.
+        /// </summary>
         public decimal TotalCost { get; set; }
         public int TotalTokens { get; set; }
         public int TotalRequests { get; set; }
+
+        /// <summary>
+        /// Count of requests whose model/provider pairing had no known pricing (excluded
+        /// from TotalCost, not zero-cost). A UI should surface this alongside TotalCost so
+        /// "$0.00 spent" is never confused with "N requests we couldn't price."
+        /// </summary>
+        public int UnpricedRequestCount { get; set; }
         public double AverageTokensPerRequest { get; set; }
         public decimal AverageCostPerRequest { get; set; }
         public List<ProviderUsage> ProviderBreakdown { get; set; } = new List<ProviderUsage>();
@@ -434,6 +640,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         public decimal TotalCost { get; set; }
         public int TotalTokens { get; set; }
         public int RequestCount { get; set; }
+
+        /// <summary>See <see cref="UsageStatistics.UnpricedRequestCount"/>, scoped to this provider.</summary>
+        public int UnpricedRequestCount { get; set; }
     }
 
     public class BudgetAlert

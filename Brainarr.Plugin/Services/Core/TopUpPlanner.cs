@@ -12,6 +12,7 @@ using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Cost;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -20,11 +21,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
     {
         private readonly Logger _logger;
         private readonly IDuplicateFilterService _duplicateFilter;
+        private readonly ITokenCostEstimator _tokenCostEstimator;
 
-        public TopUpPlanner(Logger logger, IDuplicateFilterService duplicateFilter)
+        public TopUpPlanner(Logger logger, IDuplicateFilterService duplicateFilter, ITokenCostEstimator tokenCostEstimator = null)
         {
             _logger = logger ?? LogManager.GetCurrentClassLogger();
             _duplicateFilter = duplicateFilter ?? throw new ArgumentNullException(nameof(duplicateFilter));
+            _tokenCostEstimator = tokenCostEstimator ?? new TokenCostEstimator(_logger);
         }
 
         public async Task<List<ImportListItemInfo>> TopUpAsync(
@@ -63,7 +66,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up timeout"); }
             }
 
-            var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder, new ProviderInvoker());
+            var strategy = new IterativeRecommendationStrategy(_logger, promptBuilder, new ProviderInvoker(), _tokenCostEstimator);
 
             // Temporarily adjust MaxRecommendations to the deficit only for this top-up
             using var _maxScope = SettingScope.Apply(
