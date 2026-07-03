@@ -36,7 +36,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
     private readonly IFileFingerprintService _fingerprints;
     private readonly ILibraryHealerFindingStore _findingStore;
     private readonly Func<TimeSpan>? _elapsedProvider;
-    private readonly Func<string, bool> _rootOnlineProbe;
+    private readonly StorageRootAvailabilityProbe _rootOnlineProbe;
 
     // Once this many path-unresolved (missing/inconclusive) findings share one storage root, the root
     // itself becomes the more likely explanation than that many independent per-file faults.
@@ -71,7 +71,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
         _fingerprints = fingerprints ?? throw new ArgumentNullException(nameof(fingerprints));
         _findingStore = findingStore ?? throw new ArgumentNullException(nameof(findingStore));
         _elapsedProvider = elapsedProvider;
-        _rootOnlineProbe = rootOnlineProbe ?? DefaultRootOnlineProbe;
+        _rootOnlineProbe = new StorageRootAvailabilityProbe(rootOnlineProbe ?? DefaultRootOnlineProbe);
     }
 
     // Bounded, read-only reachability check for a storage root. A hung or throwing probe (dead mount)
@@ -123,6 +123,12 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             persistedFindings = saved ? findings.Count : 0;
         }
 
+        void CoalesceAndSavePendingFindings()
+        {
+            CoalesceOfflineStorageRoots(findings, rootGroups, cancellationToken);
+            SavePendingFindings();
+        }
+
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -165,7 +171,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                     if (findings.Count > 0)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        SavePendingFindings();
+                        CoalesceAndSavePendingFindings();
                     }
 
                     return new LibraryHealerScanResult(
@@ -190,12 +196,10 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
                 cancellationToken.ThrowIfCancellationRequested();
             }
 
-            CoalesceOfflineStorageRoots(findings, rootGroups, cancellationToken);
-
             if (findings.Count > 0)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                SavePendingFindings();
+                CoalesceAndSavePendingFindings();
             }
 
             var truncated = gatherResult.BudgetTruncated || scannedTrackFiles < availableTrackFiles;
@@ -556,7 +560,7 @@ public sealed class LibraryHealerScanRunner : ILibraryHealerScanRunner
             bool online;
             try
             {
-                online = _rootOnlineProbe(group.RootPath);
+                online = _rootOnlineProbe.IsOnline(group.RootPath);
             }
             catch (Exception)
             {

@@ -60,7 +60,7 @@ The action's `maxSeconds` value is enforced through candidate-gathering budget c
 
 If the tag reader reports a busy state after an earlier timed-out read, A1 fails the current scan safely, preserves already completed findings from the batch, and does not fingerprint or classify the busy file.
 
-If a storage root is offline or otherwise fails the root-level availability check, the scan coalesces the root into a single `NeedsHumanReview` finding with `STORAGE_ROOT_OFFLINE` rather than emitting one finding per missing track file. That finding reports `affectedTrackCount` so operators can see the blast radius without flooding the review queue.
+If a storage root is offline or otherwise fails the root-level availability check, the scan coalesces the root into a single `PathInconsistency` finding with `STORAGE_ROOT_OFFLINE` rather than emitting one finding per missing track file. That finding reports `affectedTrackCount` so operators can see the blast radius without flooding the review queue.
 
 ## A2 Scope
 

@@ -290,7 +290,8 @@ public sealed class LibraryHealerFindingStore : ILibraryHealerFindingStore
         return ContainsLikelyPath(value)
             || HasDriveDesignator(value)
             || ContainsMediaExtension(value)
-            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value);
+            || LibraryHealerSensitiveText.ContainsMetadataMaterial(value)
+            || LibraryHealerSensitiveText.ContainsCommandMaterial(value);
     }
 
     private static bool HasWindowsRoot(string value)
