@@ -33,6 +33,7 @@ namespace Brainarr.Tests.Documentation
             doc.Should().Contain("field-sensitivity catalog");
             doc.Should().Contain("affectedTrackCount");
             doc.Should().Contain("STORAGE_ROOT_OFFLINE");
+            doc.Should().Contain("single `PathInconsistency` finding with `STORAGE_ROOT_OFFLINE`");
             doc.Should().Contain("fail closed");
             doc.Should().Contain("unknown");
 

@@ -6,7 +6,7 @@ public static class HealerTriageAdvisor
         LibraryHealerFinding finding,
         HealerFindingFreshness? freshness = null)
     {
-        var state = freshness ?? HealerFindingFreshness.Current;
+        var state = freshness ?? FreshnessFromFinding(finding);
 
         if (finding is null)
         {
@@ -166,6 +166,25 @@ public static class HealerTriageAdvisor
                 new[] { HealerTreatmentVocab.RequiredEvidence.FreshFileFingerprint },
                 Rationale(finding)),
         };
+    }
+
+    private static HealerFindingFreshness FreshnessFromFinding(LibraryHealerFinding? finding)
+    {
+        if (finding is null)
+        {
+            return HealerFindingFreshness.Current;
+        }
+
+        return new HealerFindingFreshness(
+            NormalizeFindingFreshness(finding.EvidenceFreshness),
+            NormalizeFindingFreshness(finding.IdentityFreshness));
+    }
+
+    private static string NormalizeFindingFreshness(string? value)
+    {
+        return string.IsNullOrWhiteSpace(value)
+            ? HealerTreatmentVocab.Freshness.Current
+            : HealerFreshnessNormalizer.Normalize(value);
     }
 
     private static HealerTreatmentPlan Review(
