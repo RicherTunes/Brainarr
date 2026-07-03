@@ -6,9 +6,8 @@
 # Jobs omitted  : none (all brainarr Gitea jobs are portable to GitHub)
 #
 # Translation vs .gitea/workflows/ci.yml:
-#   - Checkout     : actions/checkout@v4 with submodules:recursive (replaces the Gitea-only
-#                    hand-rolled git-clone workaround for verify; lint already used recursive;
-#                    Common submodule is public on GitHub so no auth header needed)
+#   - Checkout     : actions/checkout@v4 with submodules:false, then initialize only Common
+#                    after rewriting the LAN Gitea URL to the GitHub raw-history mirror branch.
 #   - .NET SDK     : actions/setup-dotnet@v4 replaces the curl dotnet-install.sh block (verify only;
 #                    lint is pwsh/Pester-only and does not need the SDK)
 #   - PowerShell   : ubuntu-latest ships pwsh -- "Install PowerShell" tarball step removed
@@ -50,7 +49,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init Common submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config url.https://github.com/RicherTunes/Lidarr.Plugin.Common.git.insteadOf http://192.168.2.59:3001/RicherTunes/Lidarr.Plugin.Common.git
+          git submodule update --init -- ext/Lidarr.Plugin.Common
       # Pester is not bundled with the pre-installed pwsh on ubuntu-latest; install from PSGallery.
       # Pinned to a known-good 5.x release to avoid accidental major-version drift.
       - name: Install Pester
@@ -73,7 +78,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          submodules: recursive
+          submodules: false
+      - name: Init Common submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config url.https://github.com/RicherTunes/Lidarr.Plugin.Common.git.insteadOf http://192.168.2.59:3001/RicherTunes/Lidarr.Plugin.Common.git
+          git submodule update --init -- ext/Lidarr.Plugin.Common
       - name: Common submodule pin guard
         shell: bash
         run: bash ext/Lidarr.Plugin.Common/scripts/repin-common-submodule.sh --verify-only --path ext/Lidarr.Plugin.Common
