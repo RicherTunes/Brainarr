@@ -115,4 +115,26 @@ public sealed class HealerTriageFreshnessTests
         plan.RationaleCodes.Should().Contain(HealerTreatmentVocab.Rationale.MalformedFindingRecord);
         plan.ExecutionAuthorization.Authorized.Should().BeFalse();
     }
+
+    [Fact]
+    public void Advise_ShouldUseFindingFreshness_WhenFreshnessArgumentOmitted()
+    {
+        var finding = HealerTriageAdvisorTests.Finding(
+            LibraryHealerLabel.TagMetadataIssue,
+            new[] { "TAG_METADATA_MISSING" },
+            new TagReaderEvidence(true, true, 245.2, null, null),
+            null) with
+        {
+            EvidenceFreshness = HealerTreatmentVocab.Freshness.Unknown,
+            IdentityFreshness = HealerTreatmentVocab.Freshness.Current,
+        };
+
+        var plan = HealerTriageAdvisor.Advise(finding);
+
+        plan.CandidateWorkflow.Should().Be(HealerTreatmentVocab.Workflow.Review);
+        plan.Risk.Should().Be(HealerTreatmentVocab.Risk.High);
+        plan.EvidenceFreshness.Should().Be(HealerTreatmentVocab.Freshness.Unknown);
+        plan.BlockedReasons.Should().Contain(HealerTreatmentVocab.BlockedReason.EvidenceFreshnessNotCurrent);
+        plan.RequiredEvidence.Should().Contain(HealerTreatmentVocab.RequiredEvidence.FreshFileFingerprint);
+    }
 }
