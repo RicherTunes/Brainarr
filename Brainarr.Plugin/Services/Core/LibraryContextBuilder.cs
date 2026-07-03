@@ -36,15 +36,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 var artists = artistService.GetAllArtists();
                 var albums = albumService.GetAllAlbums();
 
+                // Keyed on ArtistMetadataId (a plain int column on both Artist and Album), NOT
+                // Album.ArtistId. Album.ArtistId dereferences a LazyLoaded<Artist> that
+                // GetAllAlbums() leaves unloaded, so grouping by it fires a full per-row
+                // ArtistRepository.Query() DB round trip PER ALBUM -- an N+1 that both OOMs
+                // large libraries (live-observed 18 OOMs/hour at ~11,700 artists) and exposes a
+                // fragile per-row query path that can itself throw (live-observed "Error parsing
+                // column 21 (Links=[...])"), collapsing this whole profile to the hardcoded
+                // fallback. ArtistMetadataId needs no lazy load at all.
+                var artistNameByMetadataId = artists
+                    .Where(a => a != null)
+                    .GroupBy(a => a.ArtistMetadataId)
+                    .ToDictionary(g => g.Key, g => g.First().Name);
+
                 var artistAlbumCounts = albums
-                    .GroupBy(a => a.ArtistId)
-                    .Select(g => new { ArtistId = g.Key, Count = g.Count() })
+                    .GroupBy(a => a.ArtistMetadataId)
+                    .Select(g => new { ArtistMetadataId = g.Key, Count = g.Count() })
                     .OrderByDescending(x => x.Count)
                     .Take(20)
                     .ToList();
 
                 var topArtistNames = artistAlbumCounts
-                    .Select(ac => artists.FirstOrDefault(a => a.Id == ac.ArtistId)?.Name)
+                    .Select(ac => artistNameByMetadataId.TryGetValue(ac.ArtistMetadataId, out var name) ? name : null)
                     .Where(n => !string.IsNullOrEmpty(n))
                     .ToList();
 
