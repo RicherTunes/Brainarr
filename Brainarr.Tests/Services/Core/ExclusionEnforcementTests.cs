@@ -227,6 +227,46 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public void FilterHardExcludedRecommendations_PreservesNullEntries()
+        {
+            _history.MarkAsDisliked("Blocked Artist", null, DislikeLevel.NeverAgain);
+            var ex = _history.GetExclusions();
+
+            var items = new List<Recommendation>
+            {
+                null,
+                new Recommendation { Artist = "Blocked Artist", Album = "A" },
+                new Recommendation { Artist = "Allowed Artist", Album = "B" }
+            };
+
+            var result = RecommendationPipeline.FilterHardExcludedRecommendations(items, ex, _logger);
+
+            result.Should().HaveCount(2);
+            result.Should().Contain(i => i == null);
+            result.Should().Contain(i => i != null && i.Artist == "Allowed Artist");
+        }
+
+        [Fact]
+        public void FilterHardExcluded_PreservesNullEntries()
+        {
+            _history.MarkAsDisliked("Blocked Artist", null, DislikeLevel.NeverAgain);
+            var ex = _history.GetExclusions();
+
+            var items = new List<ImportListItemInfo>
+            {
+                null,
+                new ImportListItemInfo { Artist = "Blocked Artist", Album = "A" },
+                new ImportListItemInfo { Artist = "Allowed Artist", Album = "B" }
+            };
+
+            var result = RecommendationPipeline.FilterHardExcluded(items, ex, _logger);
+
+            result.Should().HaveCount(2);
+            result.Should().Contain(i => i == null);
+            result.Should().Contain(i => i != null && i.Artist == "Allowed Artist");
+        }
+
+        [Fact]
         public void FilterHardExcluded_EmptyExclusionSet_IsPassThrough()
         {
             var ex = _history.GetExclusions();
