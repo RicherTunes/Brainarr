@@ -66,11 +66,17 @@ public sealed class DefaultSamplingService : ISamplingService
         var targetArtistCount = _contextPolicy.DetermineTargetArtistCount(allArtists.Count, tokenBudget);
         var targetAlbumCount = _contextPolicy.DetermineTargetAlbumCount(allAlbums.Count, tokenBudget);
 
+        // ArtistMetadataId -> Artist map built once from the already-materialized artists list.
+        // Used to resolve each sampled album's artist id/name WITHOUT dereferencing
+        // Album.ArtistId / Album.Artist.Value / Album.ArtistMetadata.Value -- all of which are
+        // LazyLoaded on the albums GetAllAlbums() returns and fire a per-row DB round trip.
+        var artistByMetadataId = BuildArtistByMetadataIdMap(allArtists);
+
         var sample = new LibrarySample();
         var rng = new Random(seed);
 
         sample.Artists.AddRange(SampleArtists(artistMatches, allAlbums, selection, settings.DiscoveryMode, samplingShape, targetArtistCount, rng));
-        sample.Albums.AddRange(SampleAlbums(albumMatches, selection, settings.DiscoveryMode, samplingShape, targetAlbumCount, rng));
+        sample.Albums.AddRange(SampleAlbums(albumMatches, selection, settings.DiscoveryMode, samplingShape, targetAlbumCount, rng, artistByMetadataId));
 
         // Ensure any albums bring along their artist to preserve prompt grouping
         var artistIndex = sample.Artists.ToDictionary(a => a.ArtistId);
@@ -565,9 +571,31 @@ public sealed class DefaultSamplingService : ISamplingService
             return result;
         }
 
-        var albumCounts = allAlbums
-            .GroupBy(a => a.ArtistId)
+        // Count albums per artist by grouping on ArtistMetadataId (a plain int column), NOT
+        // Album.ArtistId. Album.ArtistId dereferences a LazyLoaded<Artist> that GetAllAlbums()
+        // leaves unloaded, so grouping ALL albums by it fires one per-row ArtistRepository.Query()
+        // DB round trip per album -- the N+1 that OOMed an ~11,700-artist library live. Counts are
+        // only ever looked up below by match.Artist.Id, so translate the metadata-id counts back to
+        // Artist.Id via the artists already carried on the matches (Artist.Id/.ArtistMetadataId are
+        // eager). Provably equivalent: album.ArtistId == the Id of the artist whose
+        // ArtistMetadataId == album.ArtistMetadataId, so the per-artist counts are identical.
+        var albumCountByMetadataId = allAlbums
+            .GroupBy(a => a.ArtistMetadataId)
             .ToDictionary(g => g.Key, g => g.Count());
+
+        var albumCounts = new Dictionary<int, int>();
+        foreach (var match in matches)
+        {
+            var artist = match.Artist;
+            if (artist == null || albumCounts.ContainsKey(artist.Id))
+            {
+                continue;
+            }
+
+            albumCounts[artist.Id] = albumCountByMetadataId.TryGetValue(artist.ArtistMetadataId, out var albumCount)
+                ? albumCount
+                : 0;
+        }
 
         var used = new HashSet<int>();
 
@@ -661,7 +689,8 @@ public sealed class DefaultSamplingService : ISamplingService
         DiscoveryMode mode,
         SamplingShape samplingShape,
         int targetCount,
-        Random rng)
+        Random rng,
+        IReadOnlyDictionary<int, Artist> artistByMetadataId)
     {
         var result = new List<LibrarySampleAlbum>();
         if (matches.Count == 0 || targetCount <= 0)
@@ -680,7 +709,7 @@ public sealed class DefaultSamplingService : ISamplingService
                     continue;
                 }
 
-                var sampleAlbum = CreateSampleAlbum(match);
+                var sampleAlbum = CreateSampleAlbum(match, artistByMetadataId);
                 result.Add(sampleAlbum);
                 used.Add(match.Album.Id);
                 if (result.Count >= targetCount)
@@ -740,7 +769,7 @@ public sealed class DefaultSamplingService : ISamplingService
                     continue;
                 }
 
-                var sampleAlbum = CreateSampleAlbum(candidate);
+                var sampleAlbum = CreateSampleAlbum(candidate, artistByMetadataId);
                 result.Add(sampleAlbum);
                 used.Add(candidate.Album.Id);
                 slots--;
@@ -774,13 +803,22 @@ public sealed class DefaultSamplingService : ISamplingService
         };
     }
 
-    private static LibrarySampleAlbum CreateSampleAlbum(AlbumMatch match)
+    private static LibrarySampleAlbum CreateSampleAlbum(AlbumMatch match, IReadOnlyDictionary<int, Artist> artistByMetadataId)
     {
+        // Resolve the album's artist via the ArtistMetadataId map instead of match.Album.ArtistId /
+        // match.Album.Artist.Value -- both LazyLoaded on GetAllAlbums() results, so touching them
+        // per sampled album fires a per-row DB round trip (the same N+1 lazy-load hazard). The
+        // resolved artist's Id equals Album.ArtistId (both hang off ArtistMetadataId), so the
+        // stored LibrarySampleAlbum is unchanged.
+        var artist = artistByMetadataId != null && artistByMetadataId.TryGetValue(match.Album.ArtistMetadataId, out var resolved)
+            ? resolved
+            : null;
+
         return new LibrarySampleAlbum
         {
             AlbumId = match.Album.Id,
-            ArtistId = match.Album.ArtistId,
-            ArtistName = ResolveArtistName(match.Album),
+            ArtistId = artist?.Id ?? 0,
+            ArtistName = ResolveArtistName(match.Album, artist),
             Title = string.IsNullOrWhiteSpace(match.Album.Title) ? $"Album {match.Album.Id}" : match.Album.Title,
             MatchedStyles = match.MatchedStyles.ToArray(),
             MatchScore = match.Score,
@@ -789,20 +827,42 @@ public sealed class DefaultSamplingService : ISamplingService
         };
     }
 
-    private static string ResolveArtistName(Album album)
+    private static Dictionary<int, Artist> BuildArtistByMetadataIdMap(IReadOnlyList<Artist> artists)
+    {
+        var map = new Dictionary<int, Artist>();
+        if (artists == null)
+        {
+            return map;
+        }
+
+        foreach (var artist in artists)
+        {
+            if (artist == null)
+            {
+                continue;
+            }
+
+            // ArtistMetadataId is 1:1 with an Artist; last-wins is harmless for the degenerate
+            // duplicate case.
+            map[artist.ArtistMetadataId] = artist;
+        }
+
+        return map;
+    }
+
+    private static string ResolveArtistName(Album album, Artist artist)
     {
         if (album == null)
         {
             return "Artist 0";
         }
 
-        var name = album.Artist?.Value?.Name ?? album.ArtistMetadata?.Value?.Name;
-        if (string.IsNullOrWhiteSpace(name))
+        if (!string.IsNullOrWhiteSpace(artist?.Name))
         {
-            return $"Artist {album.ArtistId}";
+            return artist.Name;
         }
 
-        return name;
+        return $"Artist {artist?.Id ?? 0}";
     }
 
     private static double ComputeArtistWeight(Artist artist, int albumCount, double matchScore)

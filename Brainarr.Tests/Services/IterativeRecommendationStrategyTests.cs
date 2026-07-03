@@ -678,10 +678,31 @@ namespace Brainarr.Tests.Services
             Assert.Equal(2, callCount); // Should continue because 70% < 80% threshold
         }
 
+        private readonly Dictionary<string, int> _metadataIdsByName = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        private int _nextMetadataId = 1;
+
+        // Assign a stable ArtistMetadataId per artist name so albums link to their artist by the plain
+        // ArtistMetadataId column -- matching how IterativeRecommendationStrategy now resolves artist
+        // names (from the artists list) instead of dereferencing Album.ArtistMetadata (a per-row
+        // lazy load / N+1 hazard).
+        private int MetadataIdFor(string name)
+        {
+            if (!_metadataIdsByName.TryGetValue(name ?? string.Empty, out var id))
+            {
+                id = _nextMetadataId++;
+                _metadataIdsByName[name ?? string.Empty] = id;
+            }
+
+            return id;
+        }
+
         private Artist CreateArtist(string name)
         {
+            var metadataId = MetadataIdFor(name);
             return new Artist
             {
+                Id = metadataId,
+                ArtistMetadataId = metadataId,
                 Name = name,
                 Metadata = new ArtistMetadata { Name = name }
             };
@@ -692,6 +713,7 @@ namespace Brainarr.Tests.Services
             return new Album
             {
                 Title = albumTitle,
+                ArtistMetadataId = MetadataIdFor(artistName),
                 ArtistMetadata = new ArtistMetadata { Name = artistName }
             };
         }

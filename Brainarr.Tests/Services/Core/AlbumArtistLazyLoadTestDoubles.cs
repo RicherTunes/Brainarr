@@ -66,4 +66,35 @@ namespace Brainarr.Tests.Services.Core
             IsLoaded = true;
         }
     }
+
+    /// <summary>
+    /// Sibling of <see cref="RecordingArtistLazyLoaded"/> for the OTHER per-album lazy-load Lidarr
+    /// wires onto every <see cref="Album"/> returned by <c>IAlbumService.GetAllAlbums()</c>:
+    /// <see cref="Album.ArtistMetadata"/>. Reading <c>album.ArtistMetadata.Value</c> per album in a
+    /// loop is the same N+1 DB-round-trip / OOM hazard as <c>album.ArtistId</c>. This double records
+    /// every would-be round trip so tests can assert batch/O(1) code never triggers it.
+    /// </summary>
+    internal sealed class RecordingArtistMetadataLazyLoaded : LazyLoaded<ArtistMetadata>
+    {
+        private readonly ArtistMetadata _metadata;
+        private readonly LazyLoadCounter _counter;
+
+        public RecordingArtistMetadataLazyLoaded(ArtistMetadata metadata, LazyLoadCounter counter)
+        {
+            _metadata = metadata;
+            _counter = counter;
+        }
+
+        public override void LazyLoad()
+        {
+            if (IsLoaded)
+            {
+                return;
+            }
+
+            _counter.Count++;
+            _value = _metadata;
+            IsLoaded = true;
+        }
+    }
 }

@@ -87,7 +87,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         {
             var existingKeys = shouldRecommendArtists ?
                 BuildExistingArtistsSet(allArtists) :
-                BuildExistingAlbumsSet(allAlbums);
+                BuildExistingAlbumsSet(allAlbums, allArtists);
             var allRecommendations = new List<Recommendation>();
             var rejectedAlbums = new HashSet<string>();
             var rejectedNames = new List<string>();
@@ -431,12 +431,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
         }
 
-        private HashSet<string> BuildExistingAlbumsSet(List<Album> allAlbums)
+        private HashSet<string> BuildExistingAlbumsSet(List<Album> allAlbums, List<Artist> allArtists)
         {
-            return allAlbums
-                .Where(a => a.ArtistMetadata?.Value?.Name != null && a.Title != null)
-                .Select(a => NormalizeAlbumKey(a.ArtistMetadata.Value.Name, a.Title))
-                .ToHashSet();
+            // Resolve each album's artist name via ArtistMetadataId (a plain int column) instead of
+            // Album.ArtistMetadata.Value.Name. Album.ArtistMetadata is LazyLoaded on the albums
+            // GetAllAlbums() returns, so reading .Value per album fires a per-row DB round trip -- the
+            // same N+1 lazy-load OOM hazard as Album.ArtistId, over the full album list on the top-up
+            // path. Artist.Name (eager) for the artist whose ArtistMetadataId == album.ArtistMetadataId
+            // is the same name Album.ArtistMetadata.Value.Name resolves to.
+            var nameByMetadataId = new Dictionary<int, string>();
+            foreach (var artist in allArtists ?? Enumerable.Empty<Artist>())
+            {
+                if (artist == null || string.IsNullOrEmpty(artist.Name))
+                {
+                    continue;
+                }
+
+                nameByMetadataId[artist.ArtistMetadataId] = artist.Name;
+            }
+
+            var set = new HashSet<string>();
+            foreach (var album in allAlbums ?? Enumerable.Empty<Album>())
+            {
+                if (album?.Title == null)
+                {
+                    continue;
+                }
+
+                if (!nameByMetadataId.TryGetValue(album.ArtistMetadataId, out var artistName))
+                {
+                    continue;
+                }
+
+                set.Add(NormalizeAlbumKey(artistName, album.Title));
+            }
+
+            return set;
         }
 
         private HashSet<string> BuildExistingArtistsSet(List<Artist> allArtists)
