@@ -311,7 +311,6 @@ Brainarr.Plugin/
 │   ├── ProviderHealth.cs
 │   ├── RateLimiter.cs
 │   ├── RecommendationCache.cs
-│   └── RetryPolicy.cs
 ├── Brainarr.cs  # Main Lidarr integration
 └── BrainarrSettings.cs    # Configuration UI
 
@@ -331,7 +330,7 @@ Brainarr.Tests/            # Comprehensive test suite
 - **Health Monitoring**: Real-time provider availability tracking
 - **Rate Limiting**: Per-provider rate limiting with configurable limits
 - **Caching**: Intelligent recommendation caching to reduce API calls
-- **Retry Policies**: Exponential backoff retry with circuit breaker patterns
+- **Retry Policies**: Exponential backoff retry through `Lidarr.Plugin.Common` resilience policies
 - **Recommendation Modes**: Supports both artist-only and album-specific recommendations
 - **Cross-Platform**: Windows, macOS, and Linux compatibility with platform-specific optimizations
 
@@ -674,7 +673,7 @@ public async Task Provider_Should_HandleFailover_WhenPrimaryUnavailable()
 - **Rate Limiting**: Provider-specific limits with `RateLimiter.cs`
 - **Memory Management**: Efficient object lifecycle in provider implementations
 - **Async Patterns**: Proper async/await usage for I/O operations
-- **Circuit Breaker**: Resilient failure handling with `RetryPolicy.cs`
+- **Circuit Breaker**: Resilient failure handling through `Lidarr.Plugin.Common` retry/circuit-breaker policies
 - **Resource Optimization**: HTTP client reuse and connection pooling
 
 **Performance Patterns**:

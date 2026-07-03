@@ -19,7 +19,7 @@ Tests individual components in isolation with mocked dependencies.
 - Core services (AIService, LibraryAnalyzer, prompt planner policies)
 - Plan cache TTL/invalidation + token budget guards
 - Renderer determinism and JSON schema contract
-- Support services (RateLimiter, Cache, RetryPolicy)
+- Support services (RateLimiter, Cache, Common retry-policy integration)
 
 #### Prompt planner suite (1.3.0+)
 
