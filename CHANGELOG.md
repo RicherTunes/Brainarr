@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Dependencies (2026-07-03)
+
+- `ext/Lidarr.Plugin.Common` submodule re-pinned to **`a894567d`** (`commonVersion` **`1.18.0-dev`**) so Brainarr stays on the current Common mainline after the template-scaffold CI gates and SettingsBinder malformed-Guid preservation fix. No Brainarr source changes required.
+
 ### Removed (parity convergence — delete dead/speculative security sanitizers; keep the Common-aligned `PromptSanitizer` seam — 2026-05-31)
 
 - **Removed `InputSanitizer` (~462 lines + its dedicated tests), the orphaned `UrlSanitizer` log-scrubber (CorrelationContext), and the dead `SecureHttpClient.SanitizeErrorMessage`** — all unused (zero production callers, verified by repo-wide sweep). brainarr deliberately does **not** sanitize prompts in production: the only "untrusted" input is the user's *own* library names + typed styles, so prompt-injection isn't a real vector — which is why `InputSanitizer` (and the `LlmPromptSanitizer`-backed shim) were never wired. Per a product decision, kept the thin `PromptSanitizer` → Common `LlmPromptSanitizer` seam as a ready-to-wire convergence point should an untrusted-input scenario ever arise. `SecureHttpClient.SanitizeUrl` was deliberately **retained** (Common's `Sanitize.UrlHostOnly` returns a bare host, not the `scheme://host` form the debug log uses — not an exact behavioral match, so adopting it would be a cosmetic change for no gain). Build clean; full suite green (3091 passed / 0 failed, excluding quarantined). Found by the Common-helper parity sweep (#2).
