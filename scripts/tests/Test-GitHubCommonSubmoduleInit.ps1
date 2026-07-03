@@ -27,10 +27,12 @@ if ($gitmodules -match '192\.168\.2\.59:3001/RicherTunes/Lidarr\.Plugin\.Common\
         'GitHub CI must not use actions/checkout submodules: recursive when Common points at LAN-only Gitea.'
     Assert-Condition ($nonCommentWorkflow -match 'submodules:\s*false') `
         'GitHub CI should checkout with submodules: false, then initialize Common explicitly.'
-    Assert-Condition ($nonCommentWorkflow -match 'git config\s+url\.https://github\.com/RicherTunes/Lidarr\.Plugin\.Common\.git\.insteadOf\s+http://192\.168\.2\.59:3001/RicherTunes/Lidarr\.Plugin\.Common\.git') `
-        'GitHub CI must rewrite the LAN-only Common submodule URL to the GitHub mirror before submodule update.'
-    Assert-Condition ($nonCommentWorkflow -match 'git submodule update --init -- ext/Lidarr\.Plugin\.Common') `
-        'GitHub CI must initialize only ext/Lidarr.Plugin.Common after the URL rewrite.'
+    Assert-Condition ($nonCommentWorkflow -match 'github_url="https://github\.com/RicherTunes/Lidarr\.Plugin\.Common\.git"') `
+        'GitHub CI must define the GitHub Common mirror URL.'
+    Assert-Condition ($nonCommentWorkflow -match 'git submodule set-url -- "\$common_path" "\$github_url"') `
+        'GitHub CI must set the Common submodule URL to the GitHub mirror before submodule update.'
+    Assert-Condition ($nonCommentWorkflow -match 'git submodule update --init -- "\$common_path"') `
+        'GitHub CI must initialize only ext/Lidarr.Plugin.Common after setting the URL.'
     Assert-Condition ($nonCommentWorkflow -notmatch 'git submodule update[^\r\n]*--depth') `
         'GitHub CI must not shallow-fetch Common; plugin gitlinks may point at Gitea raw-history commits.'
 }
