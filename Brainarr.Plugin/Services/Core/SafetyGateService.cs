@@ -20,6 +20,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             CancellationToken ct)
         {
             enriched ??= new List<Recommendation>();
+
+            // Hard-exclusion gate ("Never again" enforcement). Drop artists/albums the user marked
+            // Strong/NeverAgain BEFORE confidence/MBID gating and BEFORE any review-queue enqueue, so an
+            // excluded item can neither be delivered nor pollute the review queue. This is the deterministic
+            // guarantee that makes MarkAsDisliked(..., NeverAgain) actually stop re-suggestion (it was inert
+            // before). Snapshot the exclusion set ONCE (single lock acquisition inside GetExclusions), then
+            // test each rec in O(1) — see RecommendationHistory.IsHardExcluded for the key-matching contract.
+            var exclusions = history?.GetExclusions();
+            if (exclusions != null && exclusions.StronglyDisliked.Count > 0)
+            {
+                var preExclusion = enriched.Count;
+                enriched = enriched
+                    .Where(r => !RecommendationHistory.IsHardExcluded(exclusions, r.Artist, r.Album))
+                    .ToList();
+                var excludedCount = preExclusion - enriched.Count;
+                if (excludedCount > 0)
+                {
+                    logger?.Info($"Exclusion gate: dropped {excludedCount} recommendation(s) matching a 'Never again' / strong-dislike exclusion.");
+                }
+            }
+
             var minConf = Math.Max(0.0, Math.Min(1.0, settings.MinConfidence));
             var requireMbids = settings.RequireMbids;
             var queueBorderline = settings.QueueBorderlineItems;

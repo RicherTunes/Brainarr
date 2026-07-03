@@ -483,6 +483,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "cost/get" => _tokenCostEstimator.GetUsageStatistics(
                         DateTime.UtcNow.AddDays(-ResolveCostLookbackDays(query)),
                         DateTime.UtcNow),
+                    // Exclusions (undo for "Never again"): RecommendationHistory.RemoveDislike
+                    // previously had zero callers -- the only way to undo a "review/never" was
+                    // hand-editing recommendation_history.json inside the running container.
+                    // GetExclusions() is returned as-is (same convention as cost/get): it only ever
+                    // contains normalized "artist|album" keys, never file paths/API keys/internal IDs.
+                    "exclusions/get" => _history.GetExclusions(),
+                    "exclusions/remove" => HandleExclusionsRemove(query),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
@@ -532,6 +539,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        /// <summary>
+        /// Undoes a "Never again" (or any other level) dislike by calling
+        /// <see cref="RecommendationHistory.RemoveDislike"/>. Mirrors the validation style of
+        /// <c>review/never</c> (artist required, album optional). Idempotent: removing an
+        /// artist/album with no active dislike is NOT an error -- it returns <c>ok:true,
+        /// found:false</c> rather than throwing or 500ing, matching RemoveDislike's own
+        /// no-op-safe contract.
+        /// </summary>
+        private object HandleExclusionsRemove(IDictionary<string, string> query)
+        {
+            var artist = query != null && query.TryGetValue("artist", out var a) ? a : null;
+            var album = query != null && query.TryGetValue("album", out var b) ? b : null;
+
+            if (string.IsNullOrWhiteSpace(artist))
+            {
+                return new { ok = false, error = "artist is required" };
+            }
+
+            var found = _history.RemoveDislike(artist, string.IsNullOrWhiteSpace(album) ? null : album);
+            return new { ok = true, found };
         }
 
         /// <summary>
