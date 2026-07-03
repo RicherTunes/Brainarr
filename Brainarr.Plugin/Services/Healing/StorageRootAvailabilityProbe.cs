@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
 
@@ -50,36 +49,63 @@ internal sealed class StorageRootAvailabilityProbe
             return false;
         }
 
-        var releaseNow = true;
+        var releaseByCaller = 1;
+        var slotReleased = 0;
+        void ReleaseSlotOnce()
+        {
+            if (Interlocked.Exchange(ref slotReleased, 1) == 0)
+            {
+                _slots.Release();
+            }
+        }
+
         try
         {
-            var task = Task.Factory.StartNew(
-                () => _probe(root),
-                CancellationToken.None,
-                TaskCreationOptions.LongRunning,
-                TaskScheduler.Default);
-
-            if (!task.Wait(_timeout))
+            var completed = new ManualResetEventSlim(false);
+            Exception? failure = null;
+            var online = false;
+            var worker = new Thread(() =>
             {
-                releaseNow = false;
-                _ = task.ContinueWith(
-                    completed =>
+                try
+                {
+                    online = _probe(root);
+                }
+                catch (Exception ex)
+                {
+                    failure = ex;
+                }
+                finally
+                {
+                    completed.Set();
+                    if (Volatile.Read(ref releaseByCaller) == 0)
                     {
-                        if (completed.IsFaulted)
-                        {
-                            _ = completed.Exception;
-                        }
+                        ReleaseSlotOnce();
+                    }
+                }
+            })
+            {
+                IsBackground = true,
+                Name = "Brainarr storage-root availability probe",
+            };
 
-                        _slots.Release();
-                    },
-                    CancellationToken.None,
-                    TaskContinuationOptions.ExecuteSynchronously,
-                    TaskScheduler.Default);
+            worker.Start();
+            if (!completed.Wait(_timeout))
+            {
+                Volatile.Write(ref releaseByCaller, 0);
+                if (completed.IsSet)
+                {
+                    ReleaseSlotOnce();
+                }
+
                 Cache(key, false);
                 return false;
             }
 
-            var online = task.GetAwaiter().GetResult();
+            if (failure is not null)
+            {
+                throw failure;
+            }
+
             Cache(key, online);
             return online;
         }
@@ -90,9 +116,9 @@ internal sealed class StorageRootAvailabilityProbe
         }
         finally
         {
-            if (releaseNow)
+            if (Volatile.Read(ref releaseByCaller) == 1)
             {
-                _slots.Release();
+                ReleaseSlotOnce();
             }
         }
     }
