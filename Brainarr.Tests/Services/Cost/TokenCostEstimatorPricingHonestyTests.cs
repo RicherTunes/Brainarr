@@ -87,6 +87,25 @@ namespace Brainarr.Tests.Services.Cost
             result.EstimatedCost.Should().Be(0m);
         }
 
+        [Theory]
+        [InlineData(AIProvider.OpenAI, "gpt-5.4-mini")]
+        [InlineData(AIProvider.OpenAI, "gpt-5.5")]
+        [InlineData(AIProvider.Perplexity, "sonar-reasoning-pro")]
+        [InlineData(AIProvider.Perplexity, "sonar-deep-research")]
+        public void EstimateCost_ModelThatOnlySharesKnownPrefix_SurfacesUnpriced(AIProvider provider, string model)
+        {
+            // These are real forward-compatibility hazards: a newer OpenAI model that
+            // starts with "gpt-5" is not necessarily priced like "gpt-5", and Perplexity
+            // reasoning/deep-research SKUs include request/search/citation fees that are
+            // not represented by plain "sonar". Prefix reuse must not fabricate a known
+            // price.
+            var result = _estimator.EstimateCost(provider, model, "prompt", 500);
+
+            result.IsPriceKnown.Should().BeFalse();
+            result.EstimatedCost.Should().Be(0m);
+            result.CostBreakdown.Should().ContainAny("unknown", "not estimated");
+        }
+
         [Fact]
         public void TrackUsage_WithExplicitTokenCounts_ComputesCostWithoutRetokenizingText()
         {
