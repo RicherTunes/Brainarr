@@ -10,7 +10,7 @@ using Xunit;
 namespace Brainarr.Tests.Services.Cost
 {
     /// <summary>
-    /// Feature A2 (cost-visibility panel): the pricing table silently defaulted any
+    /// Feature A2 (cost-visibility action): the pricing table silently defaulted any
     /// unrecognized model to $0.001/1K tokens — a fabricated, confidently-wrong dollar
     /// figure. These tests pin the honesty fix: unknown/unpriced models surface as such
     /// (IsPriceKnown = false, EstimatedCost = 0, no guessed number) instead of a made-up
@@ -85,6 +85,25 @@ namespace Brainarr.Tests.Services.Cost
 
             result.IsPriceKnown.Should().BeFalse();
             result.EstimatedCost.Should().Be(0m);
+        }
+
+        [Theory]
+        [InlineData(AIProvider.OpenAI, "gpt-5.4-mini")]
+        [InlineData(AIProvider.OpenAI, "gpt-5.5")]
+        [InlineData(AIProvider.Perplexity, "sonar-reasoning-pro")]
+        [InlineData(AIProvider.Perplexity, "sonar-deep-research")]
+        public void EstimateCost_ModelThatOnlySharesKnownPrefix_SurfacesUnpriced(AIProvider provider, string model)
+        {
+            // These are real forward-compatibility hazards: a newer OpenAI model that
+            // starts with "gpt-5" is not necessarily priced like "gpt-5", and Perplexity
+            // reasoning/deep-research SKUs include request/search/citation fees that are
+            // not represented by plain "sonar". Prefix reuse must not fabricate a known
+            // price.
+            var result = _estimator.EstimateCost(provider, model, "prompt", 500);
+
+            result.IsPriceKnown.Should().BeFalse();
+            result.EstimatedCost.Should().Be(0m);
+            result.CostBreakdown.Should().ContainAny("unknown", "not estimated");
         }
 
         [Fact]
