@@ -19,6 +19,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Healing;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Cost;
 using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -70,6 +71,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly ProviderLifecycleService _providerLifecycle;
         private readonly ConfigurationValidator _configValidator;
         private readonly RecommendationGenerator _recommendationGenerator;
+        private readonly ITokenCostEstimator _tokenCostEstimator;
 
         private readonly IBreakerRegistry _breakerRegistry;
 
@@ -104,7 +106,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IStyleCatalogService styleCatalog = null,
             IBreakerRegistry breakerRegistry = null,
             IDuplicateFilterService duplicateFilter = null,
-            LibraryHealerActionHandler healerActionHandler = null)
+            LibraryHealerActionHandler healerActionHandler = null,
+            ITokenCostEstimator tokenCostEstimator = null)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerFactory = providerFactory ?? throw new ArgumentNullException(nameof(providerFactory));
@@ -133,7 +136,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _schemaValidator = schemaValidator ?? new NzbDrone.Core.ImportLists.Brainarr.Services.Core.RecommendationSchemaValidator(logger);
             _providerInvoker = providerInvoker ?? new ProviderInvoker();
             _safetyGates = safetyGates ?? new SafetyGateService();
-            _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger, duplicateFilter);
+            // Initialized before _topUpPlanner (below) because the default TopUpPlanner
+            // needs it to thread cost tracking into its IterativeRecommendationStrategy.
+            _tokenCostEstimator = tokenCostEstimator ?? new TokenCostEstimator(logger);
+            _topUpPlanner = topUpPlanner ?? new TopUpPlanner(logger, duplicateFilter, _tokenCostEstimator);
             _pipeline = pipeline ?? new RecommendationPipeline(logger, _libraryAnalyzer, duplicateFilter, _validator, _safetyGates, _topUpPlanner, _mbidResolver, _artistResolver, _duplicationPrevention, _metrics, _history);
             _coordinator = coordinator ?? new RecommendationCoordinator(
                 logger,
@@ -162,7 +168,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _providerHealth,
                 _metrics,
                 _breakerRegistry,
-                _providerInvoker);
+                _providerInvoker,
+                _tokenCostEstimator);
         }
 
         // ====== CORE RECOMMENDATION WORKFLOW ======
@@ -470,6 +477,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
+                    // Cost visibility panel: usage/spend for cloud-provider calls tracked
+                    // by ITokenCostEstimator via RecommendationGenerator. Optional "days"
+                    // query param bounds the lookback window (default 30, capped at 365).
+                    "cost/get" => _tokenCostEstimator.GetUsageStatistics(
+                        DateTime.UtcNow.AddDays(-ResolveCostLookbackDays(query)),
+                        DateTime.UtcNow),
                     // Metrics snapshot (lightweight)
                     "metrics/get" => _observability.GetMetricsSnapshot(),
                     // Prometheus export (plain text)
@@ -519,6 +532,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 _logger.Error(ex, $"Error handling action: {action}");
                 return new { error = ex.Message };
             }
+        }
+
+        /// <summary>
+        /// Parses the optional "days" query param for the cost/get action (lookback window
+        /// for usage statistics). Defaults to 30, clamps to [1, 365] so a malformed or
+        /// hostile value can't return an empty or unbounded range. Static + internal so the
+        /// parsing is unit-testable without constructing the orchestrator.
+        /// </summary>
+        internal static int ResolveCostLookbackDays(IDictionary<string, string> query)
+        {
+            const int DefaultDays = 30;
+            const int MaxDays = 365;
+
+            if (query == null || !query.TryGetValue("days", out var raw) || !int.TryParse(raw, out var days))
+            {
+                return DefaultDays;
+            }
+
+            return Math.Max(1, Math.Min(days, MaxDays));
         }
 
         /// <summary>

@@ -11,6 +11,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Support;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Cost;
 using NzbDrone.Core.ImportLists.Brainarr.Performance;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
@@ -30,6 +31,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
         private readonly IPerformanceMetrics _metrics;
         private readonly IBreakerRegistry _breakerRegistry;
         private readonly IProviderInvoker _providerInvoker;
+        private readonly ITokenCostEstimator _tokenCostEstimator;
 
         // Lightweight shared limiter registry (mirrors the static instance from the orchestrator)
         private static readonly Lazy<ILimiterRegistry> _limiterRegistry = new(() => new LimiterRegistry());
@@ -42,7 +44,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             IProviderHealthMonitor providerHealth,
             IPerformanceMetrics metrics,
             IBreakerRegistry breakerRegistry,
-            IProviderInvoker providerInvoker)
+            IProviderInvoker providerInvoker,
+            ITokenCostEstimator tokenCostEstimator)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
             _providerLifecycle = providerLifecycle ?? throw new ArgumentNullException(nameof(providerLifecycle));
@@ -52,6 +55,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             _metrics = metrics ?? throw new ArgumentNullException(nameof(metrics));
             _breakerRegistry = breakerRegistry ?? throw new ArgumentNullException(nameof(breakerRegistry));
             _providerInvoker = providerInvoker ?? throw new ArgumentNullException(nameof(providerInvoker));
+            _tokenCostEstimator = tokenCostEstimator ?? throw new ArgumentNullException(nameof(tokenCostEstimator));
         }
 
         // ------------------------------------------------------------------
@@ -86,6 +90,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             var effectiveModel = settings?.EffectiveModel ?? settings?.ModelSelection ?? string.Empty;
             var key = ModelKey.From(providerName, effectiveModel);
             var breaker = _breakerRegistry.Get(key, _logger);
+
+            // Cost tracking needs the RAW API model id (e.g. "gpt-4o-mini"), not the UI's
+            // friendly display label (e.g. "GPT4o_Mini") that effectiveModel carries — the
+            // pricing table is keyed on raw ids, matching what the provider actually sends
+            // on the wire. ModelIdMapper.ToRawId is the same translation the providers
+            // themselves apply before making the HTTP call, so this is a read of an
+            // existing, already-tested mapping, not a new heuristic. Computed once per
+            // GenerateRecommendationsAsync call since the model doesn't change per batch.
+            var costModelId = NzbDrone.Core.ImportLists.Brainarr.Configuration.ModelIdMapper.ToRawId(
+                settings.Provider, effectiveModel);
 
             var localProvider = settings.Provider == AIProvider.Ollama || settings.Provider == AIProvider.LMStudio;
             var requestedTimeout = settings.AIRequestTimeoutSeconds;
@@ -205,6 +219,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     sw.Stop();
 
                     lastBatch = batchResult ?? new List<Recommendation>();
+
+                    // Cost tracking: one TrackUsage per real provider round trip (this loop
+                    // iteration = one actual HTTP call via _providerInvoker.InvokeAsync above),
+                    // regardless of whether the call returned anything or how many top-up
+                    // iterations the caller drives. Placing this here — rather than once per
+                    // logical GenerateRecommendationsAsync invocation — is what prevents both
+                    // under-counting (a top-up run makes multiple real calls) and over-counting
+                    // (a single call is never tracked twice). GetRecommendationsAsync returns
+                    // PARSED recommendations, never raw response text, so we use the token-count
+                    // overload with the prompt builder's own estimate (promptRes.EstimatedTokens)
+                    // and the same completion-size heuristic already used for budget planning
+                    // (EstimateCompletionTokens), now applied to the batch actually returned.
+                    try
+                    {
+                        _tokenCostEstimator.TrackUsage(
+                            settings.Provider,
+                            costModelId,
+                            promptRes.EstimatedTokens,
+                            EstimateCompletionTokens(lastBatch.Count, artistMode),
+                            sw.Elapsed);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.Debug(ex, "Non-critical: Failed to track token cost usage");
+                    }
+
                     if (lastBatch.Count == 0)
                     {
                         continue;
