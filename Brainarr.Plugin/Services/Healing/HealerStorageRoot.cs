@@ -79,9 +79,23 @@ internal static class HealerStorageRoot
         return null;
     }
 
-    /// <summary>Case-insensitive grouping key for a real storage root.</summary>
+    /// <summary>
+    /// Grouping key for a real storage root. Windows drive and UNC roots are case-insensitive;
+    /// POSIX roots are case-sensitive, so /mnt/Music and /mnt/music must not be coalesced.
+    /// </summary>
     public static string Key(string root)
     {
-        return root.Trim().Replace('/', '\\').ToLowerInvariant();
+        var trimmed = root.Trim();
+        if (trimmed.StartsWith("\\\\", StringComparison.Ordinal) || trimmed.StartsWith("//", StringComparison.Ordinal))
+        {
+            return trimmed.Replace('/', '\\').ToLowerInvariant();
+        }
+
+        if (trimmed.Length >= 2 && char.IsLetter(trimmed[0]) && trimmed[1] == ':')
+        {
+            return trimmed.Replace('/', '\\').ToLowerInvariant();
+        }
+
+        return trimmed.Replace('\\', '/');
     }
 }

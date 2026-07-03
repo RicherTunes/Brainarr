@@ -72,6 +72,58 @@ public sealed class LibraryHealerScanRunnerCoalescingTests
         probeCalls.Should().Be(0, "roots below the coalesce threshold are never probed");
     }
 
+    [Fact]
+    public void Scan_ShouldCoalescePendingFindings_BeforeReaderBusyEarlyExit()
+    {
+        var store = new CapturingStore();
+        var files = InconclusiveFilesUnderOfflineRoot(3);
+        files.Add(new TrackFile
+        {
+            Id = 99,
+            Path = @"D:\Healthy\busy.flac",
+            Size = 999,
+            Modified = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
+            AlbumId = 10,
+        });
+        var runner = CreateRunner(
+            files,
+            store,
+            rootOnlineProbe: root => root != OfflineRoot,
+            tagReader: new BusyTagReader(),
+            fingerprints: new MixedFingerprintService());
+
+        var result = runner.Scan();
+
+        result.Status.Should().Be(LibraryHealerScanStatus.Failed);
+        var finding = store.Saved.Should().ContainSingle().Subject;
+        finding.Id.Should().StartWith("storage-root-");
+        finding.InternalReasonCodes.Should().Contain("STORAGE_ROOT_OFFLINE");
+        finding.AffectedTrackCount.Should().Be(3);
+    }
+
+    [Fact]
+    public void Scan_ShouldTreatPosixRootsAsCaseSensitive_WhenCoalescing()
+    {
+        var store = new CapturingStore();
+        var files = BuildFiles("/mnt/Music", 1, 3)
+            .Concat(BuildFiles("/mnt/music", 10, 3))
+            .ToList();
+        var runner = CreateRunner(
+            files,
+            store,
+            rootOnlineProbe: root => root == "/mnt/music");
+
+        runner.Scan();
+
+        store.Saved.Should().HaveCount(4);
+        store.Saved.Should().ContainSingle(f =>
+            f.Id.StartsWith("storage-root-") &&
+            f.AffectedTrackCount == 3);
+        store.Saved.Where(f => !f.Id.StartsWith("storage-root-"))
+            .Should().HaveCount(3)
+            .And.OnlyContain(f => f.File.RedactedPath.Contains("track", StringComparison.OrdinalIgnoreCase));
+    }
+
     private static List<TrackFile> InconclusiveFilesUnderOfflineRoot(int count)
     {
         return BuildFiles(count);
@@ -83,15 +135,20 @@ public sealed class LibraryHealerScanRunnerCoalescingTests
     }
 
     private static List<TrackFile> BuildFiles(int count)
+        => BuildFiles(OfflineRoot, 1, count);
+
+    private static List<TrackFile> BuildFiles(string root, int firstId, int count)
     {
         var files = new List<TrackFile>();
-        for (var i = 1; i <= count; i++)
+        for (var i = 0; i < count; i++)
         {
+            var id = firstId + i;
+            var separator = root.Contains('\\', StringComparison.Ordinal) ? @"\" : "/";
             files.Add(new TrackFile
             {
-                Id = i,
-                Path = OfflineRoot + @"\Private Artist\track" + i + ".flac",
-                Size = 100 + i,
+                Id = id,
+                Path = root + separator + "Private Artist" + separator + "track" + id + ".flac",
+                Size = 100 + id,
                 Modified = new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc),
                 AlbumId = 10,
             });
@@ -103,7 +160,9 @@ public sealed class LibraryHealerScanRunnerCoalescingTests
     private static LibraryHealerScanRunner CreateRunner(
         List<TrackFile> files,
         ILibraryHealerFindingStore store,
-        Func<string, bool> rootOnlineProbe)
+        Func<string, bool> rootOnlineProbe,
+        ITagLibSymptomReader? tagReader = null,
+        IFileFingerprintService? fingerprints = null)
     {
         var artistService = new Mock<IArtistService>();
         artistService.Setup(x => x.GetAllArtists()).Returns(new List<Artist> { new() { Id = 1 } });
@@ -113,8 +172,8 @@ public sealed class LibraryHealerScanRunnerCoalescingTests
         return new LibraryHealerScanRunner(
             artistService.Object,
             mediaFileService.Object,
-            new NoopTagReader(),
-            new OfflineFingerprintService(),
+            tagReader ?? new NoopTagReader(),
+            fingerprints ?? new OfflineFingerprintService(),
             store,
             elapsedProvider: null,
             rootOnlineProbe: rootOnlineProbe);
@@ -139,6 +198,37 @@ public sealed class LibraryHealerScanRunnerCoalescingTests
         public TagReaderEvidence Read(string path, CancellationToken cancellationToken)
         {
             return new TagReaderEvidence(true, true, 0, null, null);
+        }
+    }
+
+    private sealed class BusyTagReader : ITagLibSymptomReader
+    {
+        public TagReaderEvidence Read(string path, CancellationToken cancellationToken)
+        {
+            return new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: LidarrAudioTagSymptomReader.ReaderBusyErrorType,
+                ErrorMessage: "Tag reader is busy");
+        }
+    }
+
+    private sealed class MixedFingerprintService : IFileFingerprintService
+    {
+        public FileExistenceEvidence CheckExists(string path, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            if (path.Contains("busy.flac", StringComparison.OrdinalIgnoreCase))
+            {
+                return new FileExistenceEvidence(true, true, true, null, null);
+            }
+
+            return new FileExistenceEvidence(true, false, false, "PATH_PARENT_UNAVAILABLE", "Parent unavailable");
+        }
+
+        public FileFingerprint Read(string path)
+        {
+            return new FileFingerprint(true, 999, new DateTime(2026, 6, 1, 0, 0, 0, DateTimeKind.Utc));
         }
     }
 

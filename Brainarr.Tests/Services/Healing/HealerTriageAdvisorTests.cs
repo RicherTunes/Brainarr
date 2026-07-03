@@ -104,6 +104,8 @@ public sealed class HealerTriageAdvisorTests
             reasons,
             tagReader,
             probe,
-            new DateTime(2026, 7, 1, 1, 2, 3, DateTimeKind.Utc));
+            new DateTime(2026, 7, 1, 1, 2, 3, DateTimeKind.Utc),
+            EvidenceFreshness: HealerTreatmentVocab.Freshness.Current,
+            IdentityFreshness: HealerTreatmentVocab.Freshness.Current);
     }
 }

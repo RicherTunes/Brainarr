@@ -55,6 +55,29 @@ public sealed class LibraryHealerRedactionParityTests : IDisposable
         apiJson.Should().NotContain(RawMbid);
     }
 
+    [Fact]
+    public void CommandMaterial_RedactedByApiProjection_IsAlsoRedactedOnDisk()
+    {
+        const string commandMaterial = "ffprobe -v error -show_format /mnt/music/Private Artist/track01.flac";
+        var finding = FindingWithErrorMessage(commandMaterial);
+
+        var store = new LibraryHealerFindingStore(_tempRoot);
+        store.SaveBatch(new[] { finding });
+        var persisted = new LibraryHealerFindingStore(_tempRoot).GetRecent(1).Should().ContainSingle().Subject;
+        var diskJson = File.ReadAllText(Path.Combine(_tempRoot, "library_healer_findings.json"));
+
+        var handler = new LibraryHealerActionHandler(
+            Mock.Of<ILibraryHealerScanRunner>(),
+            new SingleFindingStore(finding));
+        var apiJson = JsonSerializer.Serialize(handler.Handle("healer/getfindings", new Dictionary<string, string>()));
+
+        persisted.TagReader.ErrorMessage.Should().Be("<path-containing message redacted>");
+        diskJson.Should().NotContain("ffprobe");
+        diskJson.Should().NotContain("Private Artist");
+        apiJson.Should().NotContain("ffprobe");
+        apiJson.Should().NotContain("Private Artist");
+    }
+
     private static LibraryHealerFinding FindingWithErrorTypeToken(string errorTypeToken)
     {
         return new LibraryHealerFinding(
@@ -75,6 +98,30 @@ public sealed class LibraryHealerRedactionParityTests : IDisposable
                 DurationSeconds: null,
                 ErrorType: errorTypeToken,
                 ErrorMessage: null),
+            Probe: null,
+            ObservedAtUtc: new DateTime(2026, 7, 1, 1, 0, 0, DateTimeKind.Utc));
+    }
+
+    private static LibraryHealerFinding FindingWithErrorMessage(string errorMessage)
+    {
+        return new LibraryHealerFinding(
+            "parity-message-finding",
+            new LibraryHealerFileIdentity(
+                TrackFileId: 10,
+                ArtistId: 20,
+                AlbumId: 30,
+                RedactedPath: "track01.flac#abcdef123456",
+                PathHash: "abcdef123456",
+                Size: 123,
+                ModifiedUtc: new DateTime(2026, 7, 1, 0, 0, 0, DateTimeKind.Utc)),
+            LibraryHealerLabel.TagReaderSymptom,
+            new[] { "TAG_READER_FAILED" },
+            new TagReaderEvidence(
+                ReadAttempted: true,
+                ReadSucceeded: false,
+                DurationSeconds: null,
+                ErrorType: "TagReaderFailed",
+                ErrorMessage: errorMessage),
             Probe: null,
             ObservedAtUtc: new DateTime(2026, 7, 1, 1, 0, 0, DateTimeKind.Utc));
     }
