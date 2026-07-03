@@ -94,6 +94,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     _logger.Info($"Filtered {removed} candidate(s) already present in the library before enrichment.");
                 }
             }
+            validated = FilterHardExcludedRecommendations(validated, _history.GetExclusions(), _logger);
 
             // Post-validation style enforcement (live, deterministic, model-agnostic).
             //
@@ -225,6 +226,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     artistResolver: _artistResolver,
                     // Album-mode parity: enrich album top-up recs with the same MBID resolver as the first pass.
                     mbidResolver: _mbidResolver).ConfigureAwait(false) ?? new List<ImportListItemInfo>();
+                topUp = FilterHardExcluded(topUp, _history.GetExclusions(), _logger);
                 if (topUp.Count > 0)
                 {
                     var beforeAdd = importItems.Count;
@@ -253,6 +255,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log top-up deficit warning"); }
             }
 
+            // Idempotent hard-exclusion sweep before the final count. The initial batch is filtered
+            // before enrichment and again in SafetyGateService; top-up is filtered before add. Keep this
+            // final pass as a cheap safety net around any future path that appends import items directly.
+            importItems = FilterHardExcluded(importItems, _history.GetExclusions(), _logger);
+
             // Final summary to make outcomes obvious in logs
             try
             {
@@ -261,6 +268,57 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             catch (Exception ex) { _logger.Debug(ex, "Non-critical: Failed to log final recommendation count"); }
 
             return importItems;
+        }
+
+        /// <summary>
+        /// Deterministic "Never again" enforcement over recommendation candidates. Drops items
+        /// whose artist/album is hard-excluded (Strong/NeverAgain) per a pre-fetched
+        /// <paramref name="exclusions"/> snapshot, matching on the same normalized key the store uses
+        /// (exact equality — never over-filters a distinct-but-similar artist). O(1) per item; a null/empty
+        /// input or an empty exclusion set is a cheap pass-through. Static + internal for direct unit testing.
+        /// </summary>
+        internal static List<Recommendation> FilterHardExcludedRecommendations(
+            List<Recommendation> items, RecommendationHistory.ExclusionList exclusions, Logger logger)
+        {
+            if (items == null || items.Count == 0 || exclusions == null || exclusions.StronglyDisliked.Count == 0)
+            {
+                return items ?? new List<Recommendation>();
+            }
+
+            var before = items.Count;
+            var filtered = items
+                .Where(i => i == null || !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
+                .ToList();
+
+            var dropped = before - filtered.Count;
+            if (dropped > 0)
+            {
+                logger?.Info($"Exclusion gate (pre-enrichment): dropped {dropped} recommendation(s) matching a 'Never again' / strong-dislike exclusion.");
+            }
+
+            return filtered;
+        }
+
+        internal static List<ImportListItemInfo> FilterHardExcluded(
+            List<ImportListItemInfo> items, RecommendationHistory.ExclusionList exclusions, Logger logger)
+        {
+            if (items == null || items.Count == 0 || exclusions == null || exclusions.StronglyDisliked.Count == 0)
+            {
+                return items ?? new List<ImportListItemInfo>();
+            }
+
+            var before = items.Count;
+            var filtered = items
+                .Where(i => i == null || !RecommendationHistory.IsHardExcluded(exclusions, i.Artist, i.Album))
+                .ToList();
+
+            var dropped = before - filtered.Count;
+            if (dropped > 0)
+            {
+                logger?.Info($"Exclusion gate (post-top-up): dropped {dropped} recommendation(s) matching a 'Never again' / strong-dislike exclusion.");
+            }
+
+            return filtered;
         }
 
         /// <summary>

@@ -26,6 +26,7 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 - **MusicBrainz enrichment** — resolve MBIDs for artists and albums; gate items missing required MBIDs.
 - **Hallucination filters** — pattern-based validation (`PossiblyLegitimatePattern` list), custom substring filters, and optional strict mode.
 - **Review Queue** — borderline items queue for manual approval; triage advisor scores each item with confidence band, MBID status, and dedup checks.
+- **Hard exclusions** — `Never again` / strong dislikes are enforced before enrichment and top-up; `exclusions/remove` can undo them without hand-editing history files.
 - **JSON salvage** — `RecommendationJsonParser` extracts valid array elements from truncated provider output, handling both bare arrays and object-wrapped shapes.
 
 ### Resilience & Performance
