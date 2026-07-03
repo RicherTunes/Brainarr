@@ -288,16 +288,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         // false, cost = 0) rather than silently reusing a guessed number. Treat entries
         // below as "best known at last refresh," not a guarantee.
         //
-        // IMPORTANT (found in self-review): keys must be specific enough to avoid
-        // GetModelPricing's partial-match (Contains-based) fallback silently attributing
-        // an OLDER/DIFFERENT model's price to a newer, differently-priced one that merely
-        // shares a prefix. Brainarr's own ModelIdMapper mints forward-looking raw ids like
-        // "claude-opus-4-7" / "claude-sonnet-4-6" that share a prefix with real
-        // "claude-sonnet-4-20250514" — a bare "claude-sonnet-4" key would (via
-        // model.Contains(key)) wrongly price both identically. Prefer exact/dated keys for
-        // any family where a same-prefix, differently-priced sibling could plausibly exist;
-        // an unmatched sibling then correctly falls through to unpriced instead of
-        // inheriting a neighboring model's number.
+        // IMPORTANT: pricing lookup is exact-only (plus an explicit provider "default"
+        // sentinel for known-free local/subscription providers). Do not add prefix/fuzzy
+        // matching here. Same-prefix families can carry different prices or non-token fees
+        // (for example "gpt-5" vs later "gpt-5.x" ids, or Perplexity "sonar" vs
+        // reasoning/deep-research SKUs), so unknown siblings must fall through to unpriced
+        // until a maintainer adds an explicit table entry.
         private Dictionary<AIProvider, ProviderPricing> InitializePricingData()
         {
             return new Dictionary<AIProvider, ProviderPricing>
@@ -339,7 +335,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                         // confidently known yet; those correctly fall through to unpriced.
                         ["claude-sonnet-4-20250514"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
                         ["claude-3-7-sonnet"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["claude-3-5-sonnet-20241022"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
                         ["claude-3-5-sonnet"] = new ModelPricing { InputPricePer1K = 0.003m, OutputPricePer1K = 0.015m },
+                        ["claude-3-5-haiku-20241022"] = new ModelPricing { InputPricePer1K = 0.0008m, OutputPricePer1K = 0.004m },
                         ["claude-3-5-haiku"] = new ModelPricing { InputPricePer1K = 0.0008m, OutputPricePer1K = 0.004m },
                         // Legacy (still selectable/billable)
                         ["claude-3-opus"] = new ModelPricing { InputPricePer1K = 0.015m, OutputPricePer1K = 0.075m },
@@ -463,21 +461,18 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 return provider.Models.GetValueOrDefault("default");
             }
 
-            // Try exact match first
-            if (provider.Models.TryGetValue(model, out var pricing))
+            var normalizedModel = model.Trim();
+
+            // Try exact match first.
+            if (provider.Models.TryGetValue(normalizedModel, out var pricing))
                 return pricing;
 
-            // Try to find partial match (e.g., "gpt-4-turbo-preview" matches "gpt-4-turbo").
-            // Skip the "default" sentinel key here — it's a deliberate opt-in fallback for
-            // providers where any model has the same known price (local backends), not a
-            // pattern to partial-match against arbitrary model names.
-            var partialMatch = provider.Models
-                .Where(kvp => kvp.Key != "default" && (model.Contains(kvp.Key) || kvp.Key.Contains(model)))
-                .OrderByDescending(kvp => kvp.Key.Length)
-                .FirstOrDefault();
-
-            if (partialMatch.Value != null)
-                return partialMatch.Value;
+            // Keep lookup case-tolerant, but still exact. Prefix/fuzzy matching creates
+            // confidently-wrong estimates for newer same-family models.
+            var caseInsensitiveMatch = provider.Models
+                .FirstOrDefault(kvp => string.Equals(kvp.Key, normalizedModel, StringComparison.OrdinalIgnoreCase));
+            if (caseInsensitiveMatch.Value != null)
+                return caseInsensitiveMatch.Value;
 
             // Only a provider that explicitly declares a "default" (i.e. every model under
             // it is priced identically — local backends) falls back to it. Everything else
