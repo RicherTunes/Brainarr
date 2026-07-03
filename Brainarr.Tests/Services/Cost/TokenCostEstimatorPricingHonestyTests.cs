@@ -10,7 +10,7 @@ using Xunit;
 namespace Brainarr.Tests.Services.Cost
 {
     /// <summary>
-    /// Feature A2 (cost-visibility panel): the pricing table silently defaulted any
+    /// Feature A2 (cost-visibility action): the pricing table silently defaulted any
     /// unrecognized model to $0.001/1K tokens — a fabricated, confidently-wrong dollar
     /// figure. These tests pin the honesty fix: unknown/unpriced models surface as such
     /// (IsPriceKnown = false, EstimatedCost = 0, no guessed number) instead of a made-up

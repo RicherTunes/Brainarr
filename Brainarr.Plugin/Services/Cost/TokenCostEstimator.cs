@@ -99,7 +99,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
                 // Unknown/unrecognized model: surface honestly rather than guessing a
                 // number. A stale or overly-generic fallback here previously reported a
                 // confidently-wrong dollar figure for any model the pricing table hadn't
-                // been updated for yet (see CLAUDE.md "Cost visibility panel" section).
+                // been updated for yet (see CLAUDE.md "Cost visibility action" section).
                 _logger.Debug($"No pricing entry matched model '{model}' for provider {provider}; reporting as unpriced.");
                 return new CostEstimate
                 {
