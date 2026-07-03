@@ -477,7 +477,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                     "review/clear" => _reviewQueueHandler.ClearApprovalSelections(settings),
                     "review/rejectselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Rejected),
                     "review/neverselected" => _reviewQueueHandler.RejectOrNeverSelected(settings, query, ReviewQueueService.ReviewStatus.Never),
-                    // Cost visibility panel: usage/spend for cloud-provider calls tracked
+                    // Cost visibility action: usage/spend for cloud-provider calls tracked
                     // by ITokenCostEstimator via RecommendationGenerator. Optional "days"
                     // query param bounds the lookback window (default 30, capped at 365).
                     "cost/get" => _tokenCostEstimator.GetUsageStatistics(
