@@ -204,20 +204,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         }
 
         /// <summary>
-        /// Remove a dislike constraint (user changed their mind)
+        /// Remove a dislike constraint (user changed their mind). Idempotent: calling this for an
+        /// artist/album with no active dislike is a safe no-op (never throws) and returns false so a
+        /// caller (e.g. the exclusions/remove UI action) can distinguish "nothing to undo" from a real
+        /// removal without needing to re-query <see cref="GetExclusions"/> separately.
         /// </summary>
-        public void RemoveDislike(string artist, string? album = null)
+        /// <returns>True if an active dislike existed and was deactivated; false if there was none.</returns>
+        public bool RemoveDislike(string artist, string? album = null)
         {
             lock (_lock)
             {
                 var key = GetKey(artist, album);
 
-                if (_history.Disliked.ContainsKey(key))
+                if (_history.Disliked.TryGetValue(key, out var record) && record.IsActive)
                 {
-                    _history.Disliked[key].IsActive = false;
+                    record.IsActive = false;
                     SaveHistory();
                     _logger.Info($"Removed dislike for: {artist} - {album ?? "All albums"}");
+                    return true;
                 }
+
+                return false;
             }
         }
 
