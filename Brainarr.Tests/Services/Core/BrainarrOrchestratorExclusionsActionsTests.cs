@@ -25,13 +25,9 @@ namespace Brainarr.Tests.Services.Core
     /// recommendation_history.json inside the running container. exclusions/get + exclusions/remove close
     /// that gap, mirroring the review/* action dispatch pattern (BrainarrOrchestrator.HandleAction).
     ///
-    /// NOTE (verified while building this feature): RecommendationHistory.GetExclusions()/GetExclusionPrompt()
-    /// have no production caller that feeds them into prompt-building or post-generation filtering today --
-    /// "Never again" writes an inert record; nothing currently blocks a disliked artist from being
-    /// re-suggested. These tests prove undo against the actual query surface that exists
-    /// (GetExclusions()'s IsActive-gated categorization, mutated by MarkAsDisliked/RemoveDislike), which is
-    /// the full extent of "the gate" this codebase defines. Wiring that gate into live recommendation
-    /// generation is a separate, out-of-scope, pre-existing gap -- not introduced or masked by this feature.
+    /// Live enforcement is covered by SafetyGateExclusionEnforcementTests and RecommendationPipelineTests:
+    /// Strong/NeverAgain dislikes are hard exclusions, while exclusions/remove deactivates the stored
+    /// dislike so the same artist/album can surface again.
     /// </summary>
     public class BrainarrOrchestratorExclusionsActionsTests : IDisposable
     {

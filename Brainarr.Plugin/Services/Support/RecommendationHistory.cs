@@ -557,6 +557,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             return string.Join(" ", decoded.Split((char[])null, StringSplitOptions.RemoveEmptyEntries));
         }
 
+        /// <summary>
+        /// True when a recommendation for <paramref name="artist"/>/<paramref name="album"/> is
+        /// HARD-excluded (a <see cref="DislikeLevel.Strong"/> or <see cref="DislikeLevel.NeverAgain"/>
+        /// dislike — i.e. present in <see cref="ExclusionList.StronglyDisliked"/>) per a pre-fetched
+        /// <paramref name="exclusions"/> snapshot.
+        ///
+        /// This is the deterministic enforcement predicate for "Never again": pass a SINGLE
+        /// <see cref="GetExclusions"/> snapshot in and call this per recommendation. Each call is O(1)
+        /// (two <see cref="HashSet{T}"/> lookups) so a large exclusion list never turns post-generation
+        /// filtering into O(n·m), and the snapshot is taken once (one lock acquisition) rather than
+        /// per item.
+        ///
+        /// Correctness invariants:
+        ///   - Matches on the SAME normalized key the store writes (<see cref="GetKey"/>: HTML-decode +
+        ///     lowercase + whitespace-collapse), so casing/entity/spacing differences between the
+        ///     model's output and the stored dislike don't leak an excluded artist through.
+        ///   - Uses EXACT key equality, never substring/prefix — so a "Never again" of "Artist A"
+        ///     (key "artist a") does NOT drop "Artist AB" (key "artist ab"). No over-filtering.
+        ///   - Checks BOTH the album-specific key AND the artist-level (album-null) key: an artist-wide
+        ///     "Never again" (stored with a null album) blocks every album by that artist, while an
+        ///     album-specific dislike blocks only that one album.
+        /// </summary>
+        internal static bool IsHardExcluded(ExclusionList exclusions, string artist, string? album)
+        {
+            if (exclusions == null || exclusions.StronglyDisliked.Count == 0 || string.IsNullOrWhiteSpace(artist))
+            {
+                return false;
+            }
+
+            // Album-specific match (also covers the artist-level case when album is null/empty, since
+            // GetKey collapses an empty album to the bare artist key).
+            if (exclusions.StronglyDisliked.Contains(GetKey(artist, album)))
+            {
+                return true;
+            }
+
+            // Artist-level match: an artist-wide dislike blocks every album by that artist.
+            return exclusions.StronglyDisliked.Contains(GetKey(artist, null));
+        }
+
         private void LoadHistory()
         {
             try
