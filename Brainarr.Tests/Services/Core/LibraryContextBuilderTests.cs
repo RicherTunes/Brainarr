@@ -19,16 +19,25 @@ namespace Brainarr.Tests.Services.Core
             var logger = LogManager.GetLogger("test");
             var builder = new LibraryContextBuilder(logger);
 
+            // ArtistMetadataId is set explicitly (matching real Lidarr data, where it is the
+            // actual FK BuildProfile joins on — see NzbDrone.Core.Datastore.TableMapping's
+            // Album.Artist LazyLoad registration: `Where<Artist>(a => a.ArtistMetadataId ==
+            // album.ArtistMetadataId)`). Using only the legacy ArtistId object-initializer
+            // shortcut (which sets Artist.Value.Id, not ArtistMetadataId) would leave
+            // ArtistMetadataId at its default 0 for every artist/album, which is unrealistic and
+            // does not exercise the real join key BuildProfile now uses to avoid the
+            // Album.ArtistId per-album lazy-load N+1 (see DuplicateFilterService/
+            // LibraryContextBuilder/StyleContextBuilder comments for the full story).
             var artists = new List<Artist>
             {
-                new Artist { Id = 1, Name = "A", Added = DateTime.UtcNow.AddDays(-1) },
-                new Artist { Id = 2, Name = "B", Added = DateTime.UtcNow },
+                new Artist { Id = 1, ArtistMetadataId = 1, Name = "A", Added = DateTime.UtcNow.AddDays(-1) },
+                new Artist { Id = 2, ArtistMetadataId = 2, Name = "B", Added = DateTime.UtcNow },
             };
             var albums = new List<Album>
             {
-                new Album { Id = 10, ArtistId = 1, Title = "A1" },
-                new Album { Id = 11, ArtistId = 1, Title = "A2" },
-                new Album { Id = 12, ArtistId = 2, Title = "B1" },
+                new Album { Id = 10, ArtistMetadataId = 1, Title = "A1" },
+                new Album { Id = 11, ArtistMetadataId = 1, Title = "A2" },
+                new Album { Id = 12, ArtistMetadataId = 2, Title = "B1" },
             };
 
             var artistSvc = new Mock<IArtistService>();
