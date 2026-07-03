@@ -778,6 +778,125 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public async Task ProcessAsync_FiltersActiveDislikeExclusionsBeforeEnrichment()
+        {
+            var (pipeline, _, validator, _, topUp, mbids, _, _, _, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                history.MarkAsDisliked("Nickelback", "Dark Horse", RecommendationHistory.DislikeLevel.NeverAgain);
+                history.MarkAsDisliked("Banned Artist", null, RecommendationHistory.DislikeLevel.Strong);
+
+                var settings = new BrainarrSettings { MaxRecommendations = 2, RecommendationMode = RecommendationMode.SpecificAlbums };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Nickelback", Album = "Dark Horse", Confidence = 0.99 },
+                    new Recommendation { Artist = "Banned Artist", Album = "Any Album", Confidence = 0.98 },
+                    new Recommendation { Artist = "Nickelback", Album = "Silver Side Up", Confidence = 0.8 },
+                    new Recommendation { Artist = "Allowed Artist", Album = "Allowed Album", Confidence = 0.7 }
+                };
+
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns<List<Recommendation>, bool>((lst, _) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = lst,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = lst.Count,
+                        ValidCount = lst.Count,
+                        FilteredCount = 0
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                Assert.Equal(2, items.Count);
+                Assert.DoesNotContain(items, i => i.Artist == "Nickelback" && i.Album == "Dark Horse");
+                Assert.DoesNotContain(items, i => i.Artist == "Banned Artist");
+                Assert.Contains(items, i => i.Artist == "Nickelback" && i.Album == "Silver Side Up");
+                Assert.Contains(items, i => i.Artist == "Allowed Artist" && i.Album == "Allowed Album");
+                topUp.Verify(t => t.TopUpAsync(It.IsAny<BrainarrSettings>(), It.IsAny<IAIProvider>(), It.IsAny<ILibraryAnalyzer>(), It.IsAny<ILibraryAwarePromptBuilder>(), It.IsAny<IDuplicationPrevention>(), It.IsAny<LibraryProfile>(), It.IsAny<int>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(), It.IsAny<CancellationToken>(), It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(), It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()), Times.Never);
+                mbids.Verify(m => m.EnrichWithMbidsAsync(It.Is<List<Recommendation>>(rs =>
+                    rs.Count == 2 &&
+                    rs.All(r => !(r.Artist == "Nickelback" && r.Album == "Dark Horse") && r.Artist != "Banned Artist")), It.IsAny<CancellationToken>()), Times.Once);
+            }
+            finally
+            {
+                try { Directory.Delete(tmp, true); } catch { }
+            }
+        }
+
+        [Fact]
+        public async Task ProcessAsync_FiltersActiveDislikeExclusionsFromTopUpResults()
+        {
+            var (pipeline, _, validator, _, topUp, _, _, _, _, history, logger, tmp) = CreatePipeline();
+            try
+            {
+                history.MarkAsDisliked("Blocked Topup", "Dead Album", RecommendationHistory.DislikeLevel.NeverAgain);
+                history.MarkAsDisliked("Blocked Artist", null, RecommendationHistory.DislikeLevel.Strong);
+
+                var settings = new BrainarrSettings { MaxRecommendations = 3, RecommendationMode = RecommendationMode.SpecificAlbums };
+                var recs = new List<Recommendation>
+                {
+                    new Recommendation { Artist = "Seed Artist", Album = "Seed Album", Confidence = 0.9 }
+                };
+
+                validator.Setup(v => v.ValidateBatch(It.IsAny<List<Recommendation>>(), false))
+                    .Returns<List<Recommendation>, bool>((lst, _) => new NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult
+                    {
+                        ValidRecommendations = lst,
+                        FilteredRecommendations = new List<Recommendation>(),
+                        TotalCount = lst.Count,
+                        ValidCount = lst.Count,
+                        FilteredCount = 0
+                    });
+
+                topUp.Setup(t => t.TopUpAsync(
+                        It.IsAny<BrainarrSettings>(),
+                        It.IsAny<IAIProvider>(),
+                        It.IsAny<ILibraryAnalyzer>(),
+                        It.IsAny<ILibraryAwarePromptBuilder>(),
+                        It.IsAny<IDuplicationPrevention>(),
+                        It.IsAny<LibraryProfile>(),
+                        It.IsAny<int>(),
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.ValidationResult>(),
+                        It.IsAny<CancellationToken>(),
+                        It.IsAny<System.Collections.Generic.IReadOnlyList<NzbDrone.Core.Parser.Model.ImportListItemInfo>>(),
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IArtistMbidResolver>(),
+                        It.IsAny<NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment.IMusicBrainzResolver>()))
+                    .ReturnsAsync(new List<ImportListItemInfo>
+                    {
+                        new ImportListItemInfo { Artist = "Blocked Topup", Album = "Dead Album" },
+                        new ImportListItemInfo { Artist = "Blocked Artist", Album = "Different Album" },
+                        new ImportListItemInfo { Artist = "Allowed Topup", Album = "Fresh Album" }
+                    });
+
+                var items = await pipeline.ProcessAsync(
+                    settings,
+                    recs,
+                    new LibraryProfile(),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(p => p.ProviderName == "OpenAI"),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                Assert.Equal(2, items.Count);
+                Assert.Contains(items, i => i.Artist == "Seed Artist" && i.Album == "Seed Album");
+                Assert.Contains(items, i => i.Artist == "Allowed Topup" && i.Album == "Fresh Album");
+                Assert.DoesNotContain(items, i => i.Artist == "Blocked Topup" && i.Album == "Dead Album");
+                Assert.DoesNotContain(items, i => i.Artist == "Blocked Artist");
+            }
+            finally
+            {
+                try { Directory.Delete(tmp, true); } catch { }
+            }
+        }
+
+        [Fact]
         public async Task ProcessAsync_CancellationEarly_ThrowsAndSkipsResolvers()
         {
             var (pipeline, dupFilter, validator, gates, topUp, mbids, artists, dedup, metrics, history, logger, tmp) = CreatePipeline();
