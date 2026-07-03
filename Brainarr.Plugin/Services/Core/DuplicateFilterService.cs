@@ -51,15 +51,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
 
-            // Build a quick lookup for artistId -> artistName
+            // Build a quick lookup for ArtistMetadataId -> artistName. Keyed on ArtistMetadataId
+            // (a plain int column on both Artist and Album) rather than Artist.Id-via-Album.ArtistId:
+            // Album.ArtistId dereferences a LazyLoaded<Artist> that Lidarr's GetAllAlbums() leaves
+            // unloaded, so reading it per album fires a full per-row ArtistRepository.Query() DB
+            // round trip (N+1 -> OOM against large libraries; live-observed 18 OOMs/hour against an
+            // ~11,700-artist library). ArtistMetadataId needs no lazy load at all.
             var artistNameById = existingArtists
                 .Where(a => a != null)
-                .GroupBy(a => a.Id)
+                .GroupBy(a => a.ArtistMetadataId)
                 .ToDictionary(g => g.Key, g => g.First().Name);
 
             foreach (var album in existingAlbums)
             {
-                if (!artistNameById.TryGetValue(album.ArtistId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
+                if (!artistNameById.TryGetValue(album.ArtistMetadataId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
                     continue;
 
                 // Multiple key formats for matching existing albums
@@ -182,14 +187,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 }
             }
 
+            // See the identical comment in FilterDuplicates above: ArtistMetadataId avoids the
+            // Album.ArtistId per-album lazy-load N+1 (OOM at ~11,700-artist scale).
             var artistNameById = existingArtists
                 .Where(a => a != null)
-                .GroupBy(a => a.Id)
+                .GroupBy(a => a.ArtistMetadataId)
                 .ToDictionary(g => g.Key, g => g.First().Name);
 
             foreach (var album in existingAlbums)
             {
-                if (!artistNameById.TryGetValue(album.ArtistId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
+                if (!artistNameById.TryGetValue(album.ArtistMetadataId, out var artistName) || string.IsNullOrWhiteSpace(artistName))
                     continue;
 
                 albumKeys.Add($"{artistName}_{album.Title}");

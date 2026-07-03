@@ -73,6 +73,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var coverage = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             var artistIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
             var albumIndex = new Dictionary<string, List<int>>(StringComparer.OrdinalIgnoreCase);
+            var artistIdByMetadataId = BuildArtistIdByMetadataIdMap(artists);
 
             foreach (var artist in artists)
             {
@@ -90,7 +91,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             foreach (var album in albums)
             {
                 var styles = ExtractAlbumStyles(album);
-                if (styles.Count == 0 && album.ArtistId != 0 && context.ArtistStyles.TryGetValue(album.ArtistId, out var fallback))
+                var artistId = ResolveArtistId(album, artistIdByMetadataId);
+                if (styles.Count == 0 && artistId != 0 && context.ArtistStyles.TryGetValue(artistId, out var fallback))
                 {
                     styles = new HashSet<string>(fallback, StringComparer.OrdinalIgnoreCase);
                 }
@@ -108,6 +110,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             FinalizeStyleContext(context, coverage, artistIndex, albumIndex);
         }
 
+        // Maps Artist.ArtistMetadataId -> Artist.Id, both plain int columns requiring no lazy
+        // load. Lets album->artist style-fallback lookups avoid Album.ArtistId (which
+        // dereferences a LazyLoaded<Artist> that GetAllAlbums() leaves unloaded -- reading it
+        // per album fires a full per-row ArtistRepository.Query() DB round trip: an N+1 that
+        // both OOMs large libraries and exposes a fragile per-row query path that can itself
+        // throw, live-observed as "Error parsing column 21 (Links=[...])").
+        private static Dictionary<int, int> BuildArtistIdByMetadataIdMap(List<Artist> artists)
+        {
+            var map = new Dictionary<int, int>(artists?.Count ?? 0);
+            if (artists == null)
+            {
+                return map;
+            }
+
+            foreach (var artist in artists)
+            {
+                if (artist == null)
+                {
+                    continue;
+                }
+
+                // Last-write-wins: ArtistMetadataId is expected unique per artist in a healthy
+                // library; a collision here is no worse than the pre-fix behavior.
+                map[artist.ArtistMetadataId] = artist.Id;
+            }
+
+            return map;
+        }
+
+        private static int ResolveArtistId(Album album, IReadOnlyDictionary<int, int> artistIdByMetadataId)
+        {
+            if (album == null)
+            {
+                return 0;
+            }
+
+            return artistIdByMetadataId.TryGetValue(album.ArtistMetadataId, out var artistId) ? artistId : 0;
+        }
+
         private void PopulateStyleContextParallel(
             LibraryStyleContext context,
             List<Artist> artists,
@@ -115,6 +156,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             CancellationToken cancellationToken = default)
         {
             // Touch LazyLoaded<T> only on the caller thread; do not do this inside Parallel loops.
+            // Also avoid Album.ArtistId entirely (see BuildArtistIdByMetadataIdMap doc comment) --
+            // resolve each album's artist via the plain-int ArtistMetadataId->Id map instead of
+            // triggering a per-album lazy Artist load.
+            var artistIdByMetadataId = BuildArtistIdByMetadataIdMap(artists);
+
             var artistPairs = new List<(int Id, HashSet<string> Styles)>(artists.Count);
             foreach (var artist in artists)
             {
@@ -126,7 +172,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             foreach (var album in albums)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                albumPairs.Add((album.Id, album.ArtistId, ExtractAlbumStyles(album)));
+                albumPairs.Add((album.Id, ResolveArtistId(album, artistIdByMetadataId), ExtractAlbumStyles(album)));
             }
 
             var artistStyles = new Dictionary<int, HashSet<string>>();
