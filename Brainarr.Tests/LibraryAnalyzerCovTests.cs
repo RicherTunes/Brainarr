@@ -861,9 +861,13 @@ namespace Brainarr.Tests
         private Artist CreateArtist(string name, bool monitored = true, DateTime? added = null)
         {
             var metadata = new NzbDrone.Core.Datastore.LazyLoaded<ArtistMetadata>(new ArtistMetadata { Name = name });
+            var id = Interlocked.Increment(ref _nextArtistId);
             return new Artist
             {
-                Id = Interlocked.Increment(ref _nextArtistId),
+                Id = id,
+                // Keep ArtistMetadataId in lockstep with Id; LibraryAnalyzer now groups albums by the
+                // plain ArtistMetadataId column (not the lazy Album.ArtistId) to avoid the N+1 OOM.
+                ArtistMetadataId = id,
                 Name = name,
                 Monitored = monitored,
                 Added = added ?? DateTime.UtcNow.AddMonths(-12),
@@ -892,7 +896,8 @@ namespace Brainarr.Tests
                 Title = title,
                 Monitored = monitored,
                 AlbumType = albumType,
-                ArtistId = 1
+                ArtistId = 1,
+                ArtistMetadataId = 1
             };
         }
 
@@ -902,6 +907,9 @@ namespace Brainarr.Tests
             {
                 Title = title,
                 ArtistId = artistId,
+                // ArtistMetadataId mirrors ArtistId in these fixtures (Artist.Id == ArtistMetadataId);
+                // LibraryAnalyzer groups albums by ArtistMetadataId to avoid the Album.ArtistId N+1.
+                ArtistMetadataId = artistId,
                 AlbumType = "Album",
                 Monitored = true
             };
@@ -914,6 +922,7 @@ namespace Brainarr.Tests
                 Title = title,
                 AlbumType = albumType,
                 ArtistId = 1,
+                ArtistMetadataId = 1,
                 Monitored = true
             };
         }
@@ -939,6 +948,7 @@ namespace Brainarr.Tests
             {
                 var artist = CreateArtist($"Artist{i}");
                 artist.Id = i;
+                artist.ArtistMetadataId = i;
                 artists.Add(artist);
             }
             return artists;

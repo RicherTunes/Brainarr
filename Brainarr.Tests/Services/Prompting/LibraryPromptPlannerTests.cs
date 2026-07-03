@@ -615,9 +615,11 @@ namespace Brainarr.Tests.Services.Prompting
                 StyleContext = context
             };
 
+            // Artist is present but has no resolvable name, so the sampled album falls back to the
+            // "Artist {id}" placeholder -- resolved via ArtistMetadataId (no Album.ArtistMetadata lazy-load).
             var artists = new List<Artist>
             {
-                new Artist { Id = 1, Name = "Primary Artist", Added = DateTime.UtcNow.AddDays(-10) }
+                new Artist { Id = 1, ArtistMetadataId = 1, Name = null, Added = DateTime.UtcNow.AddDays(-10) }
             };
 
             var albums = new List<Album>
@@ -626,6 +628,7 @@ namespace Brainarr.Tests.Services.Prompting
                 {
                     Id = 10,
                     ArtistId = 1,
+                    ArtistMetadataId = 1,
                     Title = "Album Title",
                     Added = DateTime.UtcNow.AddDays(-5),
                     ReleaseDate = DateTime.UtcNow.AddYears(-1),
@@ -951,10 +954,10 @@ namespace Brainarr.Tests.Services.Prompting
             };
 
             var artists = Enumerable.Range(1, 6)
-                .Select(i => new Artist { Id = i, Name = $"Artist {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .Select(i => new Artist { Id = i, ArtistMetadataId = i, Name = $"Artist {i}", Added = DateTime.UtcNow.AddDays(-i) })
                 .ToList();
             var albums = Enumerable.Range(1, 4)
-                .Select(i => new Album { Id = 100 + i, ArtistId = (i % 3) + 1, Title = $"Album {i}", Added = DateTime.UtcNow.AddDays(-i) })
+                .Select(i => new Album { Id = 100 + i, ArtistId = (i % 3) + 1, ArtistMetadataId = (i % 3) + 1, Title = $"Album {i}", Added = DateTime.UtcNow.AddDays(-i) })
                 .ToList();
 
             var baselineRequest = new RecommendationRequest(artists, albums, settings, profile.StyleContext, true, 3200, 2400, "openai:gpt-4o-mini", 64000);
@@ -993,14 +996,16 @@ namespace Brainarr.Tests.Services.Prompting
                 MaxRecommendations = 3
             };
 
+            // Nameless artist -> the sampled album uses the "Artist {id}" placeholder, resolved from the
+            // artists list via ArtistMetadataId (never dereferencing Album.ArtistMetadata).
             var artists = new List<Artist>
             {
-                new Artist { Id = 42, Name = "Placeholder", Added = DateTime.UtcNow.AddDays(-7) }
+                new Artist { Id = 42, ArtistMetadataId = 42, Name = null, Added = DateTime.UtcNow.AddDays(-7) }
             };
 
             var albums = new List<Album>
             {
-                new Album { Id = 101, ArtistId = 42, Title = "Lost Tapes" }
+                new Album { Id = 101, ArtistId = 42, ArtistMetadataId = 42, Title = "Lost Tapes" }
             };
 
             var request = new RecommendationRequest(

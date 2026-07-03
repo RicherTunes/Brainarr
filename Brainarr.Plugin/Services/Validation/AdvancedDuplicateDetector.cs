@@ -67,9 +67,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Validation
                 // Pre-filter by artist similarity to improve performance
                 var candidateArtists = FindSimilarArtists(normalizedRecommendation.Artist, artists, 0.6);
 
+                // Group albums by ArtistMetadataId (a plain int column) ONCE, rather than re-scanning
+                // every album per candidate artist via Album.ArtistId. Album.ArtistId dereferences a
+                // LazyLoaded<Artist> that GetAllAlbums() leaves unloaded, so the old per-artist
+                // .Where(a => a.ArtistId == artist.Id) fired a per-row DB round trip for every album on
+                // every candidate (N x M lazy loads -> OOM at large-library scale). album.ArtistId ==
+                // the Id of the artist whose ArtistMetadataId == album.ArtistMetadataId, so this is
+                // exactly equivalent.
+                var albumsByMetadataId = albums
+                    .Where(a => a != null)
+                    .GroupBy(a => a.ArtistMetadataId)
+                    .ToDictionary(g => g.Key, g => (IReadOnlyList<Album>)g.ToList());
+
                 foreach (var artist in candidateArtists)
                 {
-                    var artistAlbums = albums.Where(a => a.ArtistId == artist.Id);
+                    var artistAlbums = albumsByMetadataId.TryGetValue(artist.ArtistMetadataId, out var byMetadata)
+                        ? byMetadata
+                        : (IReadOnlyList<Album>)Array.Empty<Album>();
 
                     foreach (var album in artistAlbums)
                     {
