@@ -25,12 +25,12 @@
       },
       "Microsoft.NET.Test.Sdk": {
         "type": "Direct",
-        "requested": "[18.6.0, )",
-        "resolved": "18.6.0",
-        "contentHash": "kAIBt0MsYR0o2RULmlW5BhQ1ha50aGEgLKG4f1p0kePBGLJCprqs3S+NxRrYN8UH7mSQRPKpeiH9mwPMEKUObQ==",
+        "requested": "[18.7.0, )",
+        "resolved": "18.7.0",
+        "contentHash": "49xH9j4UzCh2hMohJp53g3wUTvyycECw7CtVht4gfCz5ykudB1uBcF6D0TtgJPjCtP76UPW53bQElKdCeX+dUg==",
         "dependencies": {
-          "Microsoft.CodeCoverage": "18.6.0",
-          "Microsoft.TestPlatform.TestHost": "18.6.0"
+          "Microsoft.CodeCoverage": "18.7.0",
+          "Microsoft.TestPlatform.TestHost": "18.7.0"
         }
       },
       "Microsoft.SourceLink.GitHub": {
@@ -109,44 +109,6 @@
           "System.Diagnostics.EventLog": "6.0.0"
         }
       },
-      "CliWrap": {
-        "type": "Transitive",
-        "resolved": "3.10.1",
-        "contentHash": "C+WzXwzpQsJVNqvuh19ZO/bw/vR43L+DC/CmvK+PATUBkail2AWYE6an17dOGgWaVGzF9sU28YwRwfNfkPrQdg=="
-      },
-      "Microsoft.AspNetCore.Cryptography.Internal": {
-        "type": "Transitive",
-        "resolved": "8.0.25",
-        "contentHash": "IoE2tChwISkEiyv1Oq+C+xA87+3xME+xnmjw+r8OqrPVdzC5ZkQeAr+YybCpTIo6SZ7//gmGHQ+mp/Y6SUSCNA=="
-      },
-      "Microsoft.AspNetCore.DataProtection": {
-        "type": "Transitive",
-        "resolved": "8.0.25",
-        "contentHash": "BJqJsMW0aHNCsFUoNpPbbbcfcs79PB7gwrWn0FwqKFlr1TtgOIfEgyDVLLSWCgm3nRctM6uGquXnbYmgtWqssQ==",
-        "dependencies": {
-          "Microsoft.AspNetCore.Cryptography.Internal": "8.0.25",
-          "Microsoft.AspNetCore.DataProtection.Abstractions": "8.0.25",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Hosting.Abstractions": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.3",
-          "Microsoft.Extensions.Options": "8.0.2",
-          "System.Security.Cryptography.Xml": "8.0.2"
-        }
-      },
-      "Microsoft.AspNetCore.DataProtection.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.25",
-        "contentHash": "AFcaoXKeV5dWEXB1QAdN6EBp/kKqjAk3hYyhMjIFwcXXhystMQJaJMhsAI8hZIGJHXxtd4y0Yb6RjsbLcCoqTg=="
-      },
-      "Microsoft.AspNetCore.DataProtection.Extensions": {
-        "type": "Transitive",
-        "resolved": "8.0.25",
-        "contentHash": "M1uetMOBi0S4FavhE6s0OpkyQSbyGsZuNSq9L+57XQjhyrfqM6V+/ipdZzHUbp3/ahawHoVKJPIy/0NxR5SGEQ==",
-        "dependencies": {
-          "Microsoft.AspNetCore.DataProtection": "8.0.25",
-          "Microsoft.Extensions.DependencyInjection": "8.0.1"
-        }
-      },
       "Microsoft.Build.Tasks.Git": {
         "type": "Transitive",
         "resolved": "8.0.0",
@@ -154,181 +116,8 @@
       },
       "Microsoft.CodeCoverage": {
         "type": "Transitive",
-        "resolved": "18.6.0",
-        "contentHash": "bkmCXn/65Cd0LdO2zTb/ValGAJ1H8y/CgYOiBb3jsDyHI3Y1ljKx6RBvhvn3e5D/4R4I00RRwLf+Bd2Sn6bJjA=="
-      },
-      "Microsoft.Extensions.Configuration": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "0J/9YNXTMWSZP2p2+nvl8p71zpSwokZXZuJW+VjdErkegAnFdO1XlqtA62SJtgVYHdKu3uPxJHcMR/r35HwFBA==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Configuration.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "3lE/iLSutpgX1CC0NOW70FJoGARRHbyKmG7dc0klnUZ9Dd9hS6N/POPWhKhMLCEuNN5nXEY5agmlFtH562vqhQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Configuration.Binder": {
-        "type": "Transitive",
-        "resolved": "8.0.2",
-        "contentHash": "7IQhGK+wjyGrNsPBjJcZwWAr+Wf6D4+TwOptUt77bWtgNkiV8tDEbhFS+dDamtQFZ2X7kWG9m71iZQRj2x3zgQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Configuration.EnvironmentVariables": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "plvZ0ZIpq+97gdPNNvhwvrEZ92kNml9hd1pe3idMA7svR0PztdzVLkoWLcRFgySYXUJc3kSM3Xw3mNFMo/bxRA==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration": "8.0.0",
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Configuration.FileExtensions": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "EJzSNO9oaAXnTdtdNO6npPRsIIeZCBSNmdQ091VDO7fBiOtJAAeEq6dtrVXIi3ZyjC5XRSAtVvF8SzcneRHqKQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration": "8.0.0",
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0",
-          "Microsoft.Extensions.FileProviders.Physical": "8.0.0",
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Configuration.Json": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "L89DLNuimOghjV3tLx0ArFDwVEJD6+uGB3BMCMX01kaLzXkaXHb2021xOMl2QOxUxbdePKUZsUY7n2UUkycjRg==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration": "8.0.0",
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.FileExtensions": "8.0.1",
-          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Diagnostics": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "doVPCUUCY7c6LhBsEfiy3W1bvS7Mi6LkfQMS8nlC22jZWNxBv8VO8bdfeyvpYFst6Kxqk7HBC6lytmEoBssvSQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration": "8.0.0",
-          "Microsoft.Extensions.Diagnostics.Abstractions": "8.0.1",
-          "Microsoft.Extensions.Options.ConfigurationExtensions": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Diagnostics.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "elH2vmwNmsXuKmUeMQ4YW9ldXiF+gSGDgg1vORksob5POnpaI6caj1Hu8zaYbEuibhqCoWg0YRWDazBY3zjBfg==",
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Options": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.FileProviders.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "ZbaMlhJlpisjuWbvXr4LdAst/1XxH3vZ6A0BsgTphZ2L4PGuxRLz7Jr/S7mkAAnOn78Vu0fKhEgNF5JO3zfjqQ==",
-        "dependencies": {
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.FileProviders.Physical": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "UboiXxpPUpwulHvIAVE36Knq0VSHaAmfrFkegLyBZeaADuKezJ/AIXYAW8F5GBlGk/VaibN2k/Zn1ca8YAfVdA==",
-        "dependencies": {
-          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0",
-          "Microsoft.Extensions.FileSystemGlobbing": "8.0.0",
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.FileSystemGlobbing": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "OK+670i7esqlQrPjdIKRbsyMCe9g5kSLpRRQGSr4Q58AOYEe/hCnfLZprh7viNisSUUQZmMrbbuDaIrP+V1ebQ=="
-      },
-      "Microsoft.Extensions.Hosting.Abstractions": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "nHwq9aPBdBPYXPti6wYEEfgXddfBrYC+CQLn+qISiwQq5tpfaqDZSKOJNxoe9rfQxGf1c+2wC/qWFe1QYJPYqw==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Diagnostics.Abstractions": "8.0.1",
-          "Microsoft.Extensions.FileProviders.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.Http": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "kDYeKJUzh0qeg/AI+nSr3ffthmXYQTEb0nS9qRC7YhSbbuN4M4NPbaB77AJwtkTnCV9XZ7qYj3dkZaNcyl73EA==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Diagnostics": "8.0.1",
-          "Microsoft.Extensions.Logging": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Options": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.Logging": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "4x+pzsQEbqxhNf1QYRr5TDkLP9UsLT3A6MdRKDDEgrW7h1ljiEPgTNhKYUhNCCAaVpQECVQ+onA91PTPnIp6Lw==",
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Options": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.Logging.Configuration": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "QWwTrsgOnJMmn+XUslm8D2H1n3PkP/u/v52FODtyBc/k4W9r3i2vcXXeeX/upnzllJYRRbrzVzT0OclfNJtBJA==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration": "8.0.0",
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.Binder": "8.0.2",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Logging": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Options": "8.0.2",
-          "Microsoft.Extensions.Options.ConfigurationExtensions": "8.0.0"
-        }
-      },
-      "Microsoft.Extensions.Logging.Console": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "uzcg/5U2eLyn5LIKlERkdSxw6VPC1yydnOSQiRRWGBGN3kphq3iL4emORzrojScDmxRhv49gp5BI8U3Dz7y4iA==",
-        "dependencies": {
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Logging": "8.0.1",
-          "Microsoft.Extensions.Logging.Abstractions": "8.0.2",
-          "Microsoft.Extensions.Logging.Configuration": "8.0.1",
-          "Microsoft.Extensions.Options": "8.0.2"
-        }
-      },
-      "Microsoft.Extensions.Options.ConfigurationExtensions": {
-        "type": "Transitive",
-        "resolved": "8.0.0",
-        "contentHash": "0f4DMRqEd50zQh+UyJc+/HiBsZ3vhAQALgdkcQEalSH1L2isdC7Yj54M3cyo5e+BeO5fcBQ7Dxly8XiBBcvRgw==",
-        "dependencies": {
-          "Microsoft.Extensions.Configuration.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Configuration.Binder": "8.0.0",
-          "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.0",
-          "Microsoft.Extensions.Options": "8.0.0",
-          "Microsoft.Extensions.Primitives": "8.0.0"
-        }
+        "resolved": "18.7.0",
+        "contentHash": "+wFfx9s7D9wegM0RziXMj2kvYDT4qcqXXtyjiQwSZOGQ2wwcOAJQcD6eQXk02jt0MvRNawtp8TJxTrV+wD8X1g=="
       },
       "Microsoft.SourceLink.Common": {
         "type": "Transitive",
@@ -337,27 +126,19 @@
       },
       "Microsoft.TestPlatform.ObjectModel": {
         "type": "Transitive",
-        "resolved": "18.6.0",
-        "contentHash": "gQTW4BIfM2ZLxixo9ITXoulLKjn20FiiHtqTsx9PENqTrX7368ZeJ5L0QZJyReXDWORPRV8jXwZR6Aar8JOyaA==",
+        "resolved": "18.7.0",
+        "contentHash": "6rmgU4q3/WOpOPcncI0YW0Q/QpcQtwR2TTEXDR5+4TfSimPBAk6Z/BgKLeGgp1SOun0ROVUCCafXhRLwsHaPpA==",
         "dependencies": {
           "System.Reflection.Metadata": "8.0.0"
         }
       },
       "Microsoft.TestPlatform.TestHost": {
         "type": "Transitive",
-        "resolved": "18.6.0",
-        "contentHash": "em1eLz5Q46+hsCtAXdXggWAPd9gQyT4ngdsQ7k1eWvQgpsjtS/wAOJ/5TteieFdiAvrEq1iVn00LtusAxRaVmQ==",
+        "resolved": "18.7.0",
+        "contentHash": "kYwfmebCs8992zaxEDkvG7S+YEouTeKfYVKUFEkwh1W2dIoOaevBt80XSKVXCUFEhusjOIm1sFfHBnoJgygrRA==",
         "dependencies": {
-          "Microsoft.TestPlatform.ObjectModel": "18.6.0",
+          "Microsoft.TestPlatform.ObjectModel": "18.7.0",
           "Newtonsoft.Json": "13.0.3"
-        }
-      },
-      "NSubstitute": {
-        "type": "Transitive",
-        "resolved": "5.3.0",
-        "contentHash": "lJ47Cps5Qzr86N99lcwd+OUvQma7+fBgr8+Mn+aOC0WrlqMNkdivaYD9IvnZ5Mqo6Ky3LS7ZI+tUq1/s9ERd0Q==",
-        "dependencies": {
-          "Castle.Core": "5.1.1"
         }
       },
       "System.Collections.Immutable": {
@@ -377,29 +158,6 @@
         "dependencies": {
           "System.Collections.Immutable": "8.0.0"
         }
-      },
-      "System.Security.Cryptography.Pkcs": {
-        "type": "Transitive",
-        "resolved": "8.0.1",
-        "contentHash": "CoCRHFym33aUSf/NtWSVSZa99dkd0Hm7OCZUxORBjRB16LNhIEOf8THPqzIYlvKM0nNDAPTRBa1FxEECrgaxxA=="
-      },
-      "System.Security.Cryptography.Xml": {
-        "type": "Transitive",
-        "resolved": "8.0.2",
-        "contentHash": "aDM/wm0ZGEZ6ZYJLzgqjp2FZdHbDHh6/OmpGfb7AdZ105zYmPn/83JRU2xLIbwgoNz9U1SLUTJN0v5th3qmvjA==",
-        "dependencies": {
-          "System.Security.Cryptography.Pkcs": "8.0.1"
-        }
-      },
-      "System.Text.Json": {
-        "type": "Transitive",
-        "resolved": "8.0.6",
-        "contentHash": "BvSpVBsVN9b+Y+wONbvJOHd1HjXQf33+XiC28ZMOwRsYb42mz3Q8YHnpTSwpwJLqYCMqM+0UUVC3V+pi25XfkQ=="
-      },
-      "TagLibSharp": {
-        "type": "Transitive",
-        "resolved": "2.3.0",
-        "contentHash": "Qo4z6ZjnIfbR3Us1Za5M2vQ97OWZPmODvVmepxZ8XW0UIVLGdO2T63/N3b23kCcyiwuIe0TQvMEQG8wUCCD1mA=="
       },
       "Validation": {
         "type": "Transitive",
@@ -450,62 +208,17 @@
         "type": "Project",
         "dependencies": {
           "Lidarr.Plugin.Brainarr": "[1.6.1, )",
-          "Lidarr.Plugin.Common.TestKit": "[1.1.8, )",
           "NLog": "[5.4.0, )"
-        }
-      },
-      "lidarr.plugin.abstractions": {
-        "type": "Project",
-        "dependencies": {
-          "Microsoft.Extensions.Logging.Abstractions": "[8.0.3, )",
-          "System.Text.Json": "[8.0.6, )"
         }
       },
       "Lidarr.Plugin.Brainarr": {
         "type": "Project",
         "dependencies": {
-          "Lidarr.Plugin.Common": "[1.18.0-dev, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
+          "NLog": "[5.4.0, )",
           "Newtonsoft.Json": "[13.0.4, )",
           "System.Security.Cryptography.ProtectedData": "[9.0.14, )"
-        }
-      },
-      "lidarr.plugin.common": {
-        "type": "Project",
-        "dependencies": {
-          "CliWrap": "[3.10.1, )",
-          "Lidarr.Plugin.Abstractions": "[1.18.0-dev, )",
-          "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
-          "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
-          "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
-          "Microsoft.Extensions.Configuration": "[8.0.0, )",
-          "Microsoft.Extensions.Configuration.EnvironmentVariables": "[8.0.0, )",
-          "Microsoft.Extensions.Configuration.Json": "[8.0.1, )",
-          "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
-          "Microsoft.Extensions.Http": "[8.0.1, )",
-          "Microsoft.Extensions.Logging": "[8.0.1, )",
-          "Microsoft.Extensions.Logging.Console": "[8.0.1, )",
-          "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
-          "System.Text.Json": "[8.0.6, )",
-          "TagLibSharp": "[2.3.0, )"
-        }
-      },
-      "lidarr.plugin.common.testkit": {
-        "type": "Project",
-        "dependencies": {
-          "Lidarr.Plugin.Abstractions": "[1.18.0-dev, )",
-          "Lidarr.Plugin.Common": "[1.18.0-dev, )",
-          "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
-          "Microsoft.Extensions.Logging": "[8.0.1, )",
-          "Microsoft.Extensions.Logging.Abstractions": "[8.0.3, )",
-          "Moq": "[4.20.72, )",
-          "NLog": "[5.4.0, )",
-          "NSubstitute": "[5.3.0, )",
-          "Xunit.SkippableFact": "[1.5.23, )",
-          "xunit.assert": "[2.9.2, )",
-          "xunit.extensibility.core": "[2.9.3, )",
-          "xunit.extensibility.execution": "[2.9.3, )"
         }
       },
       "Microsoft.Extensions.Caching.Abstractions": {
@@ -548,8 +261,8 @@
       "Microsoft.Extensions.Logging.Abstractions": {
         "type": "CentralTransitive",
         "requested": "[8.0.3, )",
-        "resolved": "8.0.3",
-        "contentHash": "dL0QGToTxggRLMYY4ZYX5AMwBb+byQBd/5dMiZE07Nv73o6I5Are3C7eQTh7K2+A4ct0PVISSr7TZANbiNb2yQ==",
+        "resolved": "8.0.2",
+        "contentHash": "nroMDjS7hNBPtkZqVBbSiQaQjWRDxITI8Y7XnDs97rqG3EbzVTNLZQf7bIeUJcaHOV8bca47s1Uxq94+2oGdxA==",
         "dependencies": {
           "Microsoft.Extensions.DependencyInjection.Abstractions": "8.0.2"
         }
