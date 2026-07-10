@@ -60,7 +60,25 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
             if (_cache.TryGet(cacheKey, out var cached))
             {
                 _logger.Debug($"RecommendationCoordinator: cache hit for {cacheKey}");
-                return cached;
+
+                // Re-apply the hard-exclusion gate before returning a cached result. Every
+                // exclusion gate (FilterHardExcludedRecommendations, SafetyGateService, the
+                // top-up/final FilterHardExcluded sweeps) lives inside _pipeline.ProcessAsync,
+                // which a cache hit skips entirely — and the cache key does not include dislike
+                // state, nor does MarkAsDisliked invalidate the cache. Without this re-filter, an
+                // artist marked "Never again" AFTER a result was cached is re-delivered for the
+                // rest of the cache TTL. Uses the SAME predicate as the pipeline
+                // (RecommendationHistory.IsHardExcluded via RecommendationPipeline.FilterHardExcluded);
+                // logger deliberately null so the helper's pipeline-context Info line doesn't fire —
+                // the cache-specific Debug line below covers it.
+                var filtered = RecommendationPipeline.FilterHardExcluded(cached, _history.GetExclusions(), null);
+                var removed = (cached?.Count ?? 0) - filtered.Count;
+                if (removed > 0)
+                {
+                    _logger.Debug($"RecommendationCoordinator: cache hit re-filter dropped {removed} hard-excluded ('Never again' / strong-dislike) item(s) from the cached result.");
+                }
+
+                return filtered;
             }
 
             // Fetch raw recs from provider

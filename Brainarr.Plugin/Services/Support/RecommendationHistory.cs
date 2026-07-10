@@ -335,6 +335,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
         {
             var exclusions = GetExclusions();
             List<string> dislikePatterns;
+            List<string> inLibraryArtists;
+            List<string> rejectedArtists;
+            List<string> strongDislikedArtists;
+            List<string> softDislikedArtists;
 
             lock (_lock)
             {
@@ -351,6 +355,42 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
                         .Select(p => p.Value.Pattern)
                         .ToList();
                 }
+
+                // Derive prompt artist names from the RECORDS, not by splitting exclusion keys:
+                // GetKey encodes "artist|album" (and just "artist" for artist-level entries), so an
+                // artist whose NAME contains '|' (e.g. "AC|DC") is not recoverable from the key by
+                // ANY split — the old Split('|')[0] truncated it to "ac". Names are normalized with
+                // the same NormalizeKeyPart the keys use, preserving the previous lowercase output.
+                inLibraryArtists = _history.Accepted.Values
+                    .Select(a => NormalizeKeyPart(a.Artist))
+                    .Where(a => !string.IsNullOrEmpty(a))
+                    .Distinct()
+                    .Take(50) // Limit to top 50
+                    .ToList();
+
+                var recentCutoff = DateTime.UtcNow.AddDays(-30);
+                rejectedArtists = _history.Rejected.Values
+                    .Where(r => r.RejectedDate > recentCutoff)
+                    .Select(r => NormalizeKeyPart(r.Artist))
+                    .Where(a => !string.IsNullOrEmpty(a))
+                    .Take(10)
+                    .ToList();
+
+                var activeDislikes = (_history.Disliked?.Values ?? Enumerable.Empty<DislikedRecord>())
+                    .Where(d => d.IsActive)
+                    .ToList();
+                strongDislikedArtists = activeDislikes
+                    .Where(d => d.Level == DislikeLevel.Strong || d.Level == DislikeLevel.NeverAgain)
+                    .Select(d => NormalizeKeyPart(d.Artist))
+                    .Where(a => !string.IsNullOrEmpty(a))
+                    .Take(20)
+                    .ToList();
+                softDislikedArtists = activeDislikes
+                    .Where(d => d.Level != DislikeLevel.Strong && d.Level != DislikeLevel.NeverAgain)
+                    .Select(d => NormalizeKeyPart(d.Artist))
+                    .Where(a => !string.IsNullOrEmpty(a))
+                    .Take(15)
+                    .ToList();
             }
 
             if (!exclusions.HasExclusions)
@@ -361,44 +401,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Support
             var prompt = new List<string>();
 
             // Ultra-compact format for token efficiency
-            if (exclusions.InLibrary.Count > 0)
+            if (inLibraryArtists.Count > 0)
             {
                 // Just send artist names for in-library items
-                var artists = exclusions.InLibrary
-                    .Select(k => k.Split('|')[0])
-                    .Distinct()
-                    .Take(50); // Limit to top 50
-
-                prompt.Add($"EXCLUDE:{string.Join(",", artists)}");
+                prompt.Add($"EXCLUDE:{string.Join(",", inLibraryArtists)}");
             }
 
-            if (exclusions.RecentlyRejected.Count > 0)
+            if (rejectedArtists.Count > 0)
             {
                 // Send a few rejected items as negative examples
-                var rejected = exclusions.RecentlyRejected
-                    .Take(10)
-                    .Select(k => k.Split('|')[0]);
-
-                prompt.Add($"AVOID:{string.Join(",", rejected)}");
+                prompt.Add($"AVOID:{string.Join(",", rejectedArtists)}");
             }
 
             // Add negative constraints for disliked items
-            if (exclusions.StronglyDisliked.Count > 0)
+            if (strongDislikedArtists.Count > 0)
             {
-                var strongDisliked = exclusions.StronglyDisliked
-                    .Take(20)
-                    .Select(k => k.Split('|')[0]);
-
-                prompt.Add($"NEVER_RECOMMEND:{string.Join(",", strongDisliked)}");
+                prompt.Add($"NEVER_RECOMMEND:{string.Join(",", strongDislikedArtists)}");
             }
 
-            if (exclusions.Disliked.Count > 0)
+            if (softDislikedArtists.Count > 0)
             {
-                var disliked = exclusions.Disliked
-                    .Take(15)
-                    .Select(k => k.Split('|')[0]);
-
-                prompt.Add($"DO_NOT_SUGGEST:{string.Join(",", disliked)}");
+                prompt.Add($"DO_NOT_SUGGEST:{string.Join(",", softDislikedArtists)}");
             }
 
             // Add dislike pattern information if available
