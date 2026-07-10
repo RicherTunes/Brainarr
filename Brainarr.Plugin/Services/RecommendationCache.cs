@@ -39,9 +39,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public RecommendationCache(Logger logger, TimeSpan? defaultDuration = null)
         {
-            // NOTE: Original behavior accepts null logger silently — preserve for compatibility.
-            // Calls to `_logger.Debug/Info/etc` will then NRE; callers that pass null
-            // historically rely on never-hit log paths.
+            // NOTE: A null logger is accepted at construction for historical compatibility, but it
+            // is NOT safe to use one: TryGet/Set/Clear call `_logger` unconditionally on every hit,
+            // miss, and store, so a null logger throws NullReferenceException on first use. Always
+            // pass a real logger (production DI does; tests use TestLogger). No null-guard is added
+            // here to keep behavior unchanged.
             _logger = logger;
             _defaultCacheDuration = defaultDuration ?? TimeSpan.FromMinutes(BrainarrConstants.CacheDurationMinutes);
 

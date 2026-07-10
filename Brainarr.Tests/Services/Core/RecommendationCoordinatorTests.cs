@@ -91,6 +91,84 @@ namespace Brainarr.Tests.Services.Core
         }
 
         [Fact]
+        public async Task RunAsync_CacheHit_DropsItemsMarkedNeverAgainAfterCaching()
+        {
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
+            try
+            {
+                // Run 1 delivered these and they were cached; then the user marks one "Never again"
+                // while the entry is still within its TTL.
+                var cachedItems = new List<ImportListItemInfo>
+                {
+                    new ImportListItemInfo { Artist = "Blocked Artist", Album = "Cached Album" },
+                    new ImportListItemInfo { Artist = "Allowed Artist", Album = "Other Album" }
+                };
+                cache.Setup(c => c.TryGet(It.IsAny<string>(), out cachedItems)).Returns(true);
+
+                history.MarkAsDisliked("Blocked Artist", null, RecommendationHistory.DislikeLevel.NeverAgain);
+
+                var fetchCalled = 0;
+                Task<List<Recommendation>> Fetch(LibraryProfile p, CancellationToken ct)
+                {
+                    fetchCalled++;
+                    return Task.FromResult(new List<Recommendation>());
+                }
+
+                var result = await coord.RunAsync(
+                    new BrainarrSettings(),
+                    Fetch,
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // The hard exclusion MUST hold on the cache-hit path too.
+                Assert.DoesNotContain(result, i => i.Artist == "Blocked Artist");
+                Assert.Contains(result, i => i.Artist == "Allowed Artist");
+                // Still a cache hit: no provider fetch, no pipeline run.
+                Assert.Equal(0, fetchCalled);
+                pipeline.Verify(p => p.ProcessAsync(
+                    It.IsAny<BrainarrSettings>(),
+                    It.IsAny<List<Recommendation>>(),
+                    It.IsAny<LibraryProfile>(),
+                    It.IsAny<ReviewQueueService>(),
+                    It.IsAny<IAIProvider>(),
+                    It.IsAny<ILibraryAwarePromptBuilder>(),
+                    It.IsAny<CancellationToken>()), Times.Never);
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
+        public async Task RunAsync_CacheHit_NoExclusions_ReturnsCachedListUnchanged()
+        {
+            var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();
+            try
+            {
+                var cachedItems = new List<ImportListItemInfo>
+                {
+                    new ImportListItemInfo { Artist = "First Artist", Album = "Album One" },
+                    new ImportListItemInfo { Artist = "Second Artist", Album = "Album Two" }
+                };
+                cache.Setup(c => c.TryGet(It.IsAny<string>(), out cachedItems)).Returns(true);
+
+                var result = await coord.RunAsync(
+                    new BrainarrSettings(),
+                    (p, ct) => Task.FromResult(new List<Recommendation>()),
+                    new ReviewQueueService(logger, tmp),
+                    Mock.Of<IAIProvider>(),
+                    Mock.Of<ILibraryAwarePromptBuilder>(),
+                    CancellationToken.None);
+
+                // No exclusions -> no over-filtering: every cached item comes back.
+                Assert.Equal(2, result.Count);
+                Assert.Contains(result, i => i.Artist == "First Artist" && i.Album == "Album One");
+                Assert.Contains(result, i => i.Artist == "Second Artist" && i.Album == "Album Two");
+            }
+            finally { try { Directory.Delete(tmp, true); } catch { } }
+        }
+
+        [Fact]
         public async Task RunAsync_CacheMiss_CallsPipeline_AndStoresCache()
         {
             var (coord, cache, pipeline, sanitizer, schema, history, profiles, logger, tmp) = Create();

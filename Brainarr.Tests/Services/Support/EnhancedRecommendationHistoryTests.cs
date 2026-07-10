@@ -98,6 +98,21 @@ namespace Brainarr.Tests.Services.Support
         }
 
         [Fact]
+        public void GetExclusionPrompt_ArtistNameContainingPipe_CarriesFullName()
+        {
+            // GetKey encodes "artist|album", so an artist whose NAME contains '|' cannot be
+            // recovered from the key with Split('|')[0] — "AC|DC" was truncated to "ac" in the
+            // prompt hints. The prompt must carry the full (normalized) artist name.
+            _history.MarkAsDisliked("AC|DC", null, DislikeLevel.NeverAgain);            // artist-level key "ac|dc"
+            _history.MarkAsDisliked("Guided|By|Voices", "Some Album", DislikeLevel.Normal); // album key "guided|by|voices|some album"
+
+            var prompt = _history.GetExclusionPrompt();
+
+            prompt.Should().Contain("NEVER_RECOMMEND:ac|dc");
+            prompt.Should().Contain("DO_NOT_SUGGEST:guided|by|voices");
+        }
+
+        [Fact]
         public async Task MarkAsRejected_ShouldAcceptRejectionReason()
         {
             // Arrange
