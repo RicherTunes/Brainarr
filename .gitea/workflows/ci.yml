@@ -124,3 +124,11 @@ jobs:
       - name: Full local-ci verification
         shell: bash
         run: pwsh ./scripts/verify-local.ps1
+      # B-208: dotnet format gate (whitespace + code-style + analyzers, e.g. the xUnit
+      # rules). Runs AFTER verify-local so the Docker-extracted Lidarr host assemblies
+      # exist -- style/analyzer analysis needs a compilable workspace. ext/ is excluded:
+      # the Common submodule is a separate repo with its own CI; its formatting is not
+      # this repo's merge gate.
+      - name: Check formatting (dotnet format)
+        shell: bash
+        run: dotnet format Brainarr.sln --verify-no-changes --exclude ext/

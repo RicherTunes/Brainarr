@@ -303,7 +303,7 @@ namespace Brainarr.Tests.Services.Core
         [InlineData("9999", 365)] // clamps to max
         [InlineData("0", 1)]      // clamps to min
         [InlineData("-5", 1)]     // clamps to min
-        public void ResolveCostLookbackDays_ParsesAndClamps(string daysValue, int expected)
+        public void ResolveCostLookbackDays_ParsesAndClamps(string? daysValue, int expected)
         {
             var query = daysValue == null ? null : new Dictionary<string, string> { ["days"] = daysValue };
 

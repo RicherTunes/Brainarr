@@ -1,57 +1,39 @@
-using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
-using Lidarr.Plugin.Common.Streaming.Decoders;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
-using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for OpenRouter
-    /// (<c>https://openrouter.ai/api/v1/chat/completions</c>).
-    ///
-    /// <para>
-    /// Wave-4b cloud provider. OpenRouter speaks the OpenAI Chat Completions wire format
-    /// behind a single endpoint that brokers requests to many upstream models
-    /// (Anthropic, OpenAI, Google, Meta, DeepSeek, ...).
-    /// </para>
+    /// (<c>https://openrouter.ai/api/v1/chat/completions</c>), built on
+    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks captured here:
     /// 1. <c>HTTP-Referer</c> and <c>X-Title</c> identifying headers — OpenRouter uses these
     ///    to attribute requests on its dashboard. Brainarr supplies its GitHub URL + project
-    ///    name from <see cref="BrainarrConstants"/>.
+    ///    name from <see cref="BrainarrConstants"/>. Applied to BOTH the completion and the
+    ///    streaming request.
     /// 2. Model ids are typically vendor-prefixed (<c>anthropic/claude-3.5-sonnet</c>); the
     ///    legacy mapper passes those through unchanged.
-    /// 3. JSON-mode is gated by the upstream model OpenRouter routes to. The capability
-    ///    flag is set, and Phase 5b honors <see cref="LlmRequest.JsonMode"/> by emitting
-    ///    <c>response_format = {"type":"json_object"}</c>. OpenRouter forwards the parameter
-    ///    to compatible upstream models and silently ignores it for incompatible routes;
-    ///    callers that target very old routes can leave <see cref="LlmRequest.JsonMode"/>
-    ///    at its default (false) to avoid 422 on the rare strict route.
+    /// 3. The health probe uses the fixed cheap test model
+    ///    (<see cref="BrainarrConstants.DefaultOpenRouterTestModelRaw"/>), not the configured
+    ///    model — probing an expensive route on every health check would bill the user.
+    /// 4. <see cref="ParseCompletion"/> surfaces the actually-routed model (top-level
+    ///    <c>model</c> field) via <c>Metadata["routed_model"]</c> for observability when the
+    ///    client requested <c>openrouter/auto</c>.
     /// </para>
     /// </summary>
-    public sealed class BrainarrOpenRouterProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
+    public sealed class BrainarrOpenRouterProvider : BrainarrOpenAiChatProviderBase
     {
         private const string ProviderIdConst = "openrouter";
-
-        private readonly IHttpClient _httpClient;
-        private readonly Logger _logger;
-        private readonly string _apiKey;
-        private readonly StreamingHttpExecutor _streamingExecutor;
-        private readonly LlmAuthCircuit _authCircuit;
-        private string _model;
 
         public BrainarrOpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
             : this(httpClient, logger, apiKey, model, streamingExecutor: null, authCircuit: null)
@@ -64,34 +46,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrOpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
+            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+                   providerId: ProviderIdConst,
+                   defaultModel: BrainarrConstants.DefaultOpenRouterModel,
+                   keyOwnerName: "OpenRouter")
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("OpenRouter API key is required", nameof(apiKey));
-
-            _apiKey = apiKey;
-            _model = ModelIdMapper.ToRawId("openrouter", model ?? BrainarrConstants.DefaultOpenRouterModel);
-            _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
-            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
         }
 
         /// <inheritdoc />
-        public string ProviderId => ProviderIdConst;
+        public override string DisplayName => "OpenRouter";
 
         /// <inheritdoc />
-        public string DisplayName => "OpenRouter";
-
-        /// <inheritdoc />
-        public LlmProviderCapabilities Capabilities => new()
+        public override LlmProviderCapabilities Capabilities => new()
         {
             // OpenRouter exposes an OpenAI-compatible surface; the exact features available
             // depend on the upstream model OpenRouter routes the request to. JsonMode is
             // listed because the gateway accepts the flag for compatible models and silently
-            // ignores it for others — matching legacy behavior. Streaming is wire-supported
-            // (text/event-stream) and decoded by common's OpenAiStreamDecoder, but the host
-            // IHttpClient buffers full responses, so StreamAsync currently returns null
-            // (matches 4a's pattern — see BrainarrOpenAiProvider).
+            // ignores it for others — matching legacy behavior.
             Flags = LlmCapabilityFlags.TextCompletion
                   | LlmCapabilityFlags.Streaming
                   | LlmCapabilityFlags.JsonMode
@@ -102,290 +73,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        public void UpdateModel(string modelName)
+        protected override string ChatCompletionsUrl => BrainarrConstants.OpenRouterChatCompletionsUrl;
+
+        /// <inheritdoc />
+        protected override double DefaultTemperature => 0.8;
+
+        /// <inheritdoc />
+        protected override void AddCompletionRequestHeaders(HttpRequestBuilder builder)
         {
-            if (string.IsNullOrWhiteSpace(modelName)) return;
-            _model = ModelIdMapper.ToRawId("openrouter", modelName);
+            builder
+                .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
+                .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle);
         }
 
         /// <inheritdoc />
-        public async Task<ProviderHealthResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        protected override IReadOnlyList<KeyValuePair<string, string>> BuildStreamingHeaders()
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
+            var headers = new List<KeyValuePair<string, string>>(base.BuildStreamingHeaders())
             {
-                var probe = new
-                {
-                    model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
-                    messages = new[] { new { role = "user", content = "Reply with OK" } },
-                    max_tokens = 5,
-                };
-
-                var response = await SendAsync(probe, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
-                sw.Stop();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    return ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", _model);
-                }
-
-                return ProviderHealthResult.Unhealthy(
-                    $"HTTP {(int)response.StatusCode}",
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model,
-                    errorCode: ((int)response.StatusCode).ToString());
-            }
-            catch (LlmProviderException lpe)
-            {
-                return ProviderHealthResult.Unhealthy(
-                    lpe.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model,
-                    errorCode: lpe.ErrorCode.ToString());
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                return ProviderHealthResult.Unhealthy(
-                    ex.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model);
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
-        {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-
-            using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
-
-            if (_authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))
-            {
-                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
-                    "Auth circuit open: " + circuitReason);
-            }
-
-            LlmResponse result;
-            try
-            {
-                var body = BuildRequestBody(request);
-                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    var ex = LlmErrorMapper.MapHttpError(
-                        ProviderIdConst,
-                        (int)response.StatusCode,
-                        Truncate(response.Content),
-                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                        inner: null);
-
-                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
-                    {
-                        _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, ex);
-                    }
-                    throw ex;
-                }
-
-                result = ParseCompletion(response.Content ?? string.Empty);
-            }
-            catch (AuthenticationException)
-            {
-                throw;
-            }
-            catch (LlmProviderException lpe) when (
-                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
-                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
-            {
-                _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, lpe);
-                throw;
-            }
-
-            _authCircuit.RecordSuccess(ProviderIdConst, _apiKey);
-            return result;
-        }
-
-        /// <inheritdoc />
-        public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
-        {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-            return StreamAsyncCore(request, cancellationToken);
-        }
-
-        private async IAsyncEnumerable<LlmStreamChunk> StreamAsyncCore(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var body = BuildStreamingRequestBody(request);
-            var headers = new[]
-            {
-                new KeyValuePair<string, string>("Authorization", $"Bearer {_apiKey}"),
-                new KeyValuePair<string, string>("Accept", "text/event-stream"),
                 new KeyValuePair<string, string>("HTTP-Referer", BrainarrConstants.ProjectReferer),
                 new KeyValuePair<string, string>("X-Title", BrainarrConstants.OpenRouterTitle),
             };
-
-            var stream = await _streamingExecutor.SendForStreamingAsync(
-                ProviderIdConst,
-                HttpMethod.Post,
-                BrainarrConstants.OpenRouterChatCompletionsUrl,
-                headers,
-                JsonConvert.SerializeObject(body),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            await using (stream)
-            {
-                var decoder = new OpenAiStreamDecoder();
-                await foreach (var chunk in decoder.DecodeAsync(stream, cancellationToken).ConfigureAwait(false))
-                {
-                    yield return chunk;
-                }
-            }
+            return headers;
         }
 
-        private object BuildStreamingRequestBody(LlmRequest request)
+        /// <inheritdoc />
+        protected override object BuildHealthProbeBody()
         {
-            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
-                ? ModelIdMapper.ToRawId("openrouter", request.Model)
-                : _model;
-            object[] messages = string.IsNullOrEmpty(request.SystemPrompt)
-                ? new object[] { new { role = "user", content = request.Prompt } }
-                : new object[]
-                {
-                    new { role = "system", content = request.SystemPrompt },
-                    new { role = "user", content = request.Prompt },
-                };
-            var dict = new Dictionary<string, object?>
-            {
-                ["model"] = modelRaw,
-                ["messages"] = messages,
-                ["temperature"] = (double?)request.Temperature ?? 0.8,
-                ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["stream"] = true,
-            };
-            if (request.JsonMode) dict["response_format"] = new { type = "json_object" };
-            return dict;
-        }
-
-        // ---------------------------------------------------------------------
-        // Private helpers
-        // ---------------------------------------------------------------------
-
-        private object BuildRequestBody(LlmRequest request)
-        {
-            var temp = (double?)request.Temperature ?? 0.8;
-            var maxTokens = request.MaxTokens ?? 2000;
-            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
-                ? ModelIdMapper.ToRawId("openrouter", request.Model)
-                : _model;
-
-            // Phase 5b: honor LlmRequest.JsonMode by emitting OpenAI-compat
-            // response_format={"type":"json_object"}. OpenRouter brokers the flag to
-            // compatible upstream models and ignores it on incompatible routes.
-            object? responseFormat = request.JsonMode ? new { type = "json_object" } : null;
-
-            if (!string.IsNullOrEmpty(request.SystemPrompt))
-            {
-                if (responseFormat != null)
-                {
-                    return new
-                    {
-                        model = modelRaw,
-                        messages = new[]
-                        {
-                            new { role = "system", content = request.SystemPrompt },
-                            new { role = "user", content = request.Prompt },
-                        },
-                        temperature = temp,
-                        max_tokens = maxTokens,
-                        stream = false,
-                        response_format = responseFormat,
-                    };
-                }
-
-                return new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = request.SystemPrompt },
-                        new { role = "user", content = request.Prompt },
-                    },
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
-                };
-            }
-
-            if (responseFormat != null)
-            {
-                return new
-                {
-                    model = modelRaw,
-                    messages = new[] { new { role = "user", content = request.Prompt } },
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
-                    response_format = responseFormat,
-                };
-            }
-
+            // Probe the fixed cheap test model, NOT the configured one — health checks
+            // must not bill the user's premium route.
             return new
             {
-                model = modelRaw,
-                messages = new[] { new { role = "user", content = request.Prompt } },
-                temperature = temp,
-                max_tokens = maxTokens,
-                stream = false,
+                model = BrainarrConstants.DefaultOpenRouterTestModelRaw,
+                messages = new[] { new { role = "user", content = "Reply with OK" } },
+                max_tokens = 5,
             };
         }
 
-        private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
-        {
-            var request = new HttpRequestBuilder(BrainarrConstants.OpenRouterChatCompletionsUrl)
-                .SetHeader("Authorization", $"Bearer {_apiKey}")
-                .SetHeader("Content-Type", "application/json")
-                .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
-                .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle)
-                .Build();
-
-            request.Method = HttpMethod.Post;
-            request.SetContent(JsonConvert.SerializeObject(body));
-
-            var seconds = useTestTimeout
-                ? BrainarrConstants.TestConnectionTimeout
-                : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-            request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-            try
-            {
-                return await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
-            }
-            catch (HttpException hex) when (hex.Response != null)
-            {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)hex.Response.StatusCode,
-                    Truncate(hex.Response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
-                    hex);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not LlmProviderException)
-            {
-                throw LlmErrorMapper.MapException(ProviderIdConst, ex);
-            }
-        }
-
-        private static LlmResponse ParseCompletion(string content)
+        /// <inheritdoc />
+        protected override LlmResponse ParseCompletion(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -427,13 +153,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
         }
 
-        private static string? Truncate(string? body, int max = 500)
-        {
-            if (string.IsNullOrEmpty(body)) return body;
-            return body.Length <= max ? body : body.Substring(0, max);
-        }
-
-        BrainarrLlmHint? IBrainarrLlmHintSource.GetUserHint(LlmProviderException exception)
+        /// <inheritdoc />
+        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {
