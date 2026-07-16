@@ -148,13 +148,13 @@ namespace Brainarr.Tests.Services
             var retryPolicy = new ExponentialBackoffRetryPolicy(
                 Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance,
                 new RetryPolicyOptions
-            {
-                MaxRetries = 3,
-                InitialDelay = TimeSpan.FromMilliseconds(10),
-                MaxDelay = TimeSpan.FromMilliseconds(100),
-                UseJitter = false,
-                ShouldRetry = Lidarr.Plugin.Common.Utilities.RetryUtilities.IsRetryableException
-            });
+                {
+                    MaxRetries = 3,
+                    InitialDelay = TimeSpan.FromMilliseconds(10),
+                    MaxDelay = TimeSpan.FromMilliseconds(100),
+                    UseJitter = false,
+                    ShouldRetry = Lidarr.Plugin.Common.Utilities.RetryUtilities.IsRetryableException
+                });
             var executionCounts = new Dictionary<string, int>();
             var lockObj = new object();
 

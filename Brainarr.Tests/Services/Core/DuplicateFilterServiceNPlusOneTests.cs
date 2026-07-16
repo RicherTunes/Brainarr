@@ -27,7 +27,7 @@ namespace Brainarr.Tests.Services.Core
 
         private const int ArtistCount = 50;
         private const int AlbumsPerArtist = 40; // 2,000 albums total — large enough that an
-                                                  // O(n) per-album DB round trip would be obviously wrong.
+                                                // O(n) per-album DB round trip would be obviously wrong.
 
         private static (List<Artist> Artists, List<Album> Albums, LazyLoadCounter Counter) BuildLargeLibrary()
         {

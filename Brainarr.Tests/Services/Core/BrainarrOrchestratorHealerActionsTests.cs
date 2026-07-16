@@ -1342,7 +1342,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
-    public void Handler_ShouldRejectClearFindings_WhenScanIsRunning()
+    public async Task Handler_ShouldRejectClearFindings_WhenScanIsRunning()
     {
         var scanRunner = new Mock<ILibraryHealerScanRunner>(MockBehavior.Strict);
         using var entered = new ManualResetEventSlim(false);
@@ -1361,7 +1361,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
         entered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         var clear = handler.Handle("healer/clearfindings", new Dictionary<string, string>());
         release.Set();
-        scan.GetAwaiter().GetResult();
+        await scan;
 
         var json = JsonSerializer.Serialize(clear);
         json.Should().Contain("\"ok\":false");
@@ -1370,7 +1370,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
     }
 
     [Fact]
-    public void Handler_ShouldRejectConcurrentScan()
+    public async Task Handler_ShouldRejectConcurrentScan()
     {
         var scanRunner = new Mock<ILibraryHealerScanRunner>(MockBehavior.Strict);
         using var entered = new ManualResetEventSlim(false);
@@ -1388,7 +1388,7 @@ public sealed class BrainarrOrchestratorHealerActionsTests
         entered.Wait(TimeSpan.FromSeconds(5)).Should().BeTrue();
         var second = handler.Handle("healer/scan", new Dictionary<string, string>());
         release.Set();
-        first.GetAwaiter().GetResult();
+        await first;
 
         var json = JsonSerializer.Serialize(second);
         json.Should().Contain("\"ok\":false");
