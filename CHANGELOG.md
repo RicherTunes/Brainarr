@@ -6,6 +6,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Added (CI — dotnet format gate on the authoritative Gitea pipeline — 2026-07-16, B-208)
+
+- **`dotnet format Brainarr.sln --verify-no-changes --exclude ext/` is now a step in the Gitea `verify` job** (mirrored in the guarded GitHub workflow), closing the gap where the formatting/xUnit-analyzer gate only ever existed on the dead GitHub mirror config. It runs after `verify-local.ps1` so the Docker-extracted Lidarr host assemblies exist (style/analyzer analysis needs a compilable workspace). `ext/` is excluded — the Common submodule is a separate repo with its own CI. Scoping found 10 whitespace violations + 2 analyzer findings in brainarr-owned code (all in tests), fixed in the preceding commit; the submodule's 237 violations are out of scope here.
+
 ### Changed (provider dedup — OpenAI-chat-format providers share one base — 2026-07-16, #46/B-201)
 
 - **The six OpenAI-chat-format cloud providers (OpenAI, DeepSeek, Groq, OpenRouter, Perplexity, Z.AI GLM) now derive from a new `BrainarrOpenAiChatProviderBase`** instead of each carrying a private copy of `BuildRequestBody`/`SendAsync`/`ParseCompletion`/auth-circuit/health-probe/streaming plumbing (~2,100 duplicated lines removed; a contract change no longer has to touch six files). Wire formats are unchanged: request-body field order, headers, temperature/max_tokens defaults, and error mapping are byte-identical, and every shipped pinning test stays green (per-provider `CompleteAsync_UsesBearerAuth_Against…Endpoint`, ZaiGlm `CompleteAsync_SendsTemperature` vs ZaiCoding `CompleteAsync_OmitsTemperature`, Gemini `SuppressHttpError`, Claude-subscription Bearer-OAuth, Codex API-key-only, truncated-array salvage, WarnOnce).
