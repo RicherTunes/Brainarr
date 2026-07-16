@@ -29,6 +29,13 @@ Discover albums with deterministic, local-first AI. Pick a provider (local or cl
 - **Hard exclusions** — `Never again` / strong dislikes are enforced before enrichment and top-up; `exclusions/remove` can undo them without hand-editing history files.
 - **JSON salvage** — `RecommendationJsonParser` extracts valid array elements from truncated provider output, handling both bare arrays and object-wrapped shapes.
 
+### Library Healer (read-only diagnostics)
+
+- **Bounded library scans** — the `healer/scan` action runs a read-only diagnostic batch over Lidarr-managed track files (default 100 files, capped at 500, resumable via `afterTrackFileId`), detecting missing on-disk paths, files whose tag reader reports a missing/zero duration, and readable files missing core tag metadata.
+- **Findings persist with a review workflow** — evidence is stored under Brainarr's plugin AppData directory and served by `healer/getfindings` with an advisory (never auto-executed) treatment plan per finding, triage filters (`workflow`, `risk`, `blockedReason`, `authorized`), and summary counts; `healer/clearfindings` clears Brainarr-owned findings and `healer/getfieldcatalog` describes the output contract's field sensitivity.
+- **Storage-root outage coalescing** — an offline drive/share collapses into one `STORAGE_ROOT_OFFLINE` finding with an `affectedTrackCount` blast radius instead of thousands of per-file findings.
+- **Privacy: local-only** — the healer never calls AI providers or external tooling; paths are redacted to `basename#hash` in both stored findings and action output, and architecture tests block the healing subsystem from referencing any Lidarr mutation API. See the [Library Healer guide](./docs/library-healer.md).
+
 ### Resilience & Performance
 
 - **Circuit breaker** — per-provider auth-failure gates with sliding-window semantics (3 failures in 5 min → latch for 30 min).
@@ -298,6 +305,7 @@ Use these focused guides when you need more than the README overview. Each link 
 | [Performance tuning](./docs/PERFORMANCE_TUNING.md) | Provider benchmarks, KPI targets, and optimization strategies by deployment scenario. |
 | [Security best practices](./docs/SECURITY.md) | API key management, data privacy, network security, and audit guidance. |
 | [API reference](./docs/API_REFERENCE.md) | Plugin action endpoints (test, fetch, observability, review queue). |
+| [Library Healer](./docs/library-healer.md) | Read-only library diagnostics: `healer/*` actions, safety model, path privacy, and milestone scope (A1/A2/A2.5). |
 | [Testing guide](./docs/TESTING_GUIDE.md) | Unit, integration, and E2E test patterns and how to run them. |
 | [Build instructions](./BUILD.md) | Full bootstrap: fetch Lidarr assemblies, build, and package. |
 | [Development guide](./DEVELOPMENT.md) | Local development workflows, debugging, and IDE setup. |

@@ -144,10 +144,10 @@ The plugin's assembly version comes **only** from the repo-root `VERSION` file: 
 
 ## Common helpers in use
 
-- `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:26`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:28`
+- `PluginConfigRoots.Resolve("Brainarr")` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:42`, `Brainarr.Plugin/Services/Support/RecommendationHistory.cs:38`, `Brainarr.Plugin/Services/Support/ReviewActionAuditService.cs:36`
 - **Unused utility surface (no production consumer; kept intentionally, not dead-code to remove):** `Services/Core/ConcurrentCache.cs` (generic LRU+TTL cache — the live recommendation cache is `RecommendationCache`; `ConcurrentCache` is exercised only by its own tests + the quarantined cache stress tests) and `Services/Providers/Shared/FormatPreferenceCache.cs` (file-backed provider-format-preference store — has tests but nothing calls it; structured-JSON is decided by provider capability flags, see the deleted `PreferStructuredJsonForChat`). Both are well-formed/tested generic utilities deliberately retained; don't re-flag them as dead config in audits, and don't cite them as active "in use" examples.
-- `BackendHealthCache` — `Brainarr.Plugin/Services/Providers/Llm/BrainarrOllamaProvider.cs:59`, `Brainarr.Plugin/Services/Providers/Llm/BrainarrLmStudioProvider.cs:64`, `Brainarr.Plugin/Services/ModelDetectionService.cs:41`
-- `JsonFileStore<TKey, TValue>` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:21` (`ReviewItem` store), `Brainarr.Plugin/Services/Support/ReviewActionAuditService.cs:36`
+- `BackendHealthCache` — `Brainarr.Plugin/Services/Providers/Llm/BrainarrOllamaProvider.cs:61-69`, `Brainarr.Plugin/Services/Providers/Llm/BrainarrLmStudioProvider.cs:66-74`, `Brainarr.Plugin/Services/ModelDetectionService.cs:44`
+- `JsonFileStore<TKey, TValue>` — `Brainarr.Plugin/Services/Support/ReviewQueueService.cs:45` (`ReviewItem` store). NOTE: `ReviewActionAuditService` does NOT use `JsonFileStore` (a stale earlier claim here) — its audit log is a hand-rolled bounded append-only JSONL file (`review_action_audit.jsonl`, entry/age/size caps); it adopts Common only for the config root (`PluginConfigRoots.Resolve`, above)
 - `PluginLifecycle` — `Brainarr.Plugin/Hosting/BrainarrModule.cs:65` (`RegisterShutdown` for MetricsCollector + LimiterRegistry), `Brainarr.Plugin/Hosting/BrainarrModule.cs:78` (`Shutdown`)
 - `WarnOnce` — `Brainarr.Plugin/Services/Tokenization/ITokenizer.cs` (tokenizer fallback gate). The `_fallbackWarn` field is **`static`** (process/ALC-wide) on purpose — Lidarr rebuilds `Brainarr`'s per-instance DI `ServiceProvider` (and thus a fresh `ModelTokenizerRegistry`) per operation, so an instance-scoped gate re-fired the "no tokenizer registered" WARN every run. This matches `WarnOnce`'s documented `private static readonly` usage; **do not** revert it to an instance field. Test isolation via `ResetFallbackWarnStateForTests()`.
 - `BoundedConcurrentDictionary<TKey, TValue>` — `Brainarr.Plugin/Services/Resilience/LimiterRegistry.cs:41-45` (5 static dicts capped at `DictCap` = 5120: `_semaphores`, `_throttledSemaphores`, `_overrides`, `_throttleUntil`, `_throttleCaps`), `Brainarr.Plugin/Services/Telemetry/MetricsCollector.cs:25` (`Metrics` capped at `MetricsCap` = 1024). Common v1.15.0 added the richer API surface (indexer setter, `ContainsKey`, `Values`, `IEnumerable<KeyValuePair>`) that lets us drop the hand-rolled `EnforceDictCaps()` / `EnforceMetricsCap()` helpers.
@@ -243,6 +243,34 @@ Cloud-provider users can see real run cost via a `cost/get` UI action backed by 
 - **`exclusions/remove`** — takes `artist` (required) + `album` (optional, matching `review/never`'s param shape) and calls `RecommendationHistory.RemoveDislike`. `RemoveDislike` was changed to **return `bool`** (`true` if an active dislike existed and was deactivated, `false` if there was none) instead of `void` — safe because it had no production callers to break. The action wraps this as `{ ok: true, found: bool }`: removing a non-existent entry is a no-op, never a thrown exception or an `ok:false`/error response — `found:false` is the only signal. Both `RemoveDislike` and `GetExclusions()` run under `RecommendationHistory`'s existing `_lock`, so no new concurrency surface is introduced.
 - **Wiring**: both cases live inline in `BrainarrOrchestrator.HandleAction`'s switch (same mechanism as `review/*`/`healer/*`/`cost/get`); `exclusions/remove` delegates to a small `HandleExclusionsRemove` private method for the artist-required validation + idempotent-removal response shape.
 - **Live enforcement**: Strong/NeverAgain dislikes are deterministic hard exclusions. `RecommendationPipeline` filters them before MBID enrichment (so excluded items do not spend resolver work), `SafetyGateService` repeats the gate before confidence/MBID review-queue routing (so excluded borderline items are not queued), and the pipeline filters top-up/final import-list items as a second safety net because top-up returns already-converted `ImportListItemInfo` values. `RecommendationCoordinator` re-applies the same filter (`RecommendationPipeline.FilterHardExcluded`) to cached results on a cache hit: all the gates above live inside `_pipeline.ProcessAsync`, which a cache hit skips, and neither does the cache key include dislike state nor does `MarkAsDisliked` invalidate the cache — so without the re-filter an artist marked "Never again" after a run was cached kept being re-delivered for the rest of the cache TTL (default 6h). Matching uses `RecommendationHistory.GetKey` normalization (HTML decode, lowercase, whitespace collapse), exact key equality, and both album-specific and artist-level keys; it must not substring/prefix match. Normal dislikes remain prompt-level soft hints, not hard drops. `exclusions/remove` deactivates the stored dislike, and the same recommendation can surface again on the next run.
+
+## Library Healer subsystem (`Services/Healing/` — read-only diagnostics, `healer/*` actions)
+
+The Library Healer (a.k.a. "library doctor") is a **read-only** diagnostic layer for Lidarr-managed track files — it scans for missing on-disk paths, tag-reader symptoms (missing/zero duration), and missing core tag metadata, then persists redacted findings for a review workflow. Full user-facing contract: [`docs/library-healer.md`](docs/library-healer.md). It runs entirely locally: **no AI provider calls, no external tooling, no Lidarr mutations** — architecture tests (`LibraryHealerReadOnlyArchitectureTests`) block the healing subsystem from referencing Lidarr mutation APIs, command-queue actions, or media-file mutation operations.
+
+**Action surface** (dispatched in `BrainarrOrchestrator.HandleAction`, which routes any `healer/`-prefixed action to `LibraryHealerActionHandler.Handle` with boundary error redaction via `SanitizeBoundaryString`; the switch cases live in `LibraryHealerActionHandler`):
+
+- `healer/scan` — one bounded read-only diagnostic batch (default 100 files, cap 500; `artistId`, `afterTrackFileId`, `maxSeconds`; returns `truncated` + `nextAfterTrackFileId` for resume)
+- `healer/getfindings` — recent findings with redacted paths, advisory A2 treatment plans, triage filters (`workflow`/`risk`/`blockedReason`/`authorized`), and summary counts
+- `healer/getfieldcatalog` — static field-sensitivity metadata for the `getfindings` output contract (read-only, no scan)
+- `healer/clearfindings` — clears Brainarr-owned findings
+
+**Key classes** (~24 files under `Brainarr.Plugin/Services/Healing/`):
+
+- `LibraryHealerActionHandler` — the `healer/*` action switch; boundary sanitization of output
+- `LibraryHealerScanRunner` — the bounded, resumable scan (path existence precheck before `IAudioTagService.ReadTags`, budget checks between synchronous host calls)
+- `LibraryHealerClassifier` / `LibraryHealerEvidence` / `LibraryHealerReasonCodes` — classify evidence into `FalsePositive` / `PathInconsistency` / `TagMetadataIssue` / `TagReaderSymptom` / `NeedsHumanReview` with a fixed reason-code vocabulary
+- `LibraryHealerFindingStore` — persists findings under the plugin AppData root (findings survive restarts; the review workflow reads/clears them)
+- `HealerTriageAdvisor` / `HealerTreatmentPlan` / `HealerTriageSummary` — advisory A2 treatment-plan projection (`executionAuthorization.authorized=false` always; plans are evidence for later milestones, never permission to write)
+- `HealerFreshnessEvaluator` / `HealerFreshnessNormalizer` — computes finding freshness at scan time (Lidarr's Size/Modified vs. live fingerprint → current/stale/missing/unknown); persisted values are allowlisted and **fail closed** to `unknown` + human review on anything malformed/hand-edited
+- `HealerStorageRoot` / `StorageRootAvailabilityProbe` — storage-root derivation + bounded health probes; an offline root coalesces per-file findings into ONE `STORAGE_ROOT_OFFLINE` finding with `affectedTrackCount`
+- `PathPrivacy` / `LibraryHealerSensitiveText` / `LibraryHealerTokenRedaction` — the `basename#hash` path redaction + the unified token/metadata redaction predicate, applied at BOTH the store boundary and the action boundary (persisted findings are treated as tainted input on read)
+- `FileFingerprintService` / `LidarrAudioTagSymptomReader` — on-disk fingerprinting + the `ITagLibSymptomReader` seam over Lidarr's tag reader
+- `LibraryHealerFieldSensitivityCatalog` — the static `healer/getfieldcatalog` projection
+
+**DI wiring**: `BrainarrOrchestratorFactory` registers `ILibraryHealerFindingStore`, `ILibraryHealerScanRunner`, and `LibraryHealerActionHandler` as singletons and passes the handler into `BrainarrOrchestrator` (optional ctor param — the orchestrator answers `healer/*` with a "not available" error object when it is absent).
+
+**Invariants when touching this subsystem**: keep it read-only (the architecture tests are the contract); never persist raw paths or raw tag values (booleans + generic field names only); route every new output field through the sensitivity catalog; freshness and any other persisted enum-ish value must fail closed, not `Enum.Parse`.
 
 ## Large-library performance: never read `Album.ArtistId` on host-fetched albums (N+1 lazy-load hazard)
 
@@ -744,16 +772,31 @@ Claude Code will automatically apply the appropriate specialist context based on
 | `LimiterRegistryBoundedTests.Insert_AtCapacity_BoundsAllDicts` (+ sibling `LimiterRegistryMaintenanceTests`) | **Fixed (2026-05-30).** The three classes shared `[Collection("LimiterRegistryBounded")]` but **no `[CollectionDefinition]` existed for that name**, so the collection ran in parallel with everything. `LimiterRegistry`'s `_throttleUntil`/`_overrides` are process-wide statics; other parallel collections mutate them via `ConfigureFromSettings`/`RegisterThrottle`/`ResetForTesting`, racing the test's exact-state assertion (a concurrent insert at cap clear-all-evicts the just-added entry). Passed in isolation, flaked ~1/3 full runs. | Added `LimiterRegistryBoundedCollection.cs` with `[CollectionDefinition("LimiterRegistryBounded", DisableParallelization = true)]` — same mechanism `OrchestratorIntegration` uses — serializing all LimiterRegistry-static-state tests. With the race gone, restored the strong clear-then-insert assertion and added a race-immune bound check via internal `ThrottleEntryCountForTesting`/`DictCapForTesting`. Verified green across 8 consecutive full-suite runs. |
 | `EnhancedConcurrencyTests.RateLimiter_ThunderingHerd_HandlesGracefully` | **Fixed (2026-06-28).** 20 clients × real `Task.Delay` rate-limiting waits (10/sec → max 1.0s per task) blew the 10s `CancellationTokenSource` under full-suite thread-pool starvation → `TaskCanceledException` with 0 failures (hang signature: duration ≈ N×timeout). Root cause: `TokenBucketRateLimiter` used real `Task.Delay(waitTime, ct)`, not fakeable. Common SHA `abd95d4218` fixed the limiter to `Task.Delay(waitTime, _timeProvider, ct)`. | Added `RateLimiter(Logger, TimeProvider)` ctor (passes `TimeProvider` through to `CommonRateLimiter`). Rewrote test to inject `FakeTimeProvider`, assert `PendingDelayCount > 0` before clock advance (proves throttling), advance by 1.5s to release all waits, assert all 20 complete. No real wall-clock dependency. 5/5 repeat runs clean. |
 
-### Quarantined Tests (OOM — crash test host)
+### Quarantined Tests
 
-These stress tests allocate large datasets that exhaust test host memory. They are excluded from default runs via `[Trait("State", "Quarantined")]` but remain discoverable via `--filter "State=Quarantined"`.
+**11 tests carry `[Trait("State", "Quarantined")]`** (verified 2026-07-16). They are excluded from default runs but remain discoverable via `--filter "State=Quarantined"`. Two distinct categories:
+
+**Category 1 — OOM stress tests (3).** Allocate large datasets that exhaust test host memory.
 
 | Test | File | Status |
 |------|------|--------|
-| `Cache_Should_HandleMillionOperations` | SecurityTestSuite.cs | Quarantined (1M iterations, 10K via CI guard) |
-| `Cache_WithVeryLargeData_HandlesMemoryPressure` | CacheAndConcurrencyTests.cs | Quarantined (100×1000 items, 10×100 via CI guard) |
-| `StressTest_MemoryPressure_HandlesGracefully` | EnhancedConcurrencyTests.cs | Quarantined (100 tasks × 1000 items, no CI guard) |
+| `Cache_Should_HandleMillionOperations` | SecurityTestSuite.cs:218 | Quarantined (1M iterations, 10K via CI guard) |
+| `Cache_WithVeryLargeData_HandlesMemoryPressure` | CacheAndConcurrencyTests.cs:114 | Quarantined (100×1000 items, 10×100 via CI guard) |
+| `StressTest_MemoryPressure_HandlesGracefully` | EnhancedConcurrencyTests.cs:463 | Quarantined (100 tasks × 1000 items, no CI guard) |
 
-**Note (2026-05-24)**: `Cache_UnderMemoryPressure_EvictsOldEntries` (`ResourceAndTimeTests.cs`) and `StressTest_ManyRecommendations` (`EndToEndTests.cs`) — previously listed here — are no longer present in the codebase (removed or never written). The 3 above are the current quarantined set.
+**Category 2 — Sandbox (no Common-IPlugin) (8).** All in `Brainarr.Tests/Runtime/PluginSandboxRuntimeTests.cs`. Brainarr is ImportList-only and has no concrete Common-`IPlugin` implementation (see "Plugin Registration" above — `BrainarrInstalledPlugin` satisfies the *host's* `IPlugin`, not Common's), so the TestKit's `PluginSandbox` cannot load the merged DLL ("no concrete IPlugin implementation"). The tests skip deterministically via `CreateSandboxOrSkip` and stay quarantined until a Common-IPlugin adapter lands (or the tests move to plugins that satisfy Common's contract):
 
-**Revival candidates**: The first two CI guards likely make those tests safe to un-quarantine. A future wave should verify by running them on a constrained CI image and dropping the `[Trait("State", "Quarantined")]` if they don't OOM. The third needs a CI guard added (or smaller default sizes) before un-quarantining.
+| Test (all PluginSandboxRuntimeTests.cs) | Line |
+|------|------|
+| `Plugin_Loads_In_Isolated_ALC` | :71 |
+| `Plugin_SettingsProvider_Describe_Returns_All_Fields` | :85 |
+| `Plugin_SettingsProvider_GetDefaults_Returns_Dictionary` | :106 |
+| `Plugin_SettingsProvider_Validate_Works_Through_Merged_DLL` | :123 |
+| `Plugin_SettingsProvider_Apply_Rebuilds_ServiceProvider` | :155 |
+| `Plugin_Dispose_Completes_Without_Error` | :177 |
+| `Plugin_Manifest_Has_Required_Fields` | :190 |
+| `Plugin_Captures_Logs_During_Initialization` | :205 |
+
+**Note (2026-05-24)**: `Cache_UnderMemoryPressure_EvictsOldEntries` (`ResourceAndTimeTests.cs`) and `StressTest_ManyRecommendations` (`EndToEndTests.cs`) — previously listed here — are no longer present in the codebase (removed or never written).
+
+**Revival candidates**: The first two OOM CI guards likely make those tests safe to un-quarantine. A future wave should verify by running them on a constrained CI image and dropping the `[Trait("State", "Quarantined")]` if they don't OOM. The third needs a CI guard added (or smaller default sizes) before un-quarantining. The 8 sandbox tests need a Common-IPlugin adapter, not a resource fix.

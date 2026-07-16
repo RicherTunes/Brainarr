@@ -1,5 +1,7 @@
 # Brainarr Library Healer
 
+> Developer-facing architecture pointers (key classes, DI wiring, invariants) live in [`CLAUDE.md`](../CLAUDE.md) under "Library Healer subsystem"; the README's "Library Healer (read-only diagnostics)" feature section gives the short user-facing summary.
+
 Library Healer is the first read-only milestone of the broader Brainarr Library Doctor track: a conservative diagnostic layer for Lidarr-managed track files. Milestone A1 detects missing on-disk paths, files where Lidarr's own tag reader reports a missing or zero duration, and readable files with missing core tag metadata, then records evidence for review.
 
 ## A1 Scope
