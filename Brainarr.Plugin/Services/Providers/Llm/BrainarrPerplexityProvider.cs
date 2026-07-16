@@ -1,59 +1,46 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Net.Http;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
-using Lidarr.Plugin.Common.Streaming.Decoders;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
-using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
-using Lidarr.Plugin.Common.Observability;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for Perplexity
-    /// (<c>https://api.perplexity.ai/chat/completions</c>).
-    ///
-    /// <para>
-    /// Wave-4b cloud provider. Perplexity speaks the OpenAI Chat Completions wire format
-    /// with a key extension: their online Sonar models surface a <c>citations</c> array
-    /// (top-level or per-choice) listing source URLs that grounded the response.
-    /// </para>
+    /// (<c>https://api.perplexity.ai/chat/completions</c>), built on
+    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks:
-    /// 1. Citations: surfaced via <see cref="LlmResponse.Metadata"/> under the key
-    ///    <c>"citations"</c> as a <c>List&lt;string&gt;</c>. Brainarr's recommendation
-    ///    pipeline ignores them today, but downstream observability/audit can read them.
+    /// 1. Citations: their online Sonar models surface a <c>citations</c> array
+    ///    (top-level or per-choice) listing source URLs that grounded the response —
+    ///    surfaced via <see cref="LlmResponse.Metadata"/> under the key <c>"citations"</c>
+    ///    as a <c>List&lt;string&gt;</c>.
     /// 2. Citation markers like <c>[1]</c>, <c>[12]</c> sometimes appear inline in the
     ///    response content. Stripping is left to <c>RecommendationJsonParser</c>
-    ///    (music-domain), but we strip them defensively here so other consumers receive
-    ///    clean output.
-    /// 3. JSON-mode: not formally supported across all routes. Capability omitted.
+    ///    (music-domain), but we strip them defensively here (both in
+    ///    <see cref="ParseCompletion"/> and per streamed chunk) so other consumers
+    ///    receive clean output.
+    /// 3. JSON-mode: not formally supported across all routes —
+    ///    <see cref="SupportsJsonResponseFormat"/> is false so <c>response_format</c> is
+    ///    never emitted, and the capability flag is omitted.
+    /// 4. The completion request additionally pins <c>Accept: application/json</c>.
     /// </para>
     /// </summary>
-    public sealed class BrainarrPerplexityProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
+    public sealed class BrainarrPerplexityProvider : BrainarrOpenAiChatProviderBase
     {
         private const string ProviderIdConst = "perplexity";
         private const string ApiUrl = "https://api.perplexity.ai/chat/completions";
 
         private static readonly Regex CitationMarkerRegex =
             new("\\[\\d{1,3}\\]", RegexOptions.Compiled);
-
-        private readonly IHttpClient _httpClient;
-        private readonly Logger _logger;
-        private readonly string _apiKey;
-        private readonly StreamingHttpExecutor _streamingExecutor;
-        private readonly LlmAuthCircuit _authCircuit;
-        private string _model;
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string model = null)
             : this(httpClient, logger, apiKey, model, streamingExecutor: null, authCircuit: null)
@@ -66,31 +53,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
+            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+                   providerId: ProviderIdConst,
+                   defaultModel: BrainarrConstants.DefaultPerplexityModel,
+                   keyOwnerName: "Perplexity")
         {
-            _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
-            _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            if (string.IsNullOrWhiteSpace(apiKey))
-                throw new ArgumentException("Perplexity API key is required", nameof(apiKey));
-
-            _apiKey = apiKey;
-            _model = ModelIdMapper.ToRawId("perplexity", model ?? BrainarrConstants.DefaultPerplexityModel);
-            _streamingExecutor = streamingExecutor ?? StreamingHttpExecutor.Shared;
-            _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
         }
 
         /// <inheritdoc />
-        public string ProviderId => ProviderIdConst;
+        public override string DisplayName => "Perplexity";
 
         /// <inheritdoc />
-        public string DisplayName => "Perplexity";
-
-        /// <inheritdoc />
-        public LlmProviderCapabilities Capabilities => new()
+        public override LlmProviderCapabilities Capabilities => new()
         {
             // JsonMode intentionally omitted: Perplexity's response_format support varies
-            // across Sonar variants; the legacy provider already handled this via its
-            // multi-shape attempt loop. Streaming wire-format is OpenAI-compatible but
-            // gated on the IHttpClient buffering issue (matches 4a).
+            // across Sonar variants.
             Flags = LlmCapabilityFlags.TextCompletion
                   | LlmCapabilityFlags.Streaming
                   | LlmCapabilityFlags.SystemPrompt,
@@ -98,263 +75,46 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        public void UpdateModel(string modelName)
+        protected override string ChatCompletionsUrl => ApiUrl;
+
+        /// <inheritdoc />
+        protected override bool SupportsJsonResponseFormat => false;
+
+        /// <inheritdoc />
+        protected override void AddCompletionRequestHeaders(HttpRequestBuilder builder)
         {
-            if (string.IsNullOrWhiteSpace(modelName)) return;
-            _model = ModelIdMapper.ToRawId("perplexity", modelName);
+            builder.SetHeader("Accept", "application/json");
         }
 
         /// <inheritdoc />
-        public async Task<ProviderHealthResult> CheckHealthAsync(CancellationToken cancellationToken = default)
+        protected override object BuildHealthProbeBody()
         {
-            var sw = System.Diagnostics.Stopwatch.StartNew();
-            try
-            {
-                var probe = new
-                {
-                    model = _model,
-                    messages = new[] { new { role = "user", content = "Reply with 'OK'" } },
-                    max_tokens = 10,
-                };
-
-                var response = await SendAsync(probe, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
-                sw.Stop();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
-                {
-                    return ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", _model);
-                }
-
-                return ProviderHealthResult.Unhealthy(
-                    $"HTTP {(int)response.StatusCode}",
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model,
-                    errorCode: ((int)response.StatusCode).ToString());
-            }
-            catch (LlmProviderException lpe)
-            {
-                return ProviderHealthResult.Unhealthy(
-                    lpe.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model,
-                    errorCode: lpe.ErrorCode.ToString());
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                return ProviderHealthResult.Unhealthy(
-                    ex.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "apiKey",
-                    _model);
-            }
-        }
-
-        /// <inheritdoc />
-        public async Task<LlmResponse> CompleteAsync(LlmRequest request, CancellationToken cancellationToken = default)
-        {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-
-            using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
-
-            // Wave-22 auth circuit pre-flight: reject immediately if this key is known-bad.
-            if (_authCircuit.IsOpen(ProviderIdConst, _apiKey, out var circuitReason))
-            {
-                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
-                    "Auth circuit open: " + circuitReason);
-            }
-
-            LlmResponse result;
-            try
-            {
-                var body = BuildRequestBody(request);
-                var response = await SendAsync(body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                    var ex = LlmErrorMapper.MapHttpError(
-                        ProviderIdConst,
-                        (int)response.StatusCode,
-                        Truncate(response.Content),
-                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                        inner: null);
-
-                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
-                    {
-                        _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, ex);
-                    }
-                    throw ex;
-                }
-
-                result = ParseCompletion(response.Content ?? string.Empty);
-            }
-            catch (AuthenticationException)
-            {
-                throw;
-            }
-            catch (LlmProviderException lpe) when (
-                lpe.ErrorCode == LlmErrorCode.AuthenticationFailed ||
-                lpe.ErrorCode == LlmErrorCode.AuthorizationFailed)
-            {
-                _authCircuit.RecordAuthFailure(ProviderIdConst, _apiKey, lpe);
-                throw;
-            }
-
-            _authCircuit.RecordSuccess(ProviderIdConst, _apiKey);
-            return result;
-        }
-
-        /// <inheritdoc />
-        public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
-        {
-            if (request == null) throw new ArgumentNullException(nameof(request));
-            return StreamAsyncCore(request, cancellationToken);
-        }
-
-        private async IAsyncEnumerable<LlmStreamChunk> StreamAsyncCore(LlmRequest request, [System.Runtime.CompilerServices.EnumeratorCancellation] CancellationToken cancellationToken)
-        {
-            var body = BuildStreamingRequestBody(request);
-            var headers = new[]
-            {
-                new KeyValuePair<string, string>("Authorization", $"Bearer {_apiKey}"),
-                new KeyValuePair<string, string>("Accept", "text/event-stream"),
-            };
-
-            var stream = await _streamingExecutor.SendForStreamingAsync(
-                ProviderIdConst,
-                HttpMethod.Post,
-                ApiUrl,
-                headers,
-                JsonConvert.SerializeObject(body),
-                cancellationToken: cancellationToken).ConfigureAwait(false);
-
-            await using (stream)
-            {
-                var decoder = new OpenAiStreamDecoder();
-                await foreach (var chunk in decoder.DecodeAsync(stream, cancellationToken).ConfigureAwait(false))
-                {
-                    // Defensively strip inline citation markers like [1], [12] from streamed deltas
-                    // so consumers see clean output, matching CompleteAsync's behavior.
-                    if (chunk.ContentDelta is { Length: > 0 } delta)
-                    {
-                        var stripped = CitationMarkerRegex.Replace(delta, string.Empty);
-                        if (!ReferenceEquals(stripped, delta))
-                        {
-                            yield return chunk with { ContentDelta = stripped };
-                            continue;
-                        }
-                    }
-                    yield return chunk;
-                }
-            }
-        }
-
-        private object BuildStreamingRequestBody(LlmRequest request)
-        {
-            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
-                ? ModelIdMapper.ToRawId("perplexity", request.Model)
-                : _model;
-            object[] messages = string.IsNullOrEmpty(request.SystemPrompt)
-                ? new object[] { new { role = "user", content = request.Prompt } }
-                : new object[]
-                {
-                    new { role = "system", content = request.SystemPrompt },
-                    new { role = "user", content = request.Prompt },
-                };
-            return new Dictionary<string, object?>
-            {
-                ["model"] = modelRaw,
-                ["messages"] = messages,
-                ["temperature"] = (double?)request.Temperature ?? 0.7,
-                ["max_tokens"] = request.MaxTokens ?? 2000,
-                ["stream"] = true,
-            };
-        }
-
-        // ---------------------------------------------------------------------
-        // Private helpers
-        // ---------------------------------------------------------------------
-
-        private object BuildRequestBody(LlmRequest request)
-        {
-            var temp = (double?)request.Temperature ?? 0.7;
-            var maxTokens = request.MaxTokens ?? 2000;
-            var modelRaw = !string.IsNullOrWhiteSpace(request.Model)
-                ? ModelIdMapper.ToRawId("perplexity", request.Model)
-                : _model;
-
-            if (!string.IsNullOrEmpty(request.SystemPrompt))
-            {
-                return new
-                {
-                    model = modelRaw,
-                    messages = new[]
-                    {
-                        new { role = "system", content = request.SystemPrompt },
-                        new { role = "user", content = request.Prompt },
-                    },
-                    temperature = temp,
-                    max_tokens = maxTokens,
-                    stream = false,
-                };
-            }
-
             return new
             {
-                model = modelRaw,
-                messages = new[] { new { role = "user", content = request.Prompt } },
-                temperature = temp,
-                max_tokens = maxTokens,
-                stream = false,
+                model = CurrentModel,
+                messages = new[] { new { role = "user", content = "Reply with 'OK'" } },
+                max_tokens = 10,
             };
         }
 
-        private async Task<HttpResponse> SendAsync(object body, bool useTestTimeout, CancellationToken cancellationToken)
+        /// <inheritdoc />
+        protected override LlmStreamChunk TransformStreamChunk(LlmStreamChunk chunk)
         {
-            var request = new HttpRequestBuilder(ApiUrl)
-                .SetHeader("Authorization", $"Bearer {_apiKey}")
-                .SetHeader("Content-Type", "application/json")
-                .SetHeader("Accept", "application/json")
-                .Build();
-
-            request.Method = HttpMethod.Post;
-            request.SetContent(JsonConvert.SerializeObject(body));
-
-            var seconds = useTestTimeout
-                ? BrainarrConstants.TestConnectionTimeout
-                : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
-            request.RequestTimeout = TimeSpan.FromSeconds(seconds);
-
-            try
+            // Defensively strip inline citation markers like [1], [12] from streamed deltas
+            // so consumers see clean output, matching CompleteAsync's behavior.
+            if (chunk.ContentDelta is { Length: > 0 } delta)
             {
-                return await HttpProviderClient.ExecuteWithCt(_httpClient, request, cancellationToken).ConfigureAwait(false);
+                var stripped = CitationMarkerRegex.Replace(delta, string.Empty);
+                if (!ReferenceEquals(stripped, delta))
+                {
+                    return chunk with { ContentDelta = stripped };
+                }
             }
-            catch (HttpException hex) when (hex.Response != null)
-            {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)hex.Response.StatusCode,
-                    Truncate(hex.Response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
-                    hex);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception ex) when (ex is not LlmProviderException)
-            {
-                throw LlmErrorMapper.MapException(ProviderIdConst, ex);
-            }
+            return chunk;
         }
 
-        private static LlmResponse ParseCompletion(string content)
+        /// <inheritdoc />
+        protected override LlmResponse ParseCompletion(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -412,13 +172,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             return merged.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private static string? Truncate(string? body, int max = 500)
-        {
-            if (string.IsNullOrEmpty(body)) return body;
-            return body.Length <= max ? body : body.Substring(0, max);
-        }
-
-        BrainarrLlmHint? IBrainarrLlmHintSource.GetUserHint(LlmProviderException exception)
+        /// <inheritdoc />
+        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {
