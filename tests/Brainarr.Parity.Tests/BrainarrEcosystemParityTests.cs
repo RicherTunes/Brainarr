@@ -151,7 +151,13 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void GlobalJson_Exists_Test() { var r = GlobalJson_Exists(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void GlobalJson_SdkVersion_OnNet8_Test() { var r = GlobalJson_SdkVersion_Is8_0_100(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
-    // Wave 6 behavior contracts (opt-in via PluginAssembly override above).
+    // Behavior contracts — the FULL RunBehaviorContractChecks() surface (16 checks), each also
+    // covered by the inherited AllParityChecksPass aggregate. Individual facts are kept so a
+    // regression names the exact failing contract instead of one opaque aggregate failure, and
+    // so brainarr's per-check surface matches the sibling plugins (amazonmusicarr/tidalarr).
+    // Download-client-shaped checks (PathTraversalGuard, StampsRegisteredClientId,
+    // PayloadValidator, DownloadTelemetrySink, CoverArtCompliance) auto-N/A for an
+    // import-list-only plugin — the base returns Success when no host download client exists.
     [Fact] public void Check_UsesCommonFileTokenStore_Test() { var r = Check_UsesCommonFileTokenStore(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_UsesCommonHttpResponseCache_Test() { var r = Check_UsesCommonHttpResponseCache(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_RegistersBridgeDefaults_Test() { var r = Check_RegistersBridgeDefaults(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
@@ -159,6 +165,15 @@ public class BrainarrEcosystemParityTests : EcosystemParityTestBase
     [Fact] public void Check_NoFluentValidation_ErrorsApi_Drift_Test() { var r = Check_NoFluentValidation_ErrorsApi_Drift(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_UsesCommonPluginConfigRoots_Test() { var r = Check_UsesCommonPluginConfigRoots(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
     [Fact] public void Check_SimpleDownloadOrchestratorCoverArtComplianceAdopted_Test() { var r = Check_SimpleDownloadOrchestratorCoverArtComplianceAdopted(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_EnforcesAlbumCompletionPolicy_Test() { var r = Check_EnforcesAlbumCompletionPolicy(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_UsesCommonLyricsEnricher_Test() { var r = Check_UsesCommonLyricsEnricher(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_UsesCommonDiagnosticTypes_Test() { var r = Check_UsesCommonDiagnosticTypes(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_UsesCommonDownloadTelemetrySink_Test() { var r = Check_UsesCommonDownloadTelemetrySink(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_DownloadClientUsesPathTraversalGuard_Test() { var r = Check_DownloadClientUsesPathTraversalGuard(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_DownloadClientStampsRegisteredClientId_Test() { var r = Check_DownloadClientStampsRegisteredClientId(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_DownloadClientUsesCommonPayloadValidator_Test() { var r = Check_DownloadClientUsesCommonPayloadValidator(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_FileClassNameParity_Test() { var r = Check_FileClassNameParity(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
+    [Fact] public void Check_ClaudeMdDocumentsCommonHelpers_Test() { var r = Check_ClaudeMdDocumentsCommonHelpers(); Assert.True(r.Passed, string.Join("; ", r.Errors)); }
 
     #endregion
 }
