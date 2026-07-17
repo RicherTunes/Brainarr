@@ -2,7 +2,7 @@
 # Billing-blocked as of 2026-07; validated to build once Actions billing is restored.
 # Keep in sync with the .gitea copy -- patch both in the same PR.
 #
-# Jobs mirrored : secret-scan, lint, verify
+# Jobs mirrored : secret-scan, lint, dependency-scan, verify
 # Jobs omitted  : none (all brainarr Gitea jobs are portable to GitHub)
 #
 # Translation vs .gitea/workflows/ci.yml:
@@ -68,6 +68,50 @@ jobs:
       - name: Shared plugin lint gates
         shell: pwsh
         run: ./ext/Lidarr.Plugin.Common/scripts/ci/run-plugin-lint-gates.ps1 -RepoPath . -CommonRoot ext/Lidarr.Plugin.Common -Mode ci
+
+  # Dependency-CVE gate: fails when any direct or transitive NuGet package carries a
+  # known vulnerability at High/Critical severity. The script is owned by Common
+  # (audit A-5) and invoked from the pinned submodule. Scoped to the five
+  # brainarr-owned csprojs, NOT Brainarr.sln -- the solution also carries the three
+  # ext/Lidarr.Plugin.Common submodule projects (Lidarr.Plugin.Common,
+  # Lidarr.Plugin.Common.TestKit, Lidarr.Plugin.Abstractions), and Common polices its
+  # own dependencies in its own CI; scanning the sln here would fail brainarr's gate
+  # on a Common-side finding brainarr doesn't own.
+  dependency-scan:
+    if: ${{ github.server_url == 'https://github.com' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      DOTNET_NOLOGO: "true"
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: false
+      - name: Init Common submodule
+        shell: bash
+        run: |
+          set -euo pipefail
+          common_path="ext/Lidarr.Plugin.Common"
+          github_url="https://github.com/RicherTunes/Lidarr.Plugin.Common.git"
+          git submodule set-url -- "$common_path" "$github_url"
+          git submodule update --init -- "$common_path"
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Dependency CVE scan
+        shell: bash
+        run: |
+          set -e
+          for target in \
+            Brainarr.Plugin/Brainarr.Plugin.csproj \
+            Brainarr.Tests/Brainarr.Tests.csproj \
+            tests/Brainarr.Parity.Tests/Brainarr.Parity.Tests.csproj \
+            tests/Brainarr.Providers.OpenAI.Tests/Brainarr.Providers.OpenAI.Tests.csproj \
+            tests/Brainarr.TestKit.Providers/Brainarr.TestKit.Providers.csproj; do
+            echo "Dependency CVE scan: $target"
+            pwsh ext/Lidarr.Plugin.Common/scripts/ci/check-vulnerable-packages.ps1 -Target "$target"
+          done
 
   verify:
     if: ${{ github.server_url == 'https://github.com' }}
