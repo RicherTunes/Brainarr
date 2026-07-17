@@ -1,4 +1,4 @@
-# Brainarr Provider Matrix (v1.6.1)
+# Brainarr Provider Matrix (v1.7.0)
 
 <!-- GENERATED: scripts/sync-provider-matrix.ps1 -->
 <!-- PROVIDER_MATRIX_START -->

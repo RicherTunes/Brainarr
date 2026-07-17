@@ -9,7 +9,7 @@ The canonical docs now live in the repository so we avoid duplicated truth.
 - Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
 - Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
 
-Latest release: **v1.6.1**
+Latest release: **v1.7.0**
 Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch.
 
 ## Built on Lidarr.Plugin.Common

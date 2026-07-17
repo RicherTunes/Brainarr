@@ -6,6 +6,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-07-17
+
 ### Changed (chore — repin Common to `b4b3145` + adopt the dependency-CVE CI gate — 2026-07-16)
 
 - **Repinned `ext/Lidarr.Plugin.Common` to `b4b31455e2773ff3c845be81a0e78b8157f54f0c`** (was `12dd294d`). Brings in: OAuth refresh cancellation-token/timeout hardening, the dependency-CVE gate script + a `System.Security.Cryptography.Xml` 8.0.3 floor in Common, queue-v2 opt-in groundwork, a CLI-framework test lane, and template scaffold parity CI. `TokenDelegatingHandler` and `HostConcurrencyGate` were deleted upstream as dead code — verified zero references in brainarr. `ext-common-sha.txt` sentinel updated in lockstep. The `System.Security.Cryptography.Xml` 8.0.3 floor flows through automatically (Common's own project reference now floors it), refreshing all five brainarr `packages.lock.json` files (`8.0.2` → `8.0.3`) with no brainarr-side floor needed.
