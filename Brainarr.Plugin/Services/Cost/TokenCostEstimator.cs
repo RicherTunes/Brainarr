@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using NLog;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
 {
@@ -79,7 +80,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Cost
         {
             if (!_pricingData.TryGetValue(provider, out var pricing))
             {
-                _logger.Warn($"No pricing data available for provider {provider}");
+                // Deliberately-unpriced providers (e.g. ZaiCoding/ZaiGlm — metered APIs with no
+                // confident public pricing, routed through the honest-unpriced path by design)
+                // hit this branch on EVERY tracked request; live-observed ~29 identical warns/day.
+                // Warn once per provider per process — the unpriced estimate itself is unchanged.
+                _logger.WarnOnceWithEvent(12002, $"pricing:{provider}", $"No pricing data available for provider {provider}");
                 return new CostEstimate
                 {
                     Provider = provider,

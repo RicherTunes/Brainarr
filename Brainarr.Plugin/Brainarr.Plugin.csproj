@@ -90,6 +90,10 @@
 
   <!-- Package dependencies -->
   <ItemGroup>
+    <!-- Direct override of the transitive Crypto.Xml 8.0.3 from the Common submodule floor
+         (2026-07 CVE wave; version comes from Directory.Packages.props). Drop after the
+         Common repin (>= 8.0.4 floor). -->
+    <PackageReference Include="System.Security.Cryptography.Xml" />
     <PackageReference Include="Newtonsoft.Json" />
     <!-- NLog: Use Lidarr's version when available, fallback to package for CI -->
     <PackageReference Include="NLog" Condition="!Exists('$(LidarrPath)\NLog.dll')" />
