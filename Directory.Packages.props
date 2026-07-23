@@ -21,6 +21,14 @@
     <PackageVersion Include="NLog" Version="5.4.0" />
     <!-- System packages needed for compilation - align with lidarr.plugin.common requirements -->
     <PackageVersion Include="System.Security.Cryptography.ProtectedData" Version="9.0.14" />
+    <!-- 2026-07 advisory wave (CVE-2026-50527 / CVE-2026-47304 et al., five High GHSAs):
+         8.0.0-8.0.3 flagged, patched in 8.0.4. Flows transitively from the Common
+         submodule's DataProtection floor; overridden via DIRECT PackageReference in the
+         CVE-gate-scanned projects (NOT CentralPackageTransitivePinningEnabled — enabling
+         that weaponizes older central entries like Microsoft.Extensions.Options 7.0.0
+         into NU1109 downgrades against host-coupled transitive graphs). Drop the
+         references once the Common submodule repin (>= 8.0.4 floor) lands. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="8.0.4" />
     <PackageVersion Include="System.Configuration.ConfigurationManager" Version="10.0.5" />
     <PackageVersion Include="Microsoft.Extensions.Primitives" Version="7.0.0" />
     <PackageVersion Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.2" />

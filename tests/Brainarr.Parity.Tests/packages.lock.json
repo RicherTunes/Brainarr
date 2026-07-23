@@ -321,14 +321,6 @@
         "resolved": "8.0.1",
         "contentHash": "CoCRHFym33aUSf/NtWSVSZa99dkd0Hm7OCZUxORBjRB16LNhIEOf8THPqzIYlvKM0nNDAPTRBa1FxEECrgaxxA=="
       },
-      "System.Security.Cryptography.Xml": {
-        "type": "Transitive",
-        "resolved": "8.0.3",
-        "contentHash": "1cHAWDYwOyyoRy+nxS7/Ro/Zcio6i5yHoIJ6xUA+fU8lNu4yGQgja5dEovAxBVud3RnfwRVWOl0B2vr+9LP/mg==",
-        "dependencies": {
-          "System.Security.Cryptography.Pkcs": "8.0.1"
-        }
-      },
       "System.Text.Json": {
         "type": "Transitive",
         "resolved": "8.0.6",
@@ -398,7 +390,8 @@
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
           "Microsoft.Extensions.DependencyInjection": "[8.0.1, )",
           "Newtonsoft.Json": "[13.0.4, )",
-          "System.Security.Cryptography.ProtectedData": "[9.0.14, )"
+          "System.Security.Cryptography.ProtectedData": "[9.0.14, )",
+          "System.Security.Cryptography.Xml": "[8.0.4, )"
         }
       },
       "lidarr.plugin.common": {
@@ -527,6 +520,15 @@
         "requested": "[9.0.14, )",
         "resolved": "9.0.14",
         "contentHash": "HEhICxFgkdXfL1nbIouV4rz4Vo9X1wqDwyofTZ7FxoEP0Kz+xJawv6UT1lJgLuYy2ZPhZcr+MhCMGsreSV/6IA=="
+      },
+      "System.Security.Cryptography.Xml": {
+        "type": "CentralTransitive",
+        "requested": "[8.0.4, )",
+        "resolved": "8.0.4",
+        "contentHash": "1y+ROEEmEOACrQWqRi37GkGHOThPc31m7vezOySpPE9xXN2nTN6ndLYjylvy42aCtQq4owlYhcqaKpQKMDFKFg==",
+        "dependencies": {
+          "System.Security.Cryptography.Pkcs": "8.0.1"
+        }
       },
       "Xunit.SkippableFact": {
         "type": "CentralTransitive",
