@@ -157,4 +157,84 @@ if (-not (Select-String -Path 'docs/PROVIDER_MATRIX.md' -Pattern "Brainarr Provi
     Fail "docs/PROVIDER_MATRIX.md header not updated for v$pluginVersion"
 }
 
+# ---------------------------------------------------------------------------
+# Wiki link integrity
+#
+# Two failure modes that shipped unnoticed because nothing checked them, and both
+# are invisible in the repo — they only break once the wiki is published:
+#
+#   1. A `HelpLink` in the settings UI ("More info") pointing at a wiki page or
+#      anchor that does not exist. GitHub silently serves the top of the page (or
+#      an empty page), so the user is dropped somewhere unrelated to the field
+#      they clicked from. These links ship compiled into the plugin DLL, so a bad
+#      one can only be fixed by editing the wiki — which is exactly why the wiki
+#      side has to be verified here.
+#   2. A relative `](../docs/...)` link inside wiki-content. The wiki is served
+#      from a different path than the repo, so `../` resolves to a 404. Wiki
+#      pages must use absolute https://github.com/... URLs.
+# ---------------------------------------------------------------------------
+
+function Get-MarkdownAnchors {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    $anchors = New-Object System.Collections.Generic.HashSet[string]
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^#{1,6}\s+(.*)$') {
+            # Mirror GitHub's slug rules: lowercase, drop anything that is not a
+            # word character/space/hyphen, then spaces to hyphens.
+            $slug = $Matches[1].Trim().ToLowerInvariant()
+            $slug = [regex]::Replace($slug, '[^\w\s-]', '')
+            $slug = [regex]::Replace($slug, '\s+', '-')
+            [void]$anchors.Add($slug)
+        }
+    }
+    return $anchors
+}
+
+$anchorCache = @{}
+$linkErrors = New-Object System.Collections.Generic.List[string]
+$wikiLinkPattern = '^https://github\.com/RicherTunes/Brainarr/wiki/([^#]+)(?:#(.+))?$'
+
+foreach ($settingsFile in Get-ChildItem -Path 'Brainarr.Plugin' -Filter '*.cs' -File) {
+    $content = Get-Content -LiteralPath $settingsFile.FullName -Raw
+    foreach ($match in [regex]::Matches($content, 'HelpLink\s*=\s*"([^"]+)"')) {
+        $link = $match.Groups[1].Value
+
+        if ($link -notmatch '^https?://') {
+            $linkErrors.Add("$($settingsFile.Name): HelpLink is not a URL: '$link'")
+            continue
+        }
+        if ($link -notmatch $wikiLinkPattern) { continue }  # external link, not ours to verify
+
+        $page = $Matches[1]
+        $anchor = $Matches[2]
+        $pagePath = Join-Path 'wiki-content' "$page.md"
+
+        if (-not (Test-Path -LiteralPath $pagePath)) {
+            $linkErrors.Add("$($settingsFile.Name): HelpLink targets missing wiki page '$page' ($link)")
+            continue
+        }
+        if ([string]::IsNullOrEmpty($anchor)) { continue }
+
+        if (-not $anchorCache.ContainsKey($pagePath)) {
+            $anchorCache[$pagePath] = Get-MarkdownAnchors -Path $pagePath
+        }
+        if (-not $anchorCache[$pagePath].Contains($anchor)) {
+            $linkErrors.Add("$($settingsFile.Name): HelpLink anchor '#$anchor' not found in $pagePath ($link)")
+        }
+    }
+}
+
+foreach ($wikiFile in Get-ChildItem -Path 'wiki-content' -Filter '*.md' -File) {
+    $content = Get-Content -LiteralPath $wikiFile.FullName -Raw
+    foreach ($match in [regex]::Matches($content, '\]\((\.\.?/[^)]+)\)')) {
+        $linkErrors.Add("wiki-content/$($wikiFile.Name): relative link '$($match.Groups[1].Value)' does not resolve on the published wiki - use an absolute https://github.com/... URL")
+    }
+}
+
+if ($linkErrors.Count -gt 0) {
+    foreach ($linkError in $linkErrors) { Write-Host "  $linkError" -ForegroundColor Red }
+    Fail "Wiki link integrity check failed ($($linkErrors.Count) problem(s))"
+}
+
 Ok "Docs consistency checks passed (version=$pluginVersion, minHostVersion=$pluginMinVersion)"

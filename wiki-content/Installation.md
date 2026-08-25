@@ -7,10 +7,10 @@ Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch.
 
 ## Install via Lidarr UI (recommended)
 
-See [README ▸ Install via Lidarr UI](../README.md#install-via-lidarr-ui-recommended) for the canonical step-by-step walkthrough.
+See [README ▸ Install via Lidarr UI](https://github.com/RicherTunes/Brainarr/blob/main/README.md#install-via-lidarr-ui-recommended) for the canonical step-by-step walkthrough.
 
 ## Manual install from Releases
 
-See [README ▸ Installing from Releases](../README.md#installing-from-releases) for ZIP download paths, Docker/Linux/Windows plugin directories, and the `latest` tag workflow.
+See [README ▸ Installing from Releases](https://github.com/RicherTunes/Brainarr/blob/main/README.md#installing-from-releases) for ZIP download paths, Docker/Linux/Windows plugin directories, and the `latest` tag workflow.
 
-For configuration details (timeouts, providers, planner/cache), see [docs/configuration.md](../docs/configuration.md).
+For configuration details (timeouts, providers, planner/cache), see [docs/configuration.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/configuration.md).

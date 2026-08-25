@@ -6,8 +6,8 @@
 
 Use the repository docs for the authoritative onboarding flow.
 
-1. Complete the [Quickstart](../README.md#quickstart) to install the plugin and run your first discovery.
-2. Read [docs/configuration.md](../docs/configuration.md) for defaults and optional cloud settings.
-3. Keep [docs/upgrade-notes-1.3.0.md](../docs/upgrade-notes-1.3.0.md) handy for team rollouts.
+1. Complete the [Quickstart](https://github.com/RicherTunes/Brainarr/blob/main/README.md#quickstart) to install the plugin and run your first discovery.
+2. Read [docs/configuration.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/configuration.md) for defaults and optional cloud settings.
+3. Keep [docs/upgrade-notes-1.3.0.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/upgrade-notes-1.3.0.md) handy for team rollouts.
 
 Keep this page as a checklist pointing to those canonical docs.
