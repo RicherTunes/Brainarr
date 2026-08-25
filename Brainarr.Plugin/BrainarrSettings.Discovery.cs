@@ -93,7 +93,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
 
         // Request timeout for AI provider calls (seconds)
         [FieldDefinition(26, Label = "AI Request Timeout (s)", Type = FieldType.Number,
-            HelpText = "Timeout for provider requests in seconds. Increase for slow local LLMs.\nNote: For Ollama/LM Studio, Brainarr uses 360s if this is set near default (≤30s).",
+            HelpText = "Timeout for provider requests in seconds. Increase for slow local LLMs.\nRecommended 60-90s for subscription/reasoning models (OpenAI Codex, Z.AI Coding GLM-5.x, Claude Code): they think before answering and a full recommendation list takes ~15s or more, so the 30s default can time out and return nothing.\nNote: For Ollama/LM Studio, Brainarr uses 360s if this is set near default (≤30s).",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Advanced-Settings#timeouts")]
         public int AIRequestTimeoutSeconds { get; set; } = BrainarrConstants.DefaultAITimeout;
 
