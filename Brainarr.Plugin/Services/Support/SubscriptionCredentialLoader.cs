@@ -223,18 +223,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
-                // Check for direct OPENAI_API_KEY first (fallback)
-                if (root.TryGetProperty("OPENAI_API_KEY", out var apiKeyElement))
+                // Check for direct OPENAI_API_KEY first (API-key mode). A ChatGPT-subscription
+                // file leaves this null and carries an OAuth token under tokens.* instead, so a
+                // present, non-empty key here unambiguously selects the Platform chat/completions
+                // path (AuthMode "apikey").
+                if (root.TryGetProperty("OPENAI_API_KEY", out var apiKeyElement) &&
+                    apiKeyElement.ValueKind == JsonValueKind.String)
                 {
                     var apiKey = apiKeyElement.GetString();
                     if (!string.IsNullOrWhiteSpace(apiKey))
                     {
                         Logger.Debug($"Loaded OpenAI Codex API key (key: ***REDACTED***)");
-                        return CredentialResult.Success(apiKey);
+                        return CredentialResult.Success(apiKey, authMode: "apikey");
                     }
                 }
 
-                // Navigate to tokens.access_token
+                // Navigate to tokens.access_token (ChatGPT subscription OAuth mode).
                 if (root.TryGetProperty("tokens", out var tokens))
                 {
                     if (tokens.TryGetProperty("access_token", out var tokenElement))
@@ -246,12 +250,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                                 "OpenAI Codex access_token is empty. Run 'codex auth login' to refresh.");
                         }
 
-                        // Extract expiration info
+                        // Expiration: the real Codex auth.json has NO expires_at field — the
+                        // lifetime lives in the access token's JWT `exp` claim. Honour an explicit
+                        // expires_at if some future/legacy file carries one, else fall back to `exp`.
                         DateTimeOffset? expiresAt = null;
                         if (tokens.TryGetProperty("expires_at", out var expiresAtElement))
                         {
                             expiresAt = EpochExpiry.FromSeconds(expiresAtElement);
                         }
+                        expiresAt ??= CodexJwt.GetExpiry(token);
 
                         // Extract refresh token if available
                         string? refreshToken = null;
@@ -260,8 +267,31 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             refreshToken = refreshElement.GetString();
                         }
 
-                        Logger.Debug($"Loaded OpenAI Codex credentials (token: ***REDACTED***)");
-                        return CredentialResult.Success(token, expiresAt, refreshToken);
+                        // account_id → chatgpt-account-id header. Prefer the explicit field; fall
+                        // back to the token's chatgpt_account_id claim.
+                        string? accountId = null;
+                        if (tokens.TryGetProperty("account_id", out var accElement) &&
+                            accElement.ValueKind == JsonValueKind.String)
+                        {
+                            accountId = accElement.GetString();
+                        }
+                        if (string.IsNullOrWhiteSpace(accountId))
+                        {
+                            accountId = CodexJwt.GetChatGptAccountId(token);
+                        }
+
+                        // auth_mode is informational; the presence of tokens.access_token without a
+                        // usable OPENAI_API_KEY means we're on the ChatGPT backend regardless.
+                        var authMode = "chatgpt";
+                        if (root.TryGetProperty("auth_mode", out var modeElement) &&
+                            modeElement.ValueKind == JsonValueKind.String &&
+                            !string.IsNullOrWhiteSpace(modeElement.GetString()))
+                        {
+                            authMode = modeElement.GetString()!;
+                        }
+
+                        Logger.Debug($"Loaded OpenAI Codex credentials (mode: {authMode}, token: ***REDACTED***)");
+                        return CredentialResult.Success(token, expiresAt, refreshToken, accountId, authMode);
                     }
                 }
 
@@ -292,13 +322,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public DateTimeOffset? ExpiresAt { get; }
         public string? RefreshToken { get; }
 
-        private CredentialResult(bool isSuccess, string? token, string? errorMessage, DateTimeOffset? expiresAt = null, string? refreshToken = null)
+        /// <summary>
+        /// ChatGPT account id (from <c>tokens.account_id</c> or the token's
+        /// <c>chatgpt_account_id</c> claim). Sent as the <c>chatgpt-account-id</c> header on
+        /// Codex ChatGPT-backend calls. Null for API-key mode and for Claude Code credentials.
+        /// </summary>
+        public string? AccountId { get; }
+
+        /// <summary>
+        /// Authentication mode for Codex credentials: <c>"chatgpt"</c> (OAuth subscription →
+        /// ChatGPT backend Responses API) or <c>"apikey"</c> (a raw OPENAI_API_KEY → Platform
+        /// chat/completions). Null for Claude Code credentials, where the distinction doesn't apply.
+        /// </summary>
+        public string? AuthMode { get; }
+
+        private CredentialResult(bool isSuccess, string? token, string? errorMessage, DateTimeOffset? expiresAt = null, string? refreshToken = null, string? accountId = null, string? authMode = null)
         {
             IsSuccess = isSuccess;
             Token = token;
             ErrorMessage = errorMessage;
             ExpiresAt = expiresAt;
             RefreshToken = refreshToken;
+            AccountId = accountId;
+            AuthMode = authMode;
         }
 
         /// <summary>
@@ -320,8 +366,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         /// </summary>
         public bool CanAutoRefresh => !string.IsNullOrEmpty(RefreshToken);
 
-        public static CredentialResult Success(string token, DateTimeOffset? expiresAt = null, string? refreshToken = null)
-            => new(true, token, null, expiresAt, refreshToken);
+        public static CredentialResult Success(string token, DateTimeOffset? expiresAt = null, string? refreshToken = null, string? accountId = null, string? authMode = null)
+            => new(true, token, null, expiresAt, refreshToken, accountId, authMode);
         public static CredentialResult Failure(string errorMessage) => new(false, null, errorMessage);
     }
 }

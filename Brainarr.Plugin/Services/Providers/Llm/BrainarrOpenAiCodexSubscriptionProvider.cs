@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Net.Http.Headers;
 using System.Threading;
 using System.Threading.Tasks;
 using Lidarr.Plugin.Common.Abstractions.Llm;
@@ -17,37 +18,57 @@ using Lidarr.Plugin.Common.Observability;
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
     /// <summary>
-    /// <see cref="ILlmProvider"/> implementation for the OpenAI Chat Completions API authenticated
-    /// via OpenAI Codex CLI subscription tokens.
+    /// <see cref="ILlmProvider"/> for OpenAI Codex authenticated via the ChatGPT subscription
+    /// (the tokens the Codex CLI stores in <c>~/.codex/auth.json</c>).
     ///
     /// <para>
-    /// Wave-4d migration of <c>OpenAICodexSubscriptionProvider</c>. Tokens come from
-    /// <see cref="SubscriptionCredentialLoader.LoadCodexCredentials"/>, which reads
-    /// <c>~/.codex/auth.json</c> (or accepts a direct <c>OPENAI_API_KEY</c> override in the same
-    /// file for legacy setups). The key/token is sent as a bearer header to the public
-    /// Chat Completions endpoint — same wire format as <see cref="BrainarrOpenAiProvider"/>,
-    /// different auth source.
+    /// Two auth modes are supported, chosen from the credential file
+    /// (<see cref="SubscriptionCredentialLoader.LoadCodexCredentials"/>):
     /// </para>
+    /// <list type="bullet">
+    ///   <item><b>chatgpt</b> (default for a subscription login): the OAuth <c>access_token</c> is
+    ///   NOT accepted by the public Platform <c>chat/completions</c> API. Instead this provider POSTs
+    ///   to the ChatGPT backend Responses API (<see cref="BrainarrConstants.OpenAICodexResponsesUrl"/>)
+    ///   with <c>Authorization: Bearer</c> + <c>chatgpt-account-id</c> + <c>OpenAI-Beta</c> +
+    ///   <c>originator</c> headers — exactly what the Codex CLI sends (live-confirmed 2026-08). The
+    ///   backend streams SSE; the buffered stream is reconstructed by <see cref="CodexSseParser"/>.
+    ///   When the access token is expired/rejected we refresh it via
+    ///   <see cref="CodexTokenRefresher"/> (OAuth2 refresh-token grant, written back to auth.json)
+    ///   and retry once.</item>
+    ///   <item><b>apikey</b>: if the file carries a raw <c>OPENAI_API_KEY</c>, we fall back to the
+    ///   standard Platform <c>chat/completions</c> path — same wire format as the OpenAI provider.</item>
+    /// </list>
     ///
     /// <para>
-    /// IMPORTANT (known limitation, audited 2026-05-30): this provider POSTs to the public
-    /// <c>api.openai.com/v1/chat/completions</c> Platform endpoint, which authenticates **API keys**.
-    /// A pure ChatGPT-subscription **OAuth token** (<c>tokens.access_token</c> from
-    /// <c>codex auth login</c>, with no <c>OPENAI_API_KEY</c>) is NOT accepted there — the Codex CLI
-    /// uses a separate ChatGPT backend (Responses API + <c>chatgpt-account-id</c> header) that this
-    /// provider does not yet speak. So today this provider works when <c>~/.codex/auth.json</c>
-    /// contains an <c>OPENAI_API_KEY</c>; pure-OAuth users get a 401 with a hint to add one. Real
-    /// ChatGPT-backend support is queued and needs a Codex subscriber to verify the live protocol.
+    /// The chatgpt path uses a raw <see cref="HttpClient"/> (not Lidarr's IHttpClient) because the
+    /// backend requires a non-Lidarr <c>User-Agent</c>/<c>originator</c>, which the host's
+    /// ManagedHttpDispatcher forbids — same rationale and pattern as <c>BrainarrZaiCodingProvider</c>.
     /// </para>
     /// </summary>
     public sealed class BrainarrOpenAiCodexSubscriptionProvider : ILlmProvider, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "openai-codex-subscription";
 
+        // Shared raw client for the ChatGPT backend. Per-request timeout is enforced with a linked
+        // CancellationTokenSource, so the client timeout is infinite (mirrors BrainarrZaiCodingProvider).
+        private static readonly Lazy<System.Net.Http.HttpClient> SharedRawClient = new(static () =>
+            new System.Net.Http.HttpClient(new SocketsHttpHandler
+            {
+                PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+                PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+            })
+            {
+                Timeout = Timeout.InfiniteTimeSpan,
+            });
+
         private readonly IHttpClient _httpClient;
+        private readonly System.Net.Http.HttpClient _rawClient;
         private readonly Logger _logger;
         private readonly string _credentialsPath;
         private readonly LlmAuthCircuit _authCircuit;
+        private readonly string _userAgent;
+        // Test seam: overrides the live OAuth refresh so provider tests never touch the network.
+        private readonly Func<CancellationToken, Task<CodexRefreshResult>>? _refreshOverride;
         private string _model;
         private string? _credentialError;
 
@@ -66,13 +87,32 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             string? credentialsPath,
             string? model,
             LlmAuthCircuit? authCircuit)
+            : this(httpClient, logger, credentialsPath, model, authCircuit, rawHandler: null, refreshOverride: null)
+        {
+        }
+
+        // Test seam: inject a fake HttpMessageHandler for the ChatGPT-backend calls and a refresh
+        // override, so tests exercise the SSE/error paths without hitting the network.
+        internal BrainarrOpenAiCodexSubscriptionProvider(
+            IHttpClient httpClient,
+            Logger logger,
+            string? credentialsPath,
+            string? model,
+            LlmAuthCircuit? authCircuit,
+            HttpMessageHandler? rawHandler,
+            Func<CancellationToken, Task<CodexRefreshResult>>? refreshOverride)
         {
             _httpClient = httpClient ?? throw new ArgumentNullException(nameof(httpClient));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _credentialsPath = credentialsPath ?? SubscriptionCredentialLoader.GetDefaultCodexPath();
-            _model = string.IsNullOrWhiteSpace(model) ? BrainarrConstants.DefaultOpenAICodexModel : model;
+            _model = NormalizeCodexModel(model);
             _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
+            _userAgent = $"{BrainarrConstants.OpenAICodexOriginator}/{BrainarrConstants.OpenAICodexClientVersion}";
+            _refreshOverride = refreshOverride;
+            _rawClient = rawHandler != null
+                ? new System.Net.Http.HttpClient(rawHandler, disposeHandler: false) { Timeout = Timeout.InfiniteTimeSpan }
+                : SharedRawClient.Value;
 
             var probe = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
             if (!probe.IsSuccess)
@@ -93,18 +133,34 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             Flags = LlmCapabilityFlags.TextCompletion
                   | LlmCapabilityFlags.SystemPrompt
-                  | LlmCapabilityFlags.JsonMode
-                  | LlmCapabilityFlags.ToolCalling
-                  | LlmCapabilityFlags.Vision,
-            // Streaming intentionally unset; the host's IHttpClient buffers full responses.
-            UsesOpenAiCompatibleApi = true,
+                  | LlmCapabilityFlags.JsonMode,
+            // Streaming intentionally unset: the backend streams SSE, but we buffer and reconstruct
+            // the full message rather than surfacing chunks (see StreamAsync).
+            UsesOpenAiCompatibleApi = false,
         };
 
         /// <inheritdoc />
         public void UpdateModel(string modelName)
         {
             if (string.IsNullOrWhiteSpace(modelName)) return;
-            _model = modelName;
+            _model = NormalizeCodexModel(modelName);
+        }
+
+        // The ChatGPT-backend Codex endpoint only accepts its own model slugs (gpt-5.5, gpt-5.6-*).
+        // When the user switches to this provider in the Lidarr UI, the model dropdown can still hold
+        // a stale value from the previously-selected provider (e.g. "GPT41_Mini"/"gpt-4o") because
+        // Lidarr does not refetch the schema on a provider-dropdown change. Sending that stale slug
+        // would 400 ("model not supported"), which fails the connection Test and — since Lidarr blocks
+        // saving an import list whose Test fails — traps the user (they can't save Codex to get the
+        // refreshed dropdown). Normalizing any non-ChatGPT-backend slug to the default lets the Test
+        // pass on first save, after which the dropdown shows the correct models on reopen. A real
+        // Codex slug (starts with "gpt-5") is passed through untouched, so explicit picks still work.
+        private static string NormalizeCodexModel(string? model)
+        {
+            if (string.IsNullOrWhiteSpace(model)) return BrainarrConstants.DefaultOpenAICodexModel;
+            return model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
+                ? model
+                : BrainarrConstants.DefaultOpenAICodexModel;
         }
 
         /// <inheritdoc />
@@ -112,8 +168,8 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             var sw = System.Diagnostics.Stopwatch.StartNew();
 
-            var token = LoadToken(out var hint);
-            if (token == null)
+            var creds = LoadCreds(out var hint);
+            if (creds == null)
             {
                 sw.Stop();
                 return ProviderHealthResult.Unhealthy(
@@ -127,47 +183,35 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             try
             {
-                var probe = new
+                var probeRequest = new LlmRequest
                 {
-                    model = _model,
-                    messages = new[] { new { role = "user", content = "Reply with OK" } },
-                    max_tokens = 5,
+                    Prompt = "Reply with exactly: OK",
+                    SystemPrompt = "You are a helpful assistant.",
+                    MaxTokens = 16,
                 };
 
-                var response = await SendAsync(token, probe, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
-                sw.Stop();
-
-                if (response.StatusCode == System.Net.HttpStatusCode.OK)
+                if (IsChatGptMode(creds))
                 {
-                    return ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "subscription", _model);
+                    var http = await SendResponsesAsync(creds, probeRequest, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                    sw.Stop();
+                    return http.StatusCode == System.Net.HttpStatusCode.OK
+                        ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "subscription", _model)
+                        : ProviderHealthResult.Unhealthy($"HTTP {(int)http.StatusCode}", sw.Elapsed, ProviderIdConst, "subscription", _model, errorCode: ((int)http.StatusCode).ToString());
                 }
 
-                return ProviderHealthResult.Unhealthy(
-                    $"HTTP {(int)response.StatusCode}",
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "subscription",
-                    _model,
-                    errorCode: ((int)response.StatusCode).ToString());
+                var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(probeRequest), useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                sw.Stop();
+                return response.StatusCode == System.Net.HttpStatusCode.OK
+                    ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", _model)
+                    : ProviderHealthResult.Unhealthy($"HTTP {(int)response.StatusCode}", sw.Elapsed, ProviderIdConst, "apiKey", _model, errorCode: ((int)response.StatusCode).ToString());
             }
             catch (LlmProviderException lpe)
             {
-                return ProviderHealthResult.Unhealthy(
-                    lpe.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "subscription",
-                    _model,
-                    errorCode: lpe.ErrorCode.ToString());
+                return ProviderHealthResult.Unhealthy(lpe.Message, sw.Elapsed, ProviderIdConst, "subscription", _model, errorCode: lpe.ErrorCode.ToString());
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return ProviderHealthResult.Unhealthy(
-                    ex.Message,
-                    sw.Elapsed,
-                    ProviderIdConst,
-                    "subscription",
-                    _model);
+                return ProviderHealthResult.Unhealthy(ex.Message, sw.Elapsed, ProviderIdConst, "subscription", _model);
             }
         }
 
@@ -178,49 +222,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             using var _scope = PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
-            // Auth circuit pre-flight keyed by credentials path. Subscription providers can't
-            // hash a fresh API key (the bearer is loaded per-call from disk), so the path —
-            // which uniquely identifies the user's Codex CLI session file — is the next-best
-            // stable identity. SHA-256 hashing inside LlmAuthCircuit.MakeKey still prevents
-            // raw path strings from appearing as dict keys.
+            // Auth circuit pre-flight keyed by credentials path. Subscription providers can't hash a
+            // fresh API key (the bearer is loaded per-call from disk), so the path — which uniquely
+            // identifies the user's Codex CLI session file — is the next-best stable identity.
             if (_authCircuit.IsOpen(ProviderIdConst, _credentialsPath, out var circuitReason))
             {
                 throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
                     "Auth circuit open: " + circuitReason);
             }
 
-            var token = LoadToken(out var hint);
-            if (token == null)
+            var creds = LoadCreds(out var hint);
+            if (creds == null)
             {
-                throw new AuthenticationException(
-                    ProviderIdConst,
-                    LlmErrorCode.AuthenticationFailed,
+                throw new AuthenticationException(ProviderIdConst, LlmErrorCode.AuthenticationFailed,
                     hint ?? "OpenAI Codex credentials not available");
             }
 
             LlmResponse result;
             try
             {
-                var body = BuildRequestBody(request);
-                var response = await SendAsync(token, body, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
-
-                if (response.StatusCode != System.Net.HttpStatusCode.OK)
-                {
-                    var ex = LlmErrorMapper.MapHttpError(
-                        ProviderIdConst,
-                        (int)response.StatusCode,
-                        Truncate(response.Content),
-                        BrainarrHttpResponseHelpers.ParseRetryAfter(response),
-                        inner: null);
-
-                    if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
-                    {
-                        _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, ex);
-                    }
-                    throw ex;
-                }
-
-                result = ParseCompletion(response.Content ?? string.Empty);
+                result = IsChatGptMode(creds)
+                    ? await CompleteViaResponsesAsync(creds, request, cancellationToken).ConfigureAwait(false)
+                    : await CompleteViaChatCompletionsAsync(creds, request, cancellationToken).ConfigureAwait(false);
             }
             catch (AuthenticationException)
             {
@@ -241,30 +264,180 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public IAsyncEnumerable<LlmStreamChunk>? StreamAsync(LlmRequest request, CancellationToken cancellationToken = default)
         {
+            // The backend streams SSE, but we buffer + reconstruct rather than surface chunks.
             return null;
         }
 
         // ---------------------------------------------------------------------
-        // Private helpers
+        // ChatGPT-backend Responses path
         // ---------------------------------------------------------------------
 
-        private string? LoadToken(out string? hint)
+        private async Task<LlmResponse> CompleteViaResponsesAsync(CredentialResult creds, LlmRequest request, CancellationToken cancellationToken)
         {
-            var result = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
-            if (!result.IsSuccess)
+            var http = await SendResponsesAsync(creds, request, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+            // On an auth failure, try one token refresh + retry before giving up. The refresh
+            // rotates ~/.codex/auth.json and hands back a fresh access token.
+            if (http.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
-                _credentialError = result.ErrorMessage;
-                hint = result.ErrorMessage;
-                _logger.Warn($"OpenAI Codex subscription token not available: {result.ErrorMessage}");
+                var refreshed = await TryRefreshAsync(cancellationToken).ConfigureAwait(false);
+                if (refreshed != null)
+                {
+                    http = await SendResponsesAsync(refreshed, request, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            if (http.StatusCode != System.Net.HttpStatusCode.OK)
+            {
+                var ex = LlmErrorMapper.MapHttpError(ProviderIdConst, (int)http.StatusCode, Truncate(http.Content), http.RetryAfter, inner: null);
+                if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                {
+                    _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, ex);
+                }
+                throw ex;
+            }
+
+            var parsed = CodexSseParser.Parse(http.Content);
+            return new LlmResponse
+            {
+                Content = parsed.Text,
+                FinishReason = parsed.FinishReason,
+                Usage = (parsed.InputTokens.HasValue || parsed.OutputTokens.HasValue)
+                    ? new LlmUsage { InputTokens = parsed.InputTokens ?? 0, OutputTokens = parsed.OutputTokens ?? 0 }
+                    : null,
+            };
+        }
+
+        private async Task<HttpCallResult> SendResponsesAsync(CredentialResult creds, LlmRequest request, bool useTestTimeout, CancellationToken cancellationToken)
+        {
+            var body = BuildResponsesBody(request);
+
+            using var req = new HttpRequestMessage(HttpMethod.Post, BrainarrConstants.OpenAICodexResponsesUrl);
+            req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {creds.Token}");
+            if (!string.IsNullOrWhiteSpace(creds.AccountId))
+            {
+                req.Headers.TryAddWithoutValidation("chatgpt-account-id", creds.AccountId);
+            }
+            req.Headers.TryAddWithoutValidation("OpenAI-Beta", "responses=experimental");
+            req.Headers.TryAddWithoutValidation("originator", BrainarrConstants.OpenAICodexOriginator);
+            req.Headers.TryAddWithoutValidation("User-Agent", _userAgent);
+            req.Headers.TryAddWithoutValidation("session_id", Guid.NewGuid().ToString());
+            req.Headers.TryAddWithoutValidation("Accept", "text/event-stream");
+
+            var content = new System.Net.Http.StringContent(JsonConvert.SerializeObject(body), System.Text.Encoding.UTF8);
+            content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+            req.Content = content;
+
+            var seconds = useTestTimeout
+                ? BrainarrConstants.TestConnectionTimeout
+                : TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout);
+
+            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            timeoutCts.CancelAfter(TimeSpan.FromSeconds(seconds));
+
+            try
+            {
+                using var response = await _rawClient
+                    .SendAsync(req, HttpCompletionOption.ResponseContentRead, timeoutCts.Token)
+                    .ConfigureAwait(false);
+
+                var respBody = response.Content != null
+                    ? await response.Content.ReadAsStringAsync(timeoutCts.Token).ConfigureAwait(false)
+                    : string.Empty;
+
+                return new HttpCallResult(response.StatusCode, respBody, LlmErrorMapper.ParseRetryAfterHeader(response.Headers.RetryAfter));
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OperationCanceledException)
+            {
+                throw LlmErrorMapper.MapException(ProviderIdConst,
+                    new TimeoutException($"OpenAI Codex request timed out after {seconds}s. Raise 'AI Request Timeout' in the import list's advanced settings if the model is slow."));
+            }
+            catch (Exception ex) when (ex is not LlmProviderException)
+            {
+                throw LlmErrorMapper.MapException(ProviderIdConst, ex);
+            }
+        }
+
+        private async Task<CredentialResult?> TryRefreshAsync(CancellationToken cancellationToken)
+        {
+            CodexRefreshResult refresh;
+            try
+            {
+                refresh = _refreshOverride != null
+                    ? await _refreshOverride(cancellationToken).ConfigureAwait(false)
+                    : await CodexTokenRefresher.RefreshAsync(_credentialsPath, cancellationToken: cancellationToken).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                _logger.Warn($"OpenAI Codex token refresh threw: {ex.Message}");
                 return null;
             }
 
-            _credentialError = null;
-            hint = null;
-            return result.Token;
+            if (!refresh.IsSuccess)
+            {
+                _logger.Warn($"OpenAI Codex token refresh failed: {refresh.ErrorMessage}");
+                return null;
+            }
+
+            _logger.Info("OpenAI Codex token refreshed; retrying request.");
+            // Reload from disk so we pick up the rotated account_id/expiry alongside the new token.
+            var reloaded = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
+            return reloaded.IsSuccess ? reloaded : null;
         }
 
-        private object BuildRequestBody(LlmRequest request)
+        // Responses API body confirmed working against the ChatGPT backend (2026-08). Minimal shape:
+        // instructions (system), input (messages), stream:true (required), store:false. temperature /
+        // max_output_tokens / reasoning are intentionally omitted — the flagship gpt-5.x models on this
+        // backend answer directly with them unset, and a low output cap can starve the reasoning budget.
+        private object BuildResponsesBody(LlmRequest request)
+        {
+            var model = !string.IsNullOrWhiteSpace(request.Model) ? NormalizeCodexModel(request.Model) : _model;
+            var instructions = string.IsNullOrWhiteSpace(request.SystemPrompt) ? "You are a helpful assistant." : request.SystemPrompt;
+
+            return new
+            {
+                model,
+                instructions,
+                input = new[]
+                {
+                    new
+                    {
+                        type = "message",
+                        role = "user",
+                        content = new[] { new { type = "input_text", text = request.Prompt } },
+                    },
+                },
+                stream = true,
+                store = false,
+            };
+        }
+
+        // ---------------------------------------------------------------------
+        // API-key (Platform chat/completions) fallback path
+        // ---------------------------------------------------------------------
+
+        private async Task<LlmResponse> CompleteViaChatCompletionsAsync(CredentialResult creds, LlmRequest request, CancellationToken cancellationToken)
+        {
+            var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(request), useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+
+            if (response.StatusCode != System.Net.HttpStatusCode.OK)
+            {
+                var ex = LlmErrorMapper.MapHttpError(ProviderIdConst, (int)response.StatusCode, Truncate(response.Content), BrainarrHttpResponseHelpers.ParseRetryAfter(response), inner: null);
+                if (ex.ErrorCode == LlmErrorCode.AuthenticationFailed || ex.ErrorCode == LlmErrorCode.AuthorizationFailed)
+                {
+                    _authCircuit.RecordAuthFailure(ProviderIdConst, _credentialsPath, ex);
+                }
+                throw ex;
+            }
+
+            return ParseChatCompletion(response.Content ?? string.Empty);
+        }
+
+        private object BuildChatCompletionsBody(LlmRequest request)
         {
             var temp = (double?)request.Temperature ?? 0.8;
             var maxTokens = request.MaxTokens ?? 2000;
@@ -296,7 +469,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             };
         }
 
-        private async Task<HttpResponse> SendAsync(string token, object body, bool useTestTimeout, CancellationToken cancellationToken)
+        private async Task<HttpResponse> SendChatCompletionsAsync(string token, object body, bool useTestTimeout, CancellationToken cancellationToken)
         {
             var request = new HttpRequestBuilder(BrainarrConstants.OpenAIChatCompletionsUrl)
                 .SetHeader("Authorization", $"Bearer {token}")
@@ -317,13 +490,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (HttpException hex) when (hex.Response != null)
             {
-                // Phase 5f: plumb Retry-After response header through to LlmProviderException.RetryAfter.
-                throw LlmErrorMapper.MapHttpError(
-                    ProviderIdConst,
-                    (int)hex.Response.StatusCode,
-                    Truncate(hex.Response.Content),
-                    BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response),
-                    hex);
+                throw LlmErrorMapper.MapHttpError(ProviderIdConst, (int)hex.Response.StatusCode, Truncate(hex.Response.Content), BrainarrHttpResponseHelpers.ParseRetryAfter(hex.Response), hex);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -335,7 +502,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
         }
 
-        private static LlmResponse ParseCompletion(string content)
+        private static LlmResponse ParseChatCompletion(string content)
         {
             if (string.IsNullOrWhiteSpace(content))
             {
@@ -353,11 +520,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     Content = text,
                     FinishReason = choice?.FinishReason,
                     Usage = parsed?.Usage != null
-                        ? new LlmUsage
-                        {
-                            InputTokens = parsed.Usage.PromptTokens,
-                            OutputTokens = parsed.Usage.CompletionTokens,
-                        }
+                        ? new LlmUsage { InputTokens = parsed.Usage.PromptTokens, OutputTokens = parsed.Usage.CompletionTokens }
                         : null,
                 };
             }
@@ -365,6 +528,29 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 return new LlmResponse { Content = content };
             }
+        }
+
+        // ---------------------------------------------------------------------
+        // Shared helpers
+        // ---------------------------------------------------------------------
+
+        private static bool IsChatGptMode(CredentialResult creds)
+            => !string.Equals(creds.AuthMode, "apikey", StringComparison.OrdinalIgnoreCase);
+
+        private CredentialResult? LoadCreds(out string? hint)
+        {
+            var result = SubscriptionCredentialLoader.LoadCodexCredentials(_credentialsPath);
+            if (!result.IsSuccess)
+            {
+                _credentialError = result.ErrorMessage;
+                hint = result.ErrorMessage;
+                _logger.Warn($"OpenAI Codex subscription token not available: {result.ErrorMessage}");
+                return null;
+            }
+
+            _credentialError = null;
+            hint = null;
+            return result;
         }
 
         private static string? Truncate(string? body, int max = 500)
@@ -384,11 +570,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             {
                 LlmErrorCode.AuthenticationFailed =>
                     new BrainarrLlmHint(
-                        "OpenAI Codex token rejected. NOTE: ChatGPT subscription (OAuth) tokens from 'codex auth login' are NOT accepted by the OpenAI API endpoint this provider uses — only a Platform API key works. Add an \"OPENAI_API_KEY\" field to ~/.codex/auth.json (or use the OpenAI provider with an API key). If you ARE using an API key, it may have expired or been revoked.",
+                        "OpenAI Codex token rejected. Run 'codex auth login' on the host to re-authenticate; the plugin auto-refreshes the token while the refresh_token stays valid.",
                         BrainarrConstants.DocsOpenAIInvalidKey),
                 LlmErrorCode.QuotaExceeded =>
                     new BrainarrLlmHint(
-                        "OpenAI subscription quota exhausted. Check your subscription status.",
+                        "OpenAI subscription quota exhausted. Check your ChatGPT plan usage.",
                         BrainarrConstants.DocsOpenAIRateLimit),
                 LlmErrorCode.RateLimited =>
                     new BrainarrLlmHint(
@@ -396,13 +582,27 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                         BrainarrConstants.DocsOpenAIRateLimit),
                 LlmErrorCode.ModelNotFound =>
                     new BrainarrLlmHint(
-                        $"Model '{_model}' not available with your subscription. Try 'gpt-4o' or 'gpt-4o-mini'.",
+                        $"Model '{_model}' is not available for your ChatGPT plan via Codex. Try 'gpt-5.6-terra' or 'gpt-5.6-luna'.",
                         BrainarrConstants.DocsOpenAIInvalidKey),
                 _ => null,
             };
         }
 
-        // -- DTOs -------------------------------------------------------------
+        // -- helpers / DTOs ---------------------------------------------------
+        private readonly struct HttpCallResult
+        {
+            public HttpCallResult(System.Net.HttpStatusCode statusCode, string content, TimeSpan? retryAfter)
+            {
+                StatusCode = statusCode;
+                Content = content;
+                RetryAfter = retryAfter;
+            }
+
+            public System.Net.HttpStatusCode StatusCode { get; }
+            public string Content { get; }
+            public TimeSpan? RetryAfter { get; }
+        }
+
         private sealed class OpenAiChatCompletionDto
         {
             [JsonProperty("choices")]
