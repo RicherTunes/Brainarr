@@ -240,7 +240,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         // Observability (hidden preview)
         [FieldDefinition(16, Label = "Observability (Preview)", Type = FieldType.TagSelect, Advanced = true,
                     HelpText = "Compact preview of provider/model latency, errors and throttles.",
-                    HelpLink = "observability/html",
+                    HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Observability-and-Metrics",
                     Placeholder = "provider:model — p95, errors, 429 (last 15m)",
                     Section = "Observability",
                     SelectOptionsProviderAction = "observability/getoptions")]

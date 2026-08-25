@@ -8,13 +8,13 @@
 
 ## 1. Pick your starting point
 
-- Review the generated matrix in [README ▸ Provider status](../README.md#provider-status) or `docs/PROVIDER_MATRIX.md` for verification state and notes.
+- Review the generated matrix in [README ▸ Provider status](https://github.com/RicherTunes/Brainarr/blob/main/README.md#provider-status) or `docs/PROVIDER_MATRIX.md` for verification state and notes.
 - Use [Provider Basics](Provider-Basics.md) for quick comparisons (privacy, cost, speed).
 
 ## 2. Follow the dedicated guides
 
 - **Local-first setup:** [Local Providers](Local-Providers.md) covers Ollama, LM Studio, hardware tips, and smoke tests.
-- **Subscription providers:** Use your existing Claude Code or OpenAI Codex CLI credentials without separate API keys. See [docs/configuration.md](../docs/configuration.md#subscription-providers) for setup.
+- **Subscription providers:** Use your existing Claude Code or OpenAI Codex CLI credentials without separate API keys. See [docs/configuration.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/configuration.md#subscription-providers) for setup.
 - **Cloud & gateway setup:** [Cloud Providers](Cloud-Providers.md) walks through API key creation, rate limits, and model selection for OpenAI, Anthropic, Gemini, DeepSeek, Groq, Perplexity, and OpenRouter.
 - **Fallback chains & failover:** See [Cloud Providers ▸ Multi-Provider Strategy](Cloud-Providers.md#multi-provider-strategy) for configuring priority lists and automatic failover.
 

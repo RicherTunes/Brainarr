@@ -365,7 +365,7 @@ Brainarr is built on [Lidarr.Plugin.Common](https://github.com/RicherTunes/Lidar
 | Z.AI GLM | Cloud | ✅ Verified in v1.6.0 | OpenAI-compatible PaaS endpoint |
 | Claude Code CLI | CLI | ✅ Verified in v1.6.1 | Shells out to local `claude` CLI binary |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
-| OpenAI Codex | Subscription | ✅ Verified (ChatGPT subscription, 2026-08) | ChatGPT backend Responses API via local Codex CLI credentials (~/.codex/auth.json); auto-refreshes the token. Needs AI Request Timeout raised to 60s+ |
+| OpenAI Codex | Subscription | ✅ Verified in v1.6.1 | ChatGPT backend Responses API via local Codex CLI credentials (~/.codex/auth.json); auto-refreshes the token. Raise AI Request Timeout to 60s+ |
 | Z.AI Coding | Subscription | ✅ Verified in v1.6.0 | Anthropic-compatible Coding Plan endpoint |
 <!-- PROVIDER_MATRIX_END -->
 

@@ -15,7 +15,7 @@
 | Advanced defaults | `Brainarr.Plugin/BrainarrSettings.cs`, planner/renderer tests | (manual doc updates) |
 | Operations guidance | `docs/USER_SETUP_GUIDE.md`, `wiki-content/Operations.md` | (manual) |
 
-Refer back to [docs/DOCS_STRATEGY.md](../docs/DOCS_STRATEGY.md) for the canonical mapping.
+Refer back to [docs/DOCS_STRATEGY.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/DOCS_STRATEGY.md) for the canonical mapping.
 
 ## 2. Local workflow
 
@@ -56,6 +56,6 @@ Refer back to [docs/DOCS_STRATEGY.md](../docs/DOCS_STRATEGY.md) for the canonica
 
 - Editing generated provider tables by hand (they revert on the next sync).
 - Leaving `[[wiki-style]]` links in markdown—doc lint now fails these.
-- Forgetting to update the README doc map or [docs/DOCS_STRATEGY.md](../docs/DOCS_STRATEGY.md) when adding a new guide.
+- Forgetting to update the README doc map or [docs/DOCS_STRATEGY.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/DOCS_STRATEGY.md) when adding a new guide.
 
 Keeping this workflow handy ensures every contributor—human or agent—follows the same process to maintain documentation quality.
