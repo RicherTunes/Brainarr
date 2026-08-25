@@ -274,6 +274,105 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public async Task CompleteAsync_StaleNonCodexModel_IsCoercedToDefault()
+        {
+            // The Lidarr UI can hold the previously-selected provider's model when switching to Codex
+            // (it doesn't refetch the schema on a provider-dropdown change). Sending it would 400 and
+            // fail the Test, which blocks Save entirely — so it must be coerced.
+            WriteChatGptTokens();
+            var handler = new SequenceHandler((HttpStatusCode.OK, SampleSse("[]")));
+            var provider = CreateChatGptProvider(handler, model: "GPT41_Mini");
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            handler.LastBody.Should().Contain("\"model\":\"gpt-5.6-terra\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_RetiredGpt54Slug_IsCoercedToDefault()
+        {
+            // gpt-5.4 answers 200 today but leaves Codex on 2026-08-31. A "gpt-5" prefix test would
+            // admit it and start 400-ing after that date, so coercion matches the known-good set.
+            WriteChatGptTokens();
+            var handler = new SequenceHandler((HttpStatusCode.OK, SampleSse("[]")));
+            var provider = CreateChatGptProvider(handler, model: "gpt-5.4");
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            handler.LastBody.Should().Contain("\"model\":\"gpt-5.6-terra\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_KnownCodexModel_IsSentUnchanged()
+        {
+            WriteChatGptTokens();
+            var handler = new SequenceHandler((HttpStatusCode.OK, SampleSse("[]")));
+            var provider = CreateChatGptProvider(handler, model: "gpt-5.6-luna");
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            handler.LastBody.Should().Contain("\"model\":\"gpt-5.6-luna\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_StreamReportsFailure_ThrowsInsteadOfEmptySuccess()
+        {
+            // HTTP 200 but the stream itself failed. Returning an empty success here would log
+            // "0 recommendations" with no cause AND record success on the auth circuit.
+            WriteChatGptTokens();
+            var errorSse = string.Join("\n", new[]
+            {
+                "event: response.created",
+                "data: {\"type\":\"response.created\"}",
+                "",
+                "event: response.failed",
+                "data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"message\":\"server had an error\"}}}",
+                "",
+            });
+            var provider = CreateChatGptProvider(new SequenceHandler((HttpStatusCode.OK, errorSse)));
+
+            Func<Task> act = async () => await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+            (await act.Should().ThrowAsync<LlmProviderException>())
+                .Which.Message.Should().Contain("server had an error");
+        }
+
+        [Fact]
+        public async Task CheckHealthAsync_401ThenRefresh_RetriesAndReportsHealthy()
+        {
+            // The access token is a ~10-day JWT. Without a refresh on the health path, a Test taken
+            // after expiry goes red while a sync succeeds — and Lidarr won't save a list whose Test
+            // failed, stranding the user.
+            WriteChatGptTokens();
+            var handler = new SequenceHandler(
+                (HttpStatusCode.Unauthorized, "{\"detail\":\"expired\"}"),
+                (HttpStatusCode.OK, SampleSse("OK")));
+            var refreshed = false;
+            var provider = CreateChatGptProvider(handler, refreshOverride: _ =>
+            {
+                refreshed = true;
+                return Task.FromResult(CodexRefreshResult.Success("tok-new", DateTimeOffset.UtcNow.AddHours(1)));
+            });
+
+            var health = await provider.CheckHealthAsync();
+
+            refreshed.Should().BeTrue();
+            handler.Calls.Should().Be(2);
+            health.IsHealthy.Should().BeTrue();
+        }
+
+        [Fact]
+        public void Capabilities_DoesNotAdvertiseJsonMode()
+        {
+            // The backend rejects text.format=json_object unless the input message contains the word
+            // "json", so we can't guarantee it. Advertising the flag would make the pipeline believe
+            // strict JSON is enforced when nothing enforces it.
+            WriteChatGptTokens();
+            var provider = CreateChatGptProvider(new SequenceHandler((HttpStatusCode.OK, SampleSse())));
+
+            provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.JsonMode).Should().BeFalse();
+        }
+
+        [Fact]
         public async Task CheckHealthAsync_Ok_IsHealthy()
         {
             WriteChatGptTokens();

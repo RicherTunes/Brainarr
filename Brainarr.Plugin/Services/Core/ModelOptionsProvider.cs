@@ -124,20 +124,26 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
 
         internal static object BuildOpenAICodexOptions()
         {
-            // gpt-5.4 / gpt-5.4-mini also answer 200 today but leave Codex on 2026-08-31, so they
-            // are deliberately omitted. gpt-5.3-codex-spark is ChatGPT Pro only. Bare gpt-5.x
-            // (no suffix) and Platform slugs (gpt-4o, o3, ...) are rejected by this backend.
-            var models = new (string Slug, string Name)[]
+            // Slugs come from BrainarrConstants.OpenAICodexModels — the single source of truth shared
+            // with the provider's model coercion, so the dropdown can never offer a slug the provider
+            // would reject (or vice versa). Labels are display-only.
+            var labels = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
             {
-                ("gpt-5.6-terra", "GPT-5.6 Terra (balanced, default)"),
-                ("gpt-5.6-sol", "GPT-5.6 Sol (flagship)"),
-                ("gpt-5.6-luna", "GPT-5.6 Luna (fast & cheap)"),
-                ("gpt-5.5", "GPT-5.5 (previous generation)"),
+                ["gpt-5.6-terra"] = "GPT-5.6 Terra (balanced, default)",
+                ["gpt-5.6-sol"] = "GPT-5.6 Sol (flagship)",
+                ["gpt-5.6-luna"] = "GPT-5.6 Luna (fast & cheap)",
+                ["gpt-5.5"] = "GPT-5.5 (previous generation)",
             };
 
             return new
             {
-                options = models.Select(m => new { value = m.Slug, name = m.Name }).ToList()
+                options = BrainarrConstants.OpenAICodexModels
+                    .Select(slug => new
+                    {
+                        value = slug,
+                        name = labels.TryGetValue(slug, out var label) ? label : FormatModelName(slug)
+                    })
+                    .ToList()
             };
         }
 

@@ -132,8 +132,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         public LlmProviderCapabilities Capabilities => new()
         {
             Flags = LlmCapabilityFlags.TextCompletion
-                  | LlmCapabilityFlags.SystemPrompt
-                  | LlmCapabilityFlags.JsonMode,
+                  | LlmCapabilityFlags.SystemPrompt,
+            // JsonMode intentionally NOT advertised. The Responses API does expose
+            // text.format={type:json_object}, but this backend rejects it with 400 unless the *input
+            // message* itself contains the word "json" (live-confirmed 2026-08) — a prompt-dependent
+            // hard failure we can't guarantee from here. Advertising the flag while dropping it on the
+            // wire is worse: LlmProviderAdapter would set request.JsonMode=true and the pipeline would
+            // believe strict JSON is enforced when nothing enforces it. Without the flag the shared
+            // system-prompt JSON shaping applies, which already yields a clean array from these models.
             // Streaming intentionally unset: the backend streams SSE, but we buffer and reconstruct
             // the full message rather than surfacing chunks (see StreamAsync).
             UsesOpenAiCompatibleApi = false,
@@ -146,21 +152,36 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             _model = NormalizeCodexModel(modelName);
         }
 
-        // The ChatGPT-backend Codex endpoint only accepts its own model slugs (gpt-5.5, gpt-5.6-*).
-        // When the user switches to this provider in the Lidarr UI, the model dropdown can still hold
-        // a stale value from the previously-selected provider (e.g. "GPT41_Mini"/"gpt-4o") because
-        // Lidarr does not refetch the schema on a provider-dropdown change. Sending that stale slug
-        // would 400 ("model not supported"), which fails the connection Test and — since Lidarr blocks
-        // saving an import list whose Test fails — traps the user (they can't save Codex to get the
-        // refreshed dropdown). Normalizing any non-ChatGPT-backend slug to the default lets the Test
-        // pass on first save, after which the dropdown shows the correct models on reopen. A real
-        // Codex slug (starts with "gpt-5") is passed through untouched, so explicit picks still work.
-        private static string NormalizeCodexModel(string? model)
+        // The ChatGPT-backend Codex endpoint only accepts the slugs in
+        // BrainarrConstants.OpenAICodexModels; anything else (Platform ids like gpt-4o/o3, bare
+        // gpt-5.6, the Pro-only spark variant, or the soon-to-be-removed gpt-5.4 family) is rejected
+        // with 400 "model is not supported when using Codex with a ChatGPT account".
+        //
+        // Coercion is load-bearing for the settings UI, not just defensive: when the user switches to
+        // this provider, Lidarr does NOT refetch the schema on a provider-dropdown change, so the model
+        // field still holds the previous provider's value (e.g. "GPT41_Mini"). Sending that 400s, which
+        // fails the connection Test — and Lidarr refuses to save an import list whose Test failed, so
+        // the user can never save Codex to get the refreshed dropdown. Coercing to the default lets the
+        // Test pass on first save; the correct dropdown appears on reopen.
+        //
+        // Matched against the known-good set rather than a "gpt-5" prefix: a prefix test admits
+        // gpt-5.4/gpt-5.4-mini, which start 400-ing when they leave Codex on 2026-08-31.
+        private string NormalizeCodexModel(string? model)
         {
             if (string.IsNullOrWhiteSpace(model)) return BrainarrConstants.DefaultOpenAICodexModel;
-            return model.StartsWith("gpt-5", StringComparison.OrdinalIgnoreCase)
-                ? model
-                : BrainarrConstants.DefaultOpenAICodexModel;
+
+            foreach (var known in BrainarrConstants.OpenAICodexModels)
+            {
+                if (string.Equals(model, known, StringComparison.OrdinalIgnoreCase)) return known;
+            }
+
+            // Log the substitution: silently discarding an explicit pick (a stale dropdown value, a
+            // ManualModelId override, or a newer slug we don't know yet) is otherwise invisible in
+            // support logs and reads as "my model choice is ignored at random".
+            _logger.Warn(
+                $"OpenAI Codex: model '{model}' is not accepted by the ChatGPT backend; using '{BrainarrConstants.DefaultOpenAICodexModel}' instead. " +
+                $"Pick one of: {string.Join(", ", BrainarrConstants.OpenAICodexModels)}.");
+            return BrainarrConstants.DefaultOpenAICodexModel;
         }
 
         /// <inheritdoc />
@@ -192,7 +213,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
                 if (IsChatGptMode(creds))
                 {
-                    var http = await SendResponsesAsync(creds, probeRequest, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                    var http = await SendResponsesWithRefreshAsync(creds, probeRequest, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
                     sw.Stop();
                     return http.StatusCode == System.Net.HttpStatusCode.OK
                         ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "subscription", _model)
@@ -272,20 +293,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         // ChatGPT-backend Responses path
         // ---------------------------------------------------------------------
 
-        private async Task<LlmResponse> CompleteViaResponsesAsync(CredentialResult creds, LlmRequest request, CancellationToken cancellationToken)
+        /// <summary>
+        /// Sends a Responses request and, on an auth failure, refreshes the access token once and
+        /// retries. Shared by <see cref="CompleteAsync"/> and <see cref="CheckHealthAsync"/> so the
+        /// connection Test behaves like a real run: the access token is a ~10-day JWT, so without a
+        /// refresh here a Test taken after expiry goes red while a concurrent sync succeeds — and
+        /// Lidarr refuses to save an import list whose Test failed, stranding the user.
+        /// </summary>
+        private async Task<HttpCallResult> SendResponsesWithRefreshAsync(
+            CredentialResult creds, LlmRequest request, bool useTestTimeout, CancellationToken cancellationToken)
         {
-            var http = await SendResponsesAsync(creds, request, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+            var http = await SendResponsesAsync(creds, request, useTestTimeout, cancellationToken).ConfigureAwait(false);
 
-            // On an auth failure, try one token refresh + retry before giving up. The refresh
-            // rotates ~/.codex/auth.json and hands back a fresh access token.
             if (http.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
             {
                 var refreshed = await TryRefreshAsync(cancellationToken).ConfigureAwait(false);
                 if (refreshed != null)
                 {
-                    http = await SendResponsesAsync(refreshed, request, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+                    http = await SendResponsesAsync(refreshed, request, useTestTimeout, cancellationToken).ConfigureAwait(false);
                 }
             }
+
+            return http;
+        }
+
+        private async Task<LlmResponse> CompleteViaResponsesAsync(CredentialResult creds, LlmRequest request, CancellationToken cancellationToken)
+        {
+            var http = await SendResponsesWithRefreshAsync(creds, request, useTestTimeout: false, cancellationToken).ConfigureAwait(false);
 
             if (http.StatusCode != System.Net.HttpStatusCode.OK)
             {
@@ -298,6 +332,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
 
             var parsed = CodexSseParser.Parse(http.Content);
+
+            // The transport succeeded (HTTP 200) but the stream itself can still report failure —
+            // `response.failed` / `error` events carry a server-side error, content-filter stop, or
+            // quota trip. Surfacing that as an exception matters: returning it as an empty-but-
+            // successful completion would log "Generated 0 validated recommendations" with no cause,
+            // AND would call RecordSuccess on the auth circuit for what may be a credential problem.
+            // Only raise when there is no usable text, so a stream that errored after emitting a
+            // complete answer still returns the answer.
+            if (!string.IsNullOrEmpty(parsed.ErrorDetail) && string.IsNullOrWhiteSpace(parsed.Text))
+            {
+                throw LlmErrorMapper.MapException(ProviderIdConst,
+                    new InvalidOperationException($"OpenAI Codex stream reported an error: {Truncate(parsed.ErrorDetail)}"));
+            }
+
             return new LlmResponse
             {
                 Content = parsed.Text,
@@ -371,6 +419,16 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     ? await _refreshOverride(cancellationToken).ConfigureAwait(false)
                     : await CodexTokenRefresher.RefreshAsync(_credentialsPath, cancellationToken: cancellationToken).ConfigureAwait(false);
             }
+            // A cancelled run must abort the run, not be downgraded to "refresh failed" — otherwise the
+            // caller falls through to mapping the original 401 into an AuthenticationException, which
+            // also records an auth failure against the credential for what was only a cancellation.
+            // The `when` guard is load-bearing: the refresher's OWN 30s HTTP timeout also surfaces as
+            // OperationCanceled while the run token is not cancelled, and that must stay a recoverable
+            // refresh failure. (CLAUDE.md: cancellation must propagate through the whole chain.)
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 _logger.Warn($"OpenAI Codex token refresh threw: {ex.Message}");
@@ -390,9 +448,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         // Responses API body confirmed working against the ChatGPT backend (2026-08). Minimal shape:
-        // instructions (system), input (messages), stream:true (required), store:false. temperature /
-        // max_output_tokens / reasoning are intentionally omitted — the flagship gpt-5.x models on this
-        // backend answer directly with them unset, and a low output cap can starve the reasoning budget.
+        // instructions (system), input (messages), stream:true (REQUIRED — the backend does not answer
+        // without it), store:false.
+        //
+        // IMPORTANT — do NOT add `max_output_tokens` here. Unlike every other provider in this plugin,
+        // this backend REJECTS it outright: 400 {"detail":"Unsupported parameter: max_output_tokens"}
+        // (live-confirmed 2026-08). So request.MaxTokens — the pipeline's timeout-aware output budget —
+        // cannot be honoured on this path and is deliberately dropped; sending it "for consistency with
+        // the other providers" breaks every request. The consequence is that output length is bounded
+        // only by the per-request timeout, so a slow/verbose run hits the linked-CTS deadline with no
+        // body to salvage. The mitigation is the user-facing AI Request Timeout (raise to 60s+ for these
+        // reasoning models), which the timeout error message points at.
+        //
+        // `temperature` and `reasoning` are also omitted: temperature is not part of this contract, and
+        // reasoning effort measurably does not help (12.6s at effort=none vs 14.8s unset for a full
+        // recommendation list — the cost is generation+network, not a reasoning preamble).
         private object BuildResponsesBody(LlmRequest request)
         {
             var model = !string.IsNullOrWhiteSpace(request.Model) ? NormalizeCodexModel(request.Model) : _model;

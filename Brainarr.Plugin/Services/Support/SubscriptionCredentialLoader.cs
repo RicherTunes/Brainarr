@@ -280,14 +280,23 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                             accountId = CodexJwt.GetChatGptAccountId(token);
                         }
 
-                        // auth_mode is informational; the presence of tokens.access_token without a
-                        // usable OPENAI_API_KEY means we're on the ChatGPT backend regardless.
-                        var authMode = "chatgpt";
+                        // Reaching this branch means the only credential we have is an OAuth access
+                        // token (the OPENAI_API_KEY early-return above did not fire), so the mode is
+                        // "chatgpt" — the ChatGPT backend — REGARDLESS of what auth_mode claims.
+                        //
+                        // Do not trust the file's auth_mode here: a file can legitimately carry
+                        // auth_mode:"apikey" with OPENAI_API_KEY:null (the Codex CLI writes that when
+                        // the key comes from the environment). Copying it verbatim would label an OAuth
+                        // token as "apikey", and the provider would then POST it to the Platform
+                        // chat/completions endpoint, which rejects OAuth bearers with 401 on every
+                        // request — the exact day-one bug this rework removed.
+                        const string authMode = "chatgpt";
                         if (root.TryGetProperty("auth_mode", out var modeElement) &&
                             modeElement.ValueKind == JsonValueKind.String &&
-                            !string.IsNullOrWhiteSpace(modeElement.GetString()))
+                            !string.Equals(modeElement.GetString(), authMode, StringComparison.OrdinalIgnoreCase))
                         {
-                            authMode = modeElement.GetString()!;
+                            Logger.Debug(
+                                $"OpenAI Codex auth file declares auth_mode '{modeElement.GetString()}' but carries only an OAuth token; treating it as '{authMode}'.");
                         }
 
                         Logger.Debug($"Loaded OpenAI Codex credentials (mode: {authMode}, token: ***REDACTED***)");
