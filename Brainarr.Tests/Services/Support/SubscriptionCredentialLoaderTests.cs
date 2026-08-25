@@ -365,6 +365,28 @@ namespace Brainarr.Tests.Services.Support
 
         [Fact]
         [Trait("Category", "Unit")]
+        public void LoadCodexCredentials_ApiKeyModeButOnlyOAuthToken_IsTreatedAsChatGpt()
+        {
+            // The Codex CLI writes auth_mode:"apikey" with OPENAI_API_KEY:null when the key comes from
+            // the environment. Trusting that label would route the OAuth bearer to the Platform
+            // chat/completions endpoint, which 401s every request.
+            var authPath = Path.Combine(_tempDir, "auth.json");
+            var json = @"{
+                ""auth_mode"": ""apikey"",
+                ""OPENAI_API_KEY"": null,
+                ""tokens"": { ""access_token"": ""oauth-token"", ""refresh_token"": ""r"", ""account_id"": ""acct-1"" }
+            }";
+            File.WriteAllText(authPath, json);
+
+            var result = SubscriptionCredentialLoader.LoadCodexCredentials(authPath);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Token.Should().Be("oauth-token");
+            result.AuthMode.Should().Be("chatgpt");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
         public void LoadCodexCredentials_NoExpiresAt_DerivesExpiryFromJwtExp()
         {
             // Real Codex auth.json has no expires_at; the lifetime lives in the JWT `exp`. The
