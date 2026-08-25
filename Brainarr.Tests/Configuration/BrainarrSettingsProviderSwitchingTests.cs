@@ -23,7 +23,7 @@ namespace Brainarr.Tests.Configuration
         [InlineData(AIProvider.Anthropic, "https://api.anthropic.com/v1/messages")]
         [InlineData(AIProvider.OpenRouter, "https://openrouter.ai/api/v1/chat/completions")]
         [InlineData(AIProvider.Perplexity, "https://api.perplexity.ai/chat/completions")]
-        [InlineData(AIProvider.OpenAICodexSubscription, "https://api.openai.com/v1/chat/completions")]
+        [InlineData(AIProvider.OpenAICodexSubscription, "https://chatgpt.com/backend-api/codex/responses")]
         public void ConfigurationUrl_CloudProvider_ShowsRealEndpoint_NotNA(AIProvider provider, string expectedEndpoint)
         {
             // F5b: switching to a cloud/subscription provider used to show "N/A - API Key based provider";

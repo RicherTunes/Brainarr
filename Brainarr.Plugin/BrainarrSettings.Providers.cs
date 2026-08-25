@@ -435,7 +435,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// Run 'codex auth login' to generate credentials.
         /// </summary>
         [FieldDefinition(39, Label = "OpenAI Codex Credentials Path", Type = FieldType.Path,
-            HelpText = "Path to your OpenAI Codex auth file. Default: ~/.codex/auth.json\nRun 'codex auth login' in terminal to authenticate. The Test button will validate your credentials.",
+            HelpText = "Path to your OpenAI Codex auth file. Default: ~/.codex/auth.json\nRun 'codex auth login' in terminal to authenticate with your ChatGPT subscription (Plus/Pro). The plugin talks to the ChatGPT backend and auto-refreshes the token; no API key is required. The Test button validates your credentials. Available models depend on your plan (e.g. gpt-5.6-terra/sol/luna on Plus).",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#openai-codex-subscription")]
         public string OpenAICodexCredentialsPath
         {

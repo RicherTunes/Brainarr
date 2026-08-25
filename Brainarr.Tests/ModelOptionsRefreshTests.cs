@@ -99,6 +99,7 @@ namespace Brainarr.Tests
         [InlineData(AIProvider.Groq, "Llama33_70B_Versatile")]
         [InlineData(AIProvider.ZaiGlm, "GLM_5_1")]
         [InlineData(AIProvider.ZaiCoding, "GLM_5_1")]
+        [InlineData(AIProvider.OpenAICodexSubscription, "gpt-5.6-terra")]
         public void StaticProviders_Should_Return_Canonical_Model_Options(AIProvider provider, string expectedValue)
         {
             var providerFactory = new Mock<IProviderFactory>();

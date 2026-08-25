@@ -97,7 +97,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.ZaiGlm => BrainarrConstants.ZaiGlmChatCompletionsUrl,
                 AIProvider.ZaiCoding => BrainarrConstants.ZaiCodingMessagesUrl,
                 AIProvider.ClaudeCodeSubscription => BrainarrConstants.AnthropicMessagesUrl,
-                AIProvider.OpenAICodexSubscription => BrainarrConstants.OpenAIChatCompletionsUrl,
+                AIProvider.OpenAICodexSubscription => BrainarrConstants.OpenAICodexResponsesUrl,
                 AIProvider.ClaudeCodeCli => "Local CLI (claude binary) — no HTTP endpoint",
                 _ => "N/A - API Key based provider"
             };

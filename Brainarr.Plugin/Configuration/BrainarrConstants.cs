@@ -43,7 +43,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Default models (subscription-based providers)
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
-        public const string DefaultOpenAICodexModel = "gpt-4o";
+        // OpenAI Codex via ChatGPT subscription (auth_mode=chatgpt) talks to the ChatGPT
+        // backend Responses API, NOT the Platform API — its model slugs differ from the
+        // sk-key OpenAI provider. gpt-5.6-terra is the balanced default confirmed available
+        // for Plus subscribers (see OpenAICodexResponsesUrl below and ModelOptionsProvider).
+        public const string DefaultOpenAICodexModel = "gpt-5.6-terra";
 
         // OpenRouter: lightweight test model
         public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
@@ -145,6 +149,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
+        // OpenAI Codex ChatGPT-subscription backend. A pure ChatGPT OAuth token (auth_mode=chatgpt,
+        // no OPENAI_API_KEY) is NOT accepted by the Platform chat/completions endpoint above — the
+        // Codex CLI authenticates against this ChatGPT backend, which speaks the Responses API and
+        // requires the chatgpt-account-id + OpenAI-Beta + originator headers. Live-confirmed 2026-08.
+        public const string OpenAICodexResponsesUrl = "https://chatgpt.com/backend-api/codex/responses";
+        // OAuth2 token endpoint + Codex CLI public client id, used to refresh the ChatGPT
+        // subscription access_token from tokens.refresh_token (client id == id_token `aud`).
+        public const string OpenAIOAuthTokenUrl = "https://auth.openai.com/oauth/token";
+        public const string OpenAICodexOAuthClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
+        // Identify as the Codex CLI so the ChatGPT backend admits the request. Sent as the
+        // `originator` header and folded into the User-Agent (codex_cli_rs/<version>). These
+        // are exactly what the CLI sends; the backend rejects Platform-style clients.
+        public const string OpenAICodexOriginator = "codex_cli_rs";
+        public const string OpenAICodexClientVersion = "0.44.0";
         public const string PerplexityChatCompletionsUrl = "https://api.perplexity.ai/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
         public const string GroqChatCompletionsUrl = "https://api.groq.com/openai/v1/chat/completions";

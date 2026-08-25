@@ -324,6 +324,79 @@ namespace Brainarr.Tests.Services.Support
             result.ErrorMessage.Should().Contain("Invalid JSON");
         }
 
+        [Fact]
+        [Trait("Category", "Unit")]
+        public void LoadCodexCredentials_ChatGptMode_ExposesAccountIdAndAuthMode()
+        {
+            var authPath = Path.Combine(_tempDir, "auth.json");
+            var futureExpiry = DateTimeOffset.UtcNow.AddDays(7).ToUnixTimeSeconds();
+            var json = $@"{{
+                ""auth_mode"": ""chatgpt"",
+                ""OPENAI_API_KEY"": null,
+                ""tokens"": {{
+                    ""access_token"": ""oauth-token"",
+                    ""refresh_token"": ""r"",
+                    ""account_id"": ""acct-42"",
+                    ""expires_at"": {futureExpiry}
+                }}
+            }}";
+            File.WriteAllText(authPath, json);
+
+            var result = SubscriptionCredentialLoader.LoadCodexCredentials(authPath);
+
+            result.IsSuccess.Should().BeTrue();
+            result.Token.Should().Be("oauth-token");
+            result.AccountId.Should().Be("acct-42");
+            result.AuthMode.Should().Be("chatgpt");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        public void LoadCodexCredentials_ApiKey_ReportsApiKeyMode()
+        {
+            var authPath = Path.Combine(_tempDir, "auth.json");
+            File.WriteAllText(authPath, @"{ ""OPENAI_API_KEY"": ""sk-key"" }");
+
+            var result = SubscriptionCredentialLoader.LoadCodexCredentials(authPath);
+
+            result.IsSuccess.Should().BeTrue();
+            result.AuthMode.Should().Be("apikey");
+        }
+
+        [Fact]
+        [Trait("Category", "Unit")]
+        public void LoadCodexCredentials_NoExpiresAt_DerivesExpiryFromJwtExp()
+        {
+            // Real Codex auth.json has no expires_at; the lifetime lives in the JWT `exp`. The
+            // loader must recover it so proactive refresh can fire.
+            var futureExp = DateTimeOffset.UtcNow.AddHours(6).ToUnixTimeSeconds();
+            var jwt = MakeJwt($"{{\"exp\":{futureExp},\"https://api.openai.com/auth\":{{\"chatgpt_account_id\":\"acct-jwt\"}}}}");
+            var authPath = Path.Combine(_tempDir, "auth.json");
+            var json = $@"{{
+                ""auth_mode"": ""chatgpt"",
+                ""tokens"": {{ ""access_token"": ""{jwt}"", ""refresh_token"": ""r"" }}
+            }}";
+            File.WriteAllText(authPath, json);
+
+            var result = SubscriptionCredentialLoader.LoadCodexCredentials(authPath);
+
+            result.IsSuccess.Should().BeTrue();
+            result.ExpiresAt.Should().NotBeNull();
+            result.ExpiresAt!.Value.ToUnixTimeSeconds().Should().Be(futureExp);
+            // account_id absent from tokens → falls back to the JWT claim.
+            result.AccountId.Should().Be("acct-jwt");
+        }
+
+        // Builds a syntactically valid (unsigned) JWT with the given JSON payload.
+        private static string MakeJwt(string payloadJson)
+        {
+            static string B64Url(byte[] bytes) =>
+                Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+            var header = B64Url(System.Text.Encoding.UTF8.GetBytes("{\"alg\":\"none\"}"));
+            var payload = B64Url(System.Text.Encoding.UTF8.GetBytes(payloadJson));
+            return $"{header}.{payload}.sig";
+        }
+
         #endregion
 
         #region Mission #30: Path Traversal Guard Tests

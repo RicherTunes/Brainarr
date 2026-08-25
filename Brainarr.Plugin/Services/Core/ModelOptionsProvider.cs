@@ -111,7 +111,33 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Core
                 // "default" sentinel (which Z.AI rejects with [1210]). Both enums share GLM ids.
                 AIProvider.ZaiGlm => BuildEnumOptions<ZaiGlmModelKind>(),
                 AIProvider.ZaiCoding => BuildEnumOptions<ZaiCodingModelKind>(),
+                // Codex via ChatGPT subscription: without this case the model dropdown rendered
+                // EMPTY (no enum was mapped), so users couldn't pick a model. The values are the
+                // ACTUAL backend slugs (with dots) — enum member names can't contain '.'/'-', and
+                // the codex ModelSelection getter passes the stored id through verbatim, so a direct
+                // slug list needs no ModelIdMapper translation. Set restricted to what the ChatGPT
+                // backend accepts for subscription accounts (live-confirmed 2026-08).
+                AIProvider.OpenAICodexSubscription => BuildOpenAICodexOptions(),
                 _ => new { options = Array.Empty<object>() }
+            };
+        }
+
+        internal static object BuildOpenAICodexOptions()
+        {
+            // gpt-5.4 / gpt-5.4-mini also answer 200 today but leave Codex on 2026-08-31, so they
+            // are deliberately omitted. gpt-5.3-codex-spark is ChatGPT Pro only. Bare gpt-5.x
+            // (no suffix) and Platform slugs (gpt-4o, o3, ...) are rejected by this backend.
+            var models = new (string Slug, string Name)[]
+            {
+                ("gpt-5.6-terra", "GPT-5.6 Terra (balanced, default)"),
+                ("gpt-5.6-sol", "GPT-5.6 Sol (flagship)"),
+                ("gpt-5.6-luna", "GPT-5.6 Luna (fast & cheap)"),
+                ("gpt-5.5", "GPT-5.5 (previous generation)"),
+            };
+
+            return new
+            {
+                options = models.Select(m => new { value = m.Slug, name = m.Name }).ToList()
             };
         }
 
