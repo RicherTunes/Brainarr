@@ -438,3 +438,8 @@ Brainarr is an independent, open-source project developed by RicherTunes for **e
 - **Not affiliated with, authorized, or endorsed by Lidarr or any AI provider** (OpenAI, Anthropic, Google, etc.). All trademarks belong to their respective owners.
 - You are responsible for complying with each AI provider's Terms of Service and for any usage costs incurred through your own API keys or subscriptions.
 - Provided **"as is", without warranty of any kind; use at your own risk** (see [LICENSE](LICENSE)). The authors accept no liability for misuse or for any consequences of use.
+
+## Contributing
+
+Run `dotnet test` and ensure lint passes before PR.
+
