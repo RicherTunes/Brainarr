@@ -6,6 +6,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [Unreleased]
 
+### Changed
+
+- Re-pin `ext/Lidarr.Plugin.Common` to `091451c7072527a719a3f9656080cbaa3ef3ef06`; `commonVersion`: `1.18.0-dev` -> `1.18.0`.
+- Adopt shared retry-budget hardening, authoritative package-version evaluation and ZIP identity checks, and one role-aware Docker smoke runner with run-owned cleanup.
+- Enforce the existing warning budget using shared unique-diagnostic accounting; repeated build output is not new debt and unrepresented summary warnings remain charged.
+
 ## [1.7.0] - 2026-07-17
 
 ### Changed (chore — repin Common to `b4b3145` + adopt the dependency-CVE CI gate — 2026-07-16)

@@ -308,7 +308,7 @@
         "type": "Project",
         "dependencies": {
           "CliWrap": "[3.10.1, )",
-          "Lidarr.Plugin.Abstractions": "[1.18.0-dev, )",
+          "Lidarr.Plugin.Abstractions": "[1.18.0, )",
           "Microsoft.AspNetCore.DataProtection": "[8.0.25, )",
           "Microsoft.AspNetCore.DataProtection.Extensions": "[8.0.25, )",
           "Microsoft.Extensions.Caching.Memory": "[8.0.1, )",
@@ -320,7 +320,7 @@
           "Microsoft.Extensions.Logging": "[8.0.1, )",
           "Microsoft.Extensions.Logging.Console": "[8.0.1, )",
           "System.Security.Cryptography.ProtectedData": "[8.0.0, )",
-          "System.Security.Cryptography.Xml": "[8.0.3, )",
+          "System.Security.Cryptography.Xml": "[8.0.4, )",
           "System.Text.Json": "[8.0.6, )",
           "TagLibSharp": "[2.3.0, )"
         }
