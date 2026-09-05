@@ -17,6 +17,9 @@ namespace Brainarr.Tests.Services.Cost
     /// price, while known current models still price correctly and local/free providers
     /// still report a real (not "unknown") $0.
     /// </summary>
+    // These assertions reset/read process-wide history; share the existing
+    // exclusive collection rather than racing unrelated usage-producing tests.
+    [Collection("TokenCostEstimatorStaticHistory")]
     [Trait("Category", "Unit")]
     public class TokenCostEstimatorPricingHonestyTests
     {
