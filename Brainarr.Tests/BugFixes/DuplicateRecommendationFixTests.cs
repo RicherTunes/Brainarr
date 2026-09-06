@@ -1,7 +1,9 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Lidarr.Plugin.Common.Hosting;
 using System.IO;
 using Moq;
 using NLog;
@@ -13,6 +15,7 @@ using NzbDrone.Core.ImportLists.Brainarr.Models;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Styles;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Core;
+using NzbDrone.Core.ImportLists.Brainarr.Services.Enrichment;
 using NzbDrone.Core.Parser.Model;
 using NzbDrone.Core.Music;
 using Xunit;
@@ -23,6 +26,9 @@ namespace Brainarr.Tests.BugFixes
     /// Test for the bug fix where artists were getting duplicated up to 8 times in Lidarr.
     /// The bug was caused by ConvertToImportListItems not deduplicating recommendations.
     /// </summary>
+    // The real workflow uses static registries and a process-wide configuration-root override.
+    // Reuse the existing exclusive fixture rather than racing other orchestrator tests.
+    [Collection("OrchestratorIntegration")]
     [Trait("Category", "BugFix")]
     public class DuplicateRecommendationFixTests
     {
@@ -34,10 +40,22 @@ namespace Brainarr.Tests.BugFixes
         }
 
         [Fact]
+        public void WorkflowFixture_UsesExclusiveOrchestratorStateCollection()
+        {
+            var collection = Assert.Single(typeof(DuplicateRecommendationFixTests).GetCustomAttributesData(),
+                attribute => attribute.AttributeType == typeof(CollectionAttribute));
+            Assert.Equal("OrchestratorIntegration", Assert.Single(collection.ConstructorArguments).Value);
+            var definition = Assert.IsType<CollectionDefinitionAttribute>(Assert.Single(
+                typeof(Brainarr.Tests.Services.Core.OrchestratorIntegrationCollection)
+                    .GetCustomAttributes(typeof(CollectionDefinitionAttribute), false)));
+            Assert.True(definition.DisableParallelization);
+        }
+
+        [Fact]
         public void DeduplicateRecommendations_WithDuplicates_RemovesDuplicates()
         {
             // Arrange - Create service directly
-            var duplicationService = new DuplicationPreventionService(_logger);
+            using var duplicationService = new DuplicationPreventionService(_logger);
 
             // Create recommendations with exact duplicates
             var duplicatedItems = new List<ImportListItemInfo>
@@ -94,7 +112,6 @@ namespace Brainarr.Tests.BugFixes
 
             var styleCatalog = new StyleCatalogService(_logger, httpClient: null);
             var libraryAnalyzer = new LibraryAnalyzer(artistServiceMock.Object, albumServiceMock.Object, styleCatalog, _logger);
-            var originalConfig = LogManager.Configuration;
 
             var providerFactoryMock = new Mock<IProviderFactory>();
             var cache = new RecommendationCache(_logger);
@@ -106,11 +123,13 @@ namespace Brainarr.Tests.BugFixes
 
             var tempAppData = Path.Combine(Path.GetTempPath(), "BrainarrTests", "AppData", Guid.NewGuid().ToString("N"));
             Directory.CreateDirectory(tempAppData);
-            var originalAppData = Environment.GetEnvironmentVariable("APPDATA");
+            var originalConfigRoot = Environment.GetEnvironmentVariable(PluginConfigRoots.OverrideEnvVar);
 
             try
             {
-                Environment.SetEnvironmentVariable("APPDATA", tempAppData);
+                // APPDATA is neither the highest-priority override nor portable to Linux.
+                Environment.SetEnvironmentVariable(PluginConfigRoots.OverrideEnvVar, tempAppData);
+                Assert.Equal(Path.Combine(tempAppData, "Brainarr"), PluginConfigRoots.Resolve("Brainarr"));
 
                 var duplicatedRecommendations = new List<Recommendation>
                 {
@@ -122,8 +141,24 @@ namespace Brainarr.Tests.BugFixes
                 var mockProvider = new Mock<IAIProvider>();
                 mockProvider.Setup(p => p.ProviderName).Returns("TestProvider");
                 mockProvider.Setup(p => p.TestConnectionAsync()).ReturnsAsync(true);
-                mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>()))
+                mockProvider.Setup(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
                            .ReturnsAsync(duplicatedRecommendations);
+
+                // Keep the real pipeline and deduplication, but never resolve synthetic artists
+                // through real MusicBrainz HTTP. The separate enrichment suites own that behavior.
+                var mbidResolver = new Mock<IMusicBrainzResolver>(MockBehavior.Strict);
+                mbidResolver.Setup(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns((List<Recommendation> recs, CancellationToken _) => Task.FromResult(recs.Select(rec => rec with
+                    {
+                        // Synthetic identities belong to this fixture, not the live catalog.
+                        ArtistMusicBrainzId = rec.Artist == "Artist 1"
+                            ? "11111111-1111-4111-8111-111111111111" : "22222222-2222-4222-8222-222222222222",
+                        AlbumMusicBrainzId = rec.Album == "Album 1"
+                            ? "33333333-3333-4333-8333-333333333333" : "44444444-4444-4444-8444-444444444444"
+                    }).ToList()));
+                var artistResolver = new Mock<IArtistMbidResolver>(MockBehavior.Strict);
+                artistResolver.Setup(r => r.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()))
+                    .Returns((List<Recommendation> recs, CancellationToken _) => Task.FromResult(recs));
 
                 providerFactoryMock.Setup(f => f.CreateProvider(It.IsAny<BrainarrSettings>(), It.IsAny<IHttpClient>(), It.IsAny<Logger>()))
                                   .Returns(mockProvider.Object);
@@ -144,7 +179,8 @@ namespace Brainarr.Tests.BugFixes
                 {
                     Provider = AIProvider.OpenAI,
                     OpenAIApiKey = "test-key",
-                    MaxRecommendations = 10
+                    MaxRecommendations = 10,
+                    RequireMbids = true // Keep the production safety gate active, using fixture-owned identities.
                 };
 
                 var duplicateFilter = new DuplicateFilterService(artistServiceMock.Object, albumServiceMock.Object, _logger);
@@ -159,6 +195,8 @@ namespace Brainarr.Tests.BugFixes
                     modelDetectionMock.Object,
                     httpClientMock.Object,
                     duplicationPrevention,
+                    mbidResolver: mbidResolver.Object,
+                    artistResolver: artistResolver.Object,
                     breakerRegistry: PassThroughBreakerRegistry.CreateMock().Object,
                     duplicateFilter: duplicateFilter);
 
@@ -169,11 +207,19 @@ namespace Brainarr.Tests.BugFixes
                 Assert.Equal(2, result.Count);
                 var artists = result.Select(r => r.Artist).Distinct().ToList();
                 Assert.Equal(2, artists.Count);
+                Assert.Contains("Artist 1", artists);
+                Assert.Contains("Artist 2", artists);
+                Assert.Contains(result, item => item.Artist == "Artist 1" && item.Album == "Album 1");
+                Assert.Contains(result, item => item.Artist == "Artist 2" && item.Album == "Album 2");
+                mbidResolver.Verify(r => r.EnrichWithMbidsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                artistResolver.Verify(r => r.EnrichArtistsAsync(It.IsAny<List<Recommendation>>(), It.IsAny<CancellationToken>()), Times.Never());
+                mockProvider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.AtLeastOnce());
+                mockProvider.Verify(p => p.GetRecommendationsAsync(It.IsAny<string>()), Times.Never());
             }
             finally
             {
                 duplicationPrevention.ClearHistory();
-                Environment.SetEnvironmentVariable("APPDATA", originalAppData);
+                Environment.SetEnvironmentVariable(PluginConfigRoots.OverrideEnvVar, originalConfigRoot);
                 try
                 {
                     if (Directory.Exists(tempAppData))
