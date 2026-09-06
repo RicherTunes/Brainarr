@@ -43,7 +43,45 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Default models (subscription-based providers)
         public const string DefaultClaudeCodeModel = "claude-sonnet-4-5-20250514";
-        public const string DefaultOpenAICodexModel = "gpt-4o";
+        // OpenAI Codex via ChatGPT subscription (auth_mode=chatgpt) talks to the ChatGPT
+        // backend Responses API, NOT the Platform API — its model slugs differ from the
+        // sk-key OpenAI provider. gpt-5.6-terra is the balanced default confirmed available
+        // for Plus subscribers (see OpenAICodexResponsesUrl below and ModelOptionsProvider).
+        public const string DefaultOpenAICodexModel = "gpt-5.6-terra";
+
+        /// <summary>
+        /// Default model for the API-KEY (Platform chat/completions) variant of the Codex
+        /// provider. The Platform API rejects the ChatGPT-backend slugs above, so API-key users
+        /// keep the pre-port Platform default instead of being migrated onto a backend id.
+        /// </summary>
+        public const string DefaultOpenAICodexApiModel = "gpt-4o";
+
+        /// <summary>
+        /// The model slugs the ChatGPT-backend Codex endpoint accepts for a subscription account,
+        /// newest-first. Live-confirmed 2026-08 against a Plus account: everything here returns 200,
+        /// while bare <c>gpt-5.6</c>, <c>gpt-5.6-codex</c>, <c>codex-mini-latest</c> and every Platform
+        /// slug (<c>gpt-4o</c>, <c>o3</c>, …) return 400 "model is not supported when using Codex with
+        /// a ChatGPT account". <c>gpt-5.3-codex-spark</c> is ChatGPT Pro only.
+        ///
+        /// <para>
+        /// Deliberately EXCLUDES <c>gpt-5.4</c>/<c>gpt-5.4-mini</c>: they answer 200 today but leave
+        /// Codex on 2026-08-31, so admitting them would start 400-ing after that date.
+        /// </para>
+        ///
+        /// <para>
+        /// This is the single source of truth for both the settings dropdown
+        /// (<c>ModelOptionsProvider</c>) and the provider's model coercion
+        /// (<c>BrainarrOpenAiCodexSubscriptionProvider.NormalizeCodexModel</c>) — keep them from
+        /// drifting by adding new slugs here only.
+        /// </para>
+        /// </summary>
+        public static readonly string[] OpenAICodexModels =
+        {
+            "gpt-5.6-terra",
+            "gpt-5.6-sol",
+            "gpt-5.6-luna",
+            "gpt-5.5",
+        };
 
         // OpenRouter: lightweight test model
         public const string DefaultOpenRouterTestModelRaw = "gpt-4.1-mini";
@@ -145,6 +183,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
 
         // Provider API endpoints
         public const string OpenAIChatCompletionsUrl = "https://api.openai.com/v1/chat/completions";
+        // OpenAI Codex ChatGPT-subscription backend. A pure ChatGPT OAuth token (auth_mode=chatgpt,
+        // no OPENAI_API_KEY) is NOT accepted by the Platform chat/completions endpoint above — the
+        // Codex CLI authenticates against this ChatGPT backend, which speaks the Responses API and
+        // requires the chatgpt-account-id + OpenAI-Beta + originator headers. Live-confirmed 2026-08.
+        public const string OpenAICodexResponsesUrl = "https://chatgpt.com/backend-api/codex/responses";
+        // OAuth2 token endpoint + Codex CLI public client id, used to refresh the ChatGPT
+        // subscription access_token from tokens.refresh_token (client id == id_token `aud`).
+        public const string OpenAIOAuthTokenUrl = "https://auth.openai.com/oauth/token";
+        public const string OpenAICodexOAuthClientId = "app_EMoamEEZ73f0CkXaXp7hrann";
+        // Identify as the Codex CLI so the ChatGPT backend admits the request. Sent as the
+        // `originator` header and folded into the User-Agent (codex_cli_rs/<version>). These
+        // are exactly what the CLI sends; the backend rejects Platform-style clients.
+        public const string OpenAICodexOriginator = "codex_cli_rs";
+        public const string OpenAICodexClientVersion = "0.44.0";
         public const string PerplexityChatCompletionsUrl = "https://api.perplexity.ai/chat/completions";
         public const string OpenRouterChatCompletionsUrl = "https://openrouter.ai/api/v1/chat/completions";
         public const string GroqChatCompletionsUrl = "https://api.groq.com/openai/v1/chat/completions";

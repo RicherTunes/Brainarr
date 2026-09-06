@@ -67,15 +67,30 @@ The plugin reads your OAuth token from the credentials file automatically. Token
 Uses credentials from the OpenAI Codex CLI (`~/.codex/auth.json`):
 
 1. Install Codex CLI: `npm install -g @openai/codex`
-2. Authenticate: `codex auth`
+2. Authenticate: `codex auth login`
 3. Select **OpenAI Codex (Subscription)** as your AI Provider in Brainarr
+4. **Raise *AI Request Timeout* to 60s or more** (advanced settings) — see the note below
+5. Click **Test**, then **Save**
 
-Supports both OAuth tokens and direct API keys stored in the auth file.
+Works with a plain ChatGPT subscription (Plus/Pro) — no API key needed. Brainarr talks to the same
+ChatGPT backend the Codex CLI uses and refreshes the access token automatically (it is only valid for
+about 10 days), writing the rotated token back to `auth.json`. If the file instead contains an
+`OPENAI_API_KEY`, that key is used against the standard OpenAI API.
 
 | Setting | Notes |
 | --- | --- |
 | Credential Path | Default: `~/.codex/auth.json` (auto-detected) |
-| Model | Default: `gpt-4.1` |
+| Model | Default: `gpt-5.6-terra`. Also `gpt-5.6-sol` (strongest), `gpt-5.6-luna` (fastest), `gpt-5.5`. The available set depends on your ChatGPT plan. |
+
+**Timeout is not optional here.** These are reasoning models — a full recommendation list takes
+roughly 15 seconds and longer on a slow connection — and this backend does not let a client cap the
+response length, so the request runs until it finishes or the timeout fires. With the default 30s
+timeout a sync typically ends with 0 recommendations and a timeout error in the log. 60–90s is a
+good starting point.
+
+**If the model dropdown looks wrong right after switching provider**, that is a Lidarr settings-UI
+quirk, not a failure: the form only reloads the model list when it is opened. Test and Save anyway,
+then reopen the import list — the Codex models will be listed.
 
 **Note**: Subscription providers share the same timeout, caching, and guardrail configurations as other providers.
 

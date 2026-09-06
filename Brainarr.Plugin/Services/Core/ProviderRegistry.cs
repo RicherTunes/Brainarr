@@ -232,9 +232,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             Register(AIProvider.OpenAICodexSubscription, (settings, http, logger) =>
             {
+                // Deliberately NO default here: the provider resolves the model per auth mode
+                // (ChatGPT-backend slugs vs Platform ids). Injecting the codex default at this
+                // seam would send a ChatGPT-backend slug to the Platform API for API-key users
+                // who never chose a model.
                 var model = !string.IsNullOrWhiteSpace(settings.ManualModelId)
                     ? settings.ManualModelId
-                    : settings.OpenAICodexModelId ?? BrainarrConstants.DefaultOpenAICodexModel;
+                    : settings.OpenAICodexModelId;
 
                 ILlmProvider llm = new BrainarrOpenAiCodexSubscriptionProvider(
                     http, logger, settings.OpenAICodexCredentialsPath, model);

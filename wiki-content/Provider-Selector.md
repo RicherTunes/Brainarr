@@ -12,8 +12,8 @@ Start
  │     ├── Yes → [Ollama](Local-Providers.md#🦙-ollama-most-popular-local)
  │     └── Prefer a GUI for local models → [LM Studio](Local-Providers.md#🎬-lm-studio-gui-based-local)
  ├── Already have Claude Code or OpenAI Codex CLI installed?
- │     ├── Claude Code → [Claude Code Subscription](../docs/configuration.md#claude-code-subscription)
- │     └── OpenAI Codex → [OpenAI Codex Subscription](../docs/configuration.md#openai-codex-subscription)
+ │     ├── Claude Code → [Claude Code Subscription](https://github.com/RicherTunes/Brainarr/blob/main/docs/configuration.md#claude-code-subscription)
+ │     └── OpenAI Codex → [OpenAI Codex Subscription](https://github.com/RicherTunes/Brainarr/blob/main/docs/configuration.md#openai-codex-subscription)
  ├── Looking for the lowest cloud cost?
  │     └── [DeepSeek](Cloud-Providers.md#🧠-deepseek-ultra-low-cost-leader) (add Gemini Flash as fallback)
  ├── Need generous free tier and speed?

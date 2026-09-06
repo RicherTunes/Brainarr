@@ -10,7 +10,7 @@
 
 - Lidarr nightly ≥ 3.0.0.4855 (README compatibility notice).
 - Brainarr built via `./setup.ps1` / `./setup.sh`; provider matrix regenerated if `docs/providers.yaml` changed.
-- Follow the README quick start and [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md) before proceeding.
+- Follow the README quick start and [docs/USER_SETUP_GUIDE.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/USER_SETUP_GUIDE.md) before proceeding.
 
 ## Day 1 – First run validation
 
@@ -49,12 +49,12 @@
 ## Change log integration
 
 - Every operational change (new provider status, advanced setting override, incident) should append an entry to `docs/VERIFICATION-RESULTS.md` and mention the version in `CHANGELOG.md`.
-- If workflows change materially, update [docs/DOCS_STRATEGY.md](../docs/DOCS_STRATEGY.md) and this playbook together.
+- If workflows change materially, update [docs/DOCS_STRATEGY.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/DOCS_STRATEGY.md) and this playbook together.
 
 ## Reference links
 
-- [docs/USER_SETUP_GUIDE.md](../docs/USER_SETUP_GUIDE.md)
-- [docs/troubleshooting.md](../docs/troubleshooting.md)
+- [docs/USER_SETUP_GUIDE.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/USER_SETUP_GUIDE.md)
+- [docs/troubleshooting.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/troubleshooting.md)
 - [wiki Observability & Metrics](Observability-and-Metrics.md)
 - [wiki Advanced Settings](Advanced-Settings.md)
 - [wiki First Run Guide](First-Run-Guide.md)

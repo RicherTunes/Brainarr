@@ -435,7 +435,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr
         /// Run 'codex auth login' to generate credentials.
         /// </summary>
         [FieldDefinition(39, Label = "OpenAI Codex Credentials Path", Type = FieldType.Path,
-            HelpText = "Path to your OpenAI Codex auth file. Default: ~/.codex/auth.json\nRun 'codex auth login' in terminal to authenticate. The Test button will validate your credentials.",
+            HelpText = "Path to the file 'codex auth login' writes. Default: ~/.codex/auth.json\nMust be filled for a successful subscription Test.\nMust be inside the container user's HOME (paths outside are rejected) and writable — Brainarr rewrites it when the ~10-day token refreshes. If your file lives elsewhere, set the container's HOME env var to its parent folder.\nPlain ChatGPT subscription works — no API key needed.",
             HelpLink = "https://github.com/RicherTunes/Brainarr/wiki/Provider-Basics#openai-codex-subscription")]
         public string OpenAICodexCredentialsPath
         {

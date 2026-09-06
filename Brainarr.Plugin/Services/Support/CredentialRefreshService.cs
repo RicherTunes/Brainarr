@@ -21,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly TimeSpan _refreshThreshold;
         private readonly TimeSpan _checkInterval;
         private bool _disposed;
+        private int _codexRefreshInFlight;
 
         /// <summary>
         /// Event raised when credentials are refreshed successfully.
@@ -186,6 +187,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                     expiresAt = EpochExpiry.FromSeconds(expiresAtElement);
                 }
 
+                // Real Codex auth.json carries no expires_at — the lifetime is in the access
+                // token's JWT `exp` claim. Fall back to it so proactive refresh actually fires.
+                if (expiresAt == null && tokens.TryGetProperty("access_token", out var accessTokenElement))
+                {
+                    expiresAt = CodexJwt.GetExpiry(accessTokenElement.GetString());
+                }
+
                 if (expiresAt == null)
                 {
                     // No expiration info, assume valid
@@ -220,30 +228,52 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         private void AttemptOpenAICodexRefresh(JsonElement tokens)
         {
-            // Check for refresh token
-            if (tokens.TryGetProperty("refresh_token", out var refreshTokenElement))
+            // Codex ChatGPT-subscription tokens refresh via the OAuth2 refresh-token grant against
+            // auth.openai.com and are written back into auth.json in place. Unlike Claude, there is
+            // NO working `codex auth refresh` CLI subcommand to fall back to (and the CLI may not be
+            // installed on a headless Synology host at all), so this is the only path.
+            if (!tokens.TryGetProperty("refresh_token", out var refreshTokenElement) ||
+                string.IsNullOrEmpty(refreshTokenElement.GetString()))
             {
-                var refreshToken = refreshTokenElement.GetString();
-                if (!string.IsNullOrEmpty(refreshToken))
-                {
-                    // Try OAuth2 refresh flow
-                    if (TryOAuth2Refresh("OpenAICodex", refreshToken))
-                    {
-                        OnCredentialsRefreshed("OpenAICodex", "Token refreshed successfully via OAuth2");
-                        return;
-                    }
-                }
-            }
-
-            // Fall back to CLI refresh
-            if (TryCliRefresh("codex", "auth refresh"))
-            {
-                OnCredentialsRefreshed("OpenAICodex", "Token refreshed successfully via CLI");
+                OnRefreshFailed("OpenAICodex", "No refresh_token present. Run 'codex auth login' to re-authenticate.");
                 return;
             }
 
-            // If all refresh attempts fail, notify user
-            OnRefreshFailed("OpenAICodex", "Auto-refresh failed. Run 'codex auth login' to re-authenticate.");
+            // The Timer callback is sync; never block it on the async refresh (sync-over-async gate).
+            // Fire the refresh as an observed task, skipping the tick when a previous refresh is
+            // still in flight so two refreshes can never interleave on the same auth.json.
+            if (Interlocked.CompareExchange(ref _codexRefreshInFlight, 1, 0) != 0)
+            {
+                _logger.Debug("OpenAICodex token refresh already in flight; skipping this check");
+                return;
+            }
+
+            _ = RefreshOpenAICodexAsync();
+        }
+
+        private async Task RefreshOpenAICodexAsync()
+        {
+            try
+            {
+                var result = await CodexTokenRefresher.RefreshAsync(_openAICodexPath).ConfigureAwait(false);
+                if (result.IsSuccess)
+                {
+                    OnCredentialsRefreshed("OpenAICodex", "Token refreshed successfully via OAuth2");
+                }
+                else
+                {
+                    OnRefreshFailed("OpenAICodex", $"Auto-refresh failed: {result.ErrorMessage} Run 'codex auth login' to re-authenticate.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error refreshing OpenAI Codex credentials");
+                OnRefreshFailed("OpenAICodex", $"Auto-refresh failed: {ex.Message} Run 'codex auth login' to re-authenticate.");
+            }
+            finally
+            {
+                Volatile.Write(ref _codexRefreshInFlight, 0);
+            }
         }
 
         private bool TryOAuth2Refresh(string provider, string refreshToken)

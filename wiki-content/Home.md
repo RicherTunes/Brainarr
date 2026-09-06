@@ -5,9 +5,9 @@
 
 The canonical docs now live in the repository so we avoid duplicated truth.
 
-- Quickstart, compatibility, and upgrade notes: see the [README](../README.md).
-- Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](../docs/).
-- Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
+- Quickstart, compatibility, and upgrade notes: see the [README](https://github.com/RicherTunes/Brainarr/blob/main/README.md).
+- Full configuration, tokenization, planner, and troubleshooting guides: see [`docs/`](https://github.com/RicherTunes/Brainarr/blob/main/docs/).
+- Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/PROVIDER_MATRIX.md).
 
 Latest release: **v1.7.0**
 Requires Lidarr 3.1.2.4913+ on the plugins/nightly branch.
@@ -51,7 +51,7 @@ You can install Brainarr directly from Lidarr without downloading a ZIP:
 | Z.AI GLM | Cloud | ✅ Verified in v1.6.0 | OpenAI-compatible PaaS endpoint |
 | Claude Code CLI | CLI | ✅ Verified in v1.6.1 | Shells out to local `claude` CLI binary |
 | Claude Code | Subscription | ✅ Verified in v1.3.2 | Uses local Claude Code CLI credentials (~/.claude/.credentials.json) |
-| OpenAI Codex | Subscription | ✅ Verified in v1.3.2 | Uses local Codex CLI credentials (~/.codex/auth.json) |
+| OpenAI Codex | Subscription | ✅ Verified in v1.6.1 | ChatGPT backend Responses API via local Codex CLI credentials (~/.codex/auth.json); auto-refreshes the token. Raise AI Request Timeout to 60s+ |
 | Z.AI Coding | Subscription | ✅ Verified in v1.6.0 | Anthropic-compatible Coding Plan endpoint |
 <!-- PROVIDER_MATRIX_END -->
 

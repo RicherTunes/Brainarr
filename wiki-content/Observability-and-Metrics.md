@@ -4,7 +4,7 @@
 
 # Observability & Metrics (Preview)
 
-> Canonical docs: [`docs/troubleshooting.md`](../docs/troubleshooting.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](../docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.
+> Canonical docs: [`docs/troubleshooting.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/troubleshooting.md) for walkthroughs, [`docs/METRICS_REFERENCE.md`](https://github.com/RicherTunes/Brainarr/blob/main/docs/METRICS_REFERENCE.md) for metric names, and `dashboards/README.md` for dashboards. Update those first, then mirror essential notes here.
 
 Brainarr exposes lightweight, model‑aware metrics to help you understand latency, error rates, and throttling across providers and models. This preview is designed for maintainers and power users; it lives under Advanced settings and can be disabled with a single flag.
 
@@ -41,7 +41,7 @@ These are the lightweight endpoints the UI calls. You can invoke them directly v
 | `prompt.plan_cache_size` | `cache=prompt_plan` | Current entry count in the plan cache. |
 | `prompt.headroom_violation` | `model` | Incremented when the headroom guard trims a prompt. |
 
-> The same table is mirrored in [docs/METRICS_REFERENCE.md](../docs/METRICS_REFERENCE.md). The CI Docs Truth Check workflow validates that the two stay in sync.
+> The same table is mirrored in [docs/METRICS_REFERENCE.md](https://github.com/RicherTunes/Brainarr/blob/main/docs/METRICS_REFERENCE.md). The CI Docs Truth Check workflow validates that the two stay in sync.
 
 - Latency histograms per `{provider}:{model}` — p50 / p95 / p99, average, counts
 - Error counters per `{provider}:{model}`
