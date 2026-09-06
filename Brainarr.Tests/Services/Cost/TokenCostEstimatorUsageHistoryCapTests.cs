@@ -21,6 +21,18 @@ namespace Brainarr.Tests.Services.Cost
     public class TokenCostEstimatorUsageHistoryCapTests
     {
         [Fact]
+        public void StaticHistoryAssertions_UseTheExistingExclusiveCollection()
+        {
+            var collection = Assert.Single(
+                typeof(TokenCostEstimatorPricingHonestyTests).GetCustomAttributesData(),
+                attribute => attribute.AttributeType == typeof(CollectionAttribute));
+            Assert.Equal("TokenCostEstimatorStaticHistory", Assert.Single(collection.ConstructorArguments).Value);
+            var definition = Assert.IsType<CollectionDefinitionAttribute>(Assert.Single(
+                typeof(TokenCostEstimatorStaticHistoryCollection).GetCustomAttributes(typeof(CollectionDefinitionAttribute), false)));
+            Assert.True(definition.DisableParallelization);
+        }
+
+        [Fact]
         public void StoreUsageReport_CapsUsageHistory_AtMaxEntries()
         {
             // #57: UsageHistory is a process-wide static list with a 10k cap; driving it past the cap

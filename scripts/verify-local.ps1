@@ -50,7 +50,8 @@ try {
         )
         ExpectedContentsFile = 'packaging/expected-contents.txt'
         WarningBudget        = 80
-        WarningBudgetEnforce = $false
+        WarningBudgetMetric  = 'UniqueDiagnostics'
+        WarningBudgetEnforce = $true
     }
 
     # Dropout guard: fail if any *.Tests.csproj on disk is neither run nor skip-listed.

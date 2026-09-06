@@ -10,7 +10,7 @@ The canonical docs now live in the repository so we avoid duplicated truth.
 - Provider status is generated here for convenience; the source of truth is [`docs/PROVIDER_MATRIX.md`](../docs/PROVIDER_MATRIX.md).
 
 Latest release: **v1.7.0**
-Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch.
+Requires Lidarr 3.1.2.4913+ on the plugins/nightly branch.
 
 ## Built on Lidarr.Plugin.Common
 
@@ -26,7 +26,7 @@ Brainarr is built on the shared [Lidarr.Plugin.Common](https://github.com/Richer
 
 You can install Brainarr directly from Lidarr without downloading a ZIP:
 
-1. Ensure Lidarr is on the plugins/nightly branch and at least version 3.0.0.4855 (Settings > General > Updates > Branch = nightly).
+1. Ensure Lidarr is on the plugins/nightly branch and at least version 3.1.2.4913 (Settings > General > Updates > Branch = nightly).
 2. Go to Settings > Plugins.
 3. Click Add Plugin.
 4. Paste the repository URL: <https://github.com/RicherTunes/Brainarr>
