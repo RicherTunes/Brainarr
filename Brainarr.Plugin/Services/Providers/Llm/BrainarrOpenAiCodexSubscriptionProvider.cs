@@ -252,7 +252,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     // response.failed/error event (the case CompleteAsync deliberately surfaces).
                     // Reporting Healthy for it would green-light a credential that cannot serve.
                     var parsed = CodexSseParser.Parse(http.Content);
-                    if (!string.IsNullOrEmpty(parsed.ErrorDetail) && string.IsNullOrWhiteSpace(parsed.Text))
+                    if (!string.IsNullOrEmpty(parsed.ErrorDetail) && (parsed.IsIncomplete || string.IsNullOrWhiteSpace(parsed.Text)))
                     {
                         return ProviderHealthResult.Unhealthy($"Stream error: {Truncate(parsed.ErrorDetail)}", sw.Elapsed, ProviderIdConst, "subscription", wireModel, errorCode: "StreamFailed");
                     }
@@ -268,11 +268,21 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
             catch (LlmProviderException lpe)
             {
-                return ProviderHealthResult.Unhealthy(lpe.Message, sw.Elapsed, ProviderIdConst, creds.AuthMode ?? "subscription", _model, errorCode: lpe.ErrorCode.ToString());
+                return ProviderHealthResult.Unhealthy(lpe.Message, sw.Elapsed, ProviderIdConst, HealthAuthMethod(creds), ResolveWireModel(creds, null), errorCode: lpe.ErrorCode.ToString());
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                // The overall test budget fired (caller cancellation still propagates): report a
+                // guided timeout instead of surfacing as a bare "A task was canceled."
+                sw.Stop();
+                return ProviderHealthResult.Unhealthy(
+                    $"Connection test timed out after {BrainarrConstants.TestConnectionTimeout}s.",
+                    sw.Elapsed, ProviderIdConst, HealthAuthMethod(creds), ResolveWireModel(creds, null),
+                    errorCode: "TestTimeout");
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return ProviderHealthResult.Unhealthy(ex.Message, sw.Elapsed, ProviderIdConst, creds.AuthMode ?? "subscription", _model);
+                return ProviderHealthResult.Unhealthy(ex.Message, sw.Elapsed, ProviderIdConst, HealthAuthMethod(creds), ResolveWireModel(creds, null));
             }
         }
 
@@ -383,7 +393,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             // AND would call RecordSuccess on the auth circuit for what may be a credential problem.
             // Only raise when there is no usable text, so a stream that errored after emitting a
             // complete answer still returns the answer.
-            if (!string.IsNullOrEmpty(parsed.ErrorDetail) && string.IsNullOrWhiteSpace(parsed.Text))
+            // An incomplete termination (length/content-filter stop) is an error even when partial
+            // text exists: the answer is truncated by definition, and downstream JSON parsing of a
+            // half-delivered list is a confusing failure mode to debug. `response.failed`/`error`
+            // events after a complete answer keep the answer (condition below preserves that).
+            var fatalStreamError = !string.IsNullOrEmpty(parsed.ErrorDetail)
+                                   && (parsed.IsIncomplete || string.IsNullOrWhiteSpace(parsed.Text));
+            if (fatalStreamError)
             {
                 throw LlmErrorMapper.MapException(ProviderIdConst,
                     new InvalidOperationException($"OpenAI Codex stream reported an error: {Truncate(parsed.ErrorDetail)}"));
@@ -658,6 +674,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
         private static bool IsChatGptMode(CredentialResult creds)
             => !string.Equals(creds.AuthMode, "apikey", StringComparison.OrdinalIgnoreCase);
+
+        private static string HealthAuthMethod(CredentialResult creds)
+            => string.Equals(creds.AuthMode, "apikey", StringComparison.OrdinalIgnoreCase) ? "apiKey" : "subscription";
 
         private CredentialResult? LoadCreds(out string? hint)
         {

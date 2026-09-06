@@ -321,9 +321,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     }
 
     /// <summary>
-    /// Result of a credential loading operation.
-    /// </summary>
-    /// <summary>
     /// Reads a text file allowing other handles to delete/replace it while we read — required
     /// so the token refresher's atomic temp+Move replace is not blocked by a concurrent load.
     /// </summary>
@@ -337,6 +334,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         }
     }
 
+    /// <summary>
+    /// Result of a credential loading operation.
+    /// </summary>
     public class CredentialResult
     {
         public bool IsSuccess { get; }

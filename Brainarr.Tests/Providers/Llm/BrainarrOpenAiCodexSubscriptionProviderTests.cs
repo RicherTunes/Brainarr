@@ -12,6 +12,7 @@ using Lidarr.Plugin.Common.Errors;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
@@ -217,6 +218,62 @@ namespace Brainarr.Tests.Providers.Llm
 
             Func<Task> act = async () => await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
             await act.Should().ThrowAsync<AuthenticationException>();
+        }
+
+        [Fact]
+        public async Task CompleteAsync_401AndRefreshPersistsFails_StillCompletesOnFreshToken()
+        {
+            // Rotation succeeded server-side but the write-back failed: the refresh token on disk
+            // is dead, yet the fresh access token in hand is valid for days. The run must COMPLETE
+            // on that token (retry succeeds) instead of failing a request we hold credentials for
+            // — the plain-Failure contrast is the test above this one.
+            WriteChatGptTokens();
+            var handler = new SequenceHandler(
+                (HttpStatusCode.Unauthorized, "{\"detail\":\"expired\"}"),
+                (HttpStatusCode.OK, SampleSse("ok")));
+            var provider = CreateChatGptProvider(handler, refreshOverride: _ =>
+                Task.FromResult(CodexRefreshResult.PersistenceFailure(
+                    "tok-fresh", DateTimeOffset.UtcNow.AddHours(1),
+                    "Refreshed token could not be written to disk; re-login required.")));
+
+            var response = await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            handler.Calls.Should().Be(2, "the fresh access token must be used for the retry");
+            handler.LastHeaders["Authorization"].Should().Be("Bearer tok-fresh");
+            response.Content.Should().Be("ok");
+        }
+
+        [Fact]
+        public void ProviderRegistry_WithUnsetModel_ApiKeyModeGetsPlatformDefault_NotCodexSlug()
+        {
+            // THE REGISTRY SEAM (adversarial review round 2): the factory used to substitute
+            // DefaultOpenAICodexModel ("gpt-5.6-terra") before construction, which made the
+            // provider's mode-aware default unreachable — API-key users who never chose a model
+            // got a ChatGPT-backend slug sent to the Platform API and a dead provider. The
+            // registry must pass the unset model through and let the provider resolve per mode.
+            WriteFallbackApiKey("sk-xyz");
+            var settings = new BrainarrSettings
+            {
+                Provider = AIProvider.OpenAICodexSubscription,
+                OpenAICodexCredentialsPath = _tempCredentialsPath,
+                ManualModelId = null,
+                OpenAICodexModelId = null,
+            };
+
+            var registry = new ProviderRegistry();
+            var adapter = (LlmProviderAdapter)registry.CreateProvider(AIProvider.OpenAICodexSubscription, settings, _http.Object, _logger);
+
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+            adapter.Inner.CompleteAsync(new LlmRequest { Prompt = "hi" }).GetAwaiter().GetResult();
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"model\":\"gpt-4o\"",
+                "an API-key user with no stored model must get the Platform default, never a codex slug");
         }
 
         [Fact]

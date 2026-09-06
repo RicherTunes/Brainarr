@@ -122,6 +122,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
                     // treating a truncated answer as a clean success.
                     sawRecognizedEvent = true;
                     ApplyCompleted(evt, result);
+                    result.IsIncomplete = true;
                     result.ErrorDetail ??= ExtractIncompleteReason(evt);
                     break;
 
@@ -175,6 +176,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Shared
     {
         public string Text { get; set; } = string.Empty;
         public string? FinishReason { get; set; }
+
+        /// <summary>
+        /// True when the stream terminated with <c>response.incomplete</c> (length/content-filter
+        /// stop): any Text present is PARTIAL. Callers must treat this as an error even when text
+        /// exists, rather than returning a silently truncated answer.
+        /// </summary>
+        public bool IsIncomplete { get; set; }
         public int? InputTokens { get; set; }
         public int? OutputTokens { get; set; }
         public string? ErrorDetail { get; set; }

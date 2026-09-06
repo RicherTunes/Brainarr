@@ -126,7 +126,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                     AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                     AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                     AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
-                    AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                    // No codex default here either: the provider owns mode-aware model defaulting
+                    // (see ProviderRegistry's OpenAICodexSubscription factory note).
+                    AIProvider.OpenAICodexSubscription => OpenAICodexModelId,
                     // ClaudeCodeCli reuses ClaudeCodeModelId — same Anthropic models, alternate
                     // transport. Default is the CLI's "sonnet" alias rather than a dated model id
                     // so users get whatever sonnet variant the installed CLI considers current.
