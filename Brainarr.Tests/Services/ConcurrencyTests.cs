@@ -487,39 +487,67 @@ namespace Brainarr.Tests.Services
         }
 
         [Fact]
-        public async Task SyncAsyncBridge_WithTimeout_CancelsCorrectly()
+        public void SyncAsyncBridge_WithTimeout_CancelsCorrectly()
         {
             const int operationCount = 5;
             var enteredBridge = 0;
+            var errors = new ConcurrentQueue<Exception>();
+            var callerWasPoolThread = new bool[operationCount];
             using var allBridgeCallsEntered = new CountdownEvent(operationCount);
-            var completions = Enumerable
-                .Range(0, operationCount)
-                .Select(_ => new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously))
-                .ToArray();
-
-            var bridgeTasks = completions.Select(completion => Task.Run(() =>
+            // Inline completion is intentional: neither the blocking callers nor cancellation
+            // completion may depend on workers from the pool this test would otherwise starve.
+            var completions = Enumerable.Range(0, operationCount)
+                .Select(_ => new TaskCompletionSource<object?>()).ToArray();
+            var callers = Enumerable.Range(0, operationCount).Select(index => new Thread(() =>
             {
-                Interlocked.Increment(ref enteredBridge);
-                allBridgeCallsEntered.Signal();
-
-                var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
-                    () => completion.Task,
-                    timeoutMs: 5000);
-
-                act.Should().Throw<OperationCanceledException>();
-            })).ToArray();
-
-            allBridgeCallsEntered
-                .Wait(TimeSpan.FromSeconds(5))
-                .Should()
-                .BeTrue("all bridge callers should reach RunSafeSync before cancellation is released");
-
-            foreach (var completion in completions)
+                try
+                {
+                    callerWasPoolThread[index] = Thread.CurrentThread.IsThreadPoolThread;
+                    var act = () => NzbDrone.Core.ImportLists.Brainarr.Utils.SafeAsyncHelper.RunSafeSync(
+                        () =>
+                        {
+                            Interlocked.Increment(ref enteredBridge);
+                            allBridgeCallsEntered.Signal();
+                            return completions[index].Task;
+                        },
+                        timeoutMs: 5000);
+                    act.Should().Throw<OperationCanceledException>();
+                }
+                catch (Exception ex)
+                {
+                    errors.Enqueue(ex);
+                }
+            }) { IsBackground = true }).ToArray();
+            var joined = new bool[operationCount];
+            var allEntered = false;
+            try
             {
-                completion.SetCanceled();
+                foreach (var caller in callers)
+                {
+                    caller.Start();
+                }
+                allEntered = allBridgeCallsEntered.Wait(TimeSpan.FromSeconds(5));
+            }
+            finally
+            {
+                // Always unblock and observe every caller, including a failed startup barrier.
+                foreach (var completion in completions)
+                {
+                    completion.TrySetCanceled();
+                }
+                for (var index = 0; index < callers.Length; index++)
+                {
+                    if ((callers[index].ThreadState & ThreadState.Unstarted) == 0)
+                    {
+                        joined[index] = callers[index].Join(TimeSpan.FromSeconds(10));
+                    }
+                }
             }
 
-            await Task.WhenAll(bridgeTasks).WaitAsync(TimeSpan.FromSeconds(10));
+            allEntered.Should().BeTrue("all task factories must actually enter the bridge before cancellation");
+            joined.Should().OnlyContain(value => value, "every started caller must terminate");
+            errors.Should().BeEmpty("every caller must observe cancellation rather than a bridge timeout");
+            callerWasPoolThread.Should().OnlyContain(value => !value, "blocking test callers must not occupy pool workers");
             Volatile.Read(ref enteredBridge).Should().Be(operationCount);
         }
     }
