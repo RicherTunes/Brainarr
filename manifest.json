@@ -4,7 +4,7 @@
   "description": "AI-powered music discovery with 14 providers including local, cloud, subscription, and CLI options",
   "author": "Brainarr Team",
   "commonVersion": "1.18.0",
-  "minHostVersion": "3.0.0.4855",
+  "minHostVersion": "3.1.2.4913",
   "tags": [
     "import-list",
     "ai",
