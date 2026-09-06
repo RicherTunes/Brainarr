@@ -517,7 +517,8 @@ namespace Brainarr.Tests.Services
                 {
                     errors.Enqueue(ex);
                 }
-            }) { IsBackground = true }).ToArray();
+            })
+            { IsBackground = true }).ToArray();
             var joined = new bool[operationCount];
             var allEntered = false;
             try
