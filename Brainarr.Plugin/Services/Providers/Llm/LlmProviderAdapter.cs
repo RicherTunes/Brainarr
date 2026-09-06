@@ -188,9 +188,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public Task<bool> TestConnectionAsync()
         {
-            using var cts = new CancellationTokenSource(
-                TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
-            return TestConnectionAsync(cts.Token);
+            // No outer CTS: the provider's own test budget (see CheckHealthAsync) is the single
+            // deadline, so a timeout surfaces as the guided "Connection test timed out" unhealthy
+            // result instead of being shadowed by a bare outer cancellation.
+            return TestConnectionAsync(CancellationToken.None);
         }
 
         /// <inheritdoc />

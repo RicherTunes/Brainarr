@@ -85,30 +85,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             return settings;
         }
 
-
-        /// <summary>
-        /// Gets the default model for a specific provider.
-        /// </summary>
-        private string? GetCurrentProviderModel()
-        {
-            return Provider switch
-            {
-                AIProvider.Ollama => _ollamaModel,
-                AIProvider.LMStudio => _lmStudioModel,
-                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
-                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
-                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
-                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
-                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
-                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
-                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
-                AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
-                AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
-                AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? "sonnet" : ClaudeCodeModelId,
-                _ => null
-            };
-        }
-
         private void ClearCurrentProviderModel()
         {
             // Clear the model for the current provider to reset to default
@@ -200,26 +176,6 @@ namespace NzbDrone.Core.ImportLists.Brainarr
             }
         }
 
-        private string GetDefaultModelForProvider(AIProvider provider)
-        {
-            return provider switch
-            {
-                AIProvider.Ollama => BrainarrConstants.DefaultOllamaModel,
-                AIProvider.LMStudio => BrainarrConstants.DefaultLMStudioModel,
-                AIProvider.Perplexity => ProviderModelNormalizer.Normalize(AIProvider.Perplexity, string.IsNullOrEmpty(PerplexityModelId) ? BrainarrConstants.DefaultPerplexityModel : PerplexityModelId),
-                AIProvider.OpenAI => ProviderModelNormalizer.Normalize(AIProvider.OpenAI, string.IsNullOrEmpty(OpenAIModelId) ? BrainarrConstants.DefaultOpenAIModel : OpenAIModelId),
-                AIProvider.Anthropic => ProviderModelNormalizer.Normalize(AIProvider.Anthropic, string.IsNullOrEmpty(AnthropicModelId) ? BrainarrConstants.DefaultAnthropicModel : AnthropicModelId),
-                AIProvider.OpenRouter => ProviderModelNormalizer.Normalize(AIProvider.OpenRouter, string.IsNullOrEmpty(OpenRouterModelId) ? BrainarrConstants.DefaultOpenRouterModel : OpenRouterModelId),
-                AIProvider.DeepSeek => ProviderModelNormalizer.Normalize(AIProvider.DeepSeek, string.IsNullOrEmpty(DeepSeekModelId) ? BrainarrConstants.DefaultDeepSeekModel : DeepSeekModelId),
-                AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
-                AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
-                AIProvider.ClaudeCodeSubscription => BrainarrConstants.DefaultClaudeCodeModel,
-                AIProvider.OpenAICodexSubscription => BrainarrConstants.DefaultOpenAICodexModel,
-                AIProvider.ClaudeCodeCli => "sonnet",
-                _ => "Default"
-            };
-        }
-
         // Polymorphic methods to get/set provider-specific configuration
         public string? GetModelForProvider()
         {
@@ -235,7 +191,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr
                 AIProvider.Gemini => ProviderModelNormalizer.Normalize(AIProvider.Gemini, string.IsNullOrEmpty(GeminiModelId) ? BrainarrConstants.DefaultGeminiModel : GeminiModelId),
                 AIProvider.Groq => ProviderModelNormalizer.Normalize(AIProvider.Groq, string.IsNullOrEmpty(GroqModelId) ? BrainarrConstants.DefaultGroqModel : GroqModelId),
                 AIProvider.ClaudeCodeSubscription => string.IsNullOrEmpty(ClaudeCodeModelId) ? BrainarrConstants.DefaultClaudeCodeModel : ClaudeCodeModelId,
-                AIProvider.OpenAICodexSubscription => string.IsNullOrEmpty(OpenAICodexModelId) ? BrainarrConstants.DefaultOpenAICodexModel : OpenAICodexModelId,
+                // No codex default: the provider resolves the model per auth mode (Platform ids
+                // vs ChatGPT-backend slugs). Injecting the codex default here would re-open the
+                // registry seam through the live model-update path.
+                AIProvider.OpenAICodexSubscription => OpenAICodexModelId,
                 AIProvider.ClaudeCodeCli => string.IsNullOrEmpty(ClaudeCodeModelId) ? "sonnet" : ClaudeCodeModelId,
                 _ => null
             };

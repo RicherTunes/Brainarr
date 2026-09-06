@@ -244,7 +244,7 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public void ProviderRegistry_WithUnsetModel_ApiKeyModeGetsPlatformDefault_NotCodexSlug()
+        public async Task ProviderRegistry_WithUnsetModel_ApiKeyModeGetsPlatformDefault_NotCodexSlug()
         {
             // THE REGISTRY SEAM (adversarial review round 2): the factory used to substitute
             // DefaultOpenAICodexModel ("gpt-5.6-terra") before construction, which made the
@@ -269,7 +269,7 @@ namespace Brainarr.Tests.Providers.Llm
                 .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
                     "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
 
-            adapter.Inner.CompleteAsync(new LlmRequest { Prompt = "hi" }).GetAwaiter().GetResult();
+            await adapter.Inner.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
             var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
             body.Should().Contain("\"model\":\"gpt-4o\"",
