@@ -21,6 +21,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         private readonly TimeSpan _refreshThreshold;
         private readonly TimeSpan _checkInterval;
         private bool _disposed;
+        private int _codexRefreshInFlight;
 
         /// <summary>
         /// Event raised when credentials are refreshed successfully.
@@ -238,15 +239,40 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return;
             }
 
-            // The Timer callback is sync; block briefly on the async refresh (30s HTTP timeout).
-            var result = CodexTokenRefresher.RefreshAsync(_openAICodexPath).GetAwaiter().GetResult();
-            if (result.IsSuccess)
+            // The Timer callback is sync; never block it on the async refresh (sync-over-async gate).
+            // Fire the refresh as an observed task, skipping the tick when a previous refresh is
+            // still in flight so two refreshes can never interleave on the same auth.json.
+            if (Interlocked.CompareExchange(ref _codexRefreshInFlight, 1, 0) != 0)
             {
-                OnCredentialsRefreshed("OpenAICodex", "Token refreshed successfully via OAuth2");
+                _logger.Debug("OpenAICodex token refresh already in flight; skipping this check");
+                return;
             }
-            else
+
+            _ = RefreshOpenAICodexAsync();
+        }
+
+        private async Task RefreshOpenAICodexAsync()
+        {
+            try
             {
-                OnRefreshFailed("OpenAICodex", $"Auto-refresh failed: {result.ErrorMessage} Run 'codex auth login' to re-authenticate.");
+                var result = await CodexTokenRefresher.RefreshAsync(_openAICodexPath).ConfigureAwait(false);
+                if (result.IsSuccess)
+                {
+                    OnCredentialsRefreshed("OpenAICodex", "Token refreshed successfully via OAuth2");
+                }
+                else
+                {
+                    OnRefreshFailed("OpenAICodex", $"Auto-refresh failed: {result.ErrorMessage} Run 'codex auth login' to re-authenticate.");
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.Error(ex, "Error refreshing OpenAI Codex credentials");
+                OnRefreshFailed("OpenAICodex", $"Auto-refresh failed: {ex.Message} Run 'codex auth login' to re-authenticate.");
+            }
+            finally
+            {
+                Volatile.Write(ref _codexRefreshInFlight, 0);
             }
         }
 
