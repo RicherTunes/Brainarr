@@ -110,6 +110,22 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 return CodexRefreshResult.Failure("Codex auth file has no refresh_token. Run 'codex auth login' to re-authenticate.");
             }
 
+            // Pre-flight writability probe BEFORE the token endpoint is called. The refresh token
+            // is single-use: if the server rotates it and we then cannot persist the result, the
+            // file is left holding a dead refresh token and BOTH this provider and the Codex CLI
+            // (which shares the file) are bricked until a manual `codex auth login`. Failing here
+            // costs nothing; failing after the grant is unrecoverable.
+            try
+            {
+                ProbeWritable(path);
+            }
+            catch (Exception ex)
+            {
+                return CodexRefreshResult.Failure(
+                    $"Codex auth directory is not writable, so the token rotation cannot be persisted safely ({ex.Message}). " +
+                    "Not refreshing; fix the mount/permissions to avoid bricking the stored refresh token.");
+            }
+
             OAuthTokenResponse tokenResponse;
             try
             {
@@ -129,6 +145,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             {
                 return CodexRefreshResult.Failure("Token endpoint returned no access_token.");
             }
+
+            var expiresAt = CodexJwt.GetExpiry(tokenResponse.AccessToken)
+                            ?? (tokenResponse.ExpiresInSeconds > 0
+                                ? DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresInSeconds)
+                                : (DateTimeOffset?)null);
 
             // Merge rotated tokens back in, preserving every other field.
             tokensObj["access_token"] = tokenResponse.AccessToken;
@@ -150,17 +171,41 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             }
             catch (Exception ex)
             {
-                Logger.Error(ex, $"Failed to persist refreshed Codex tokens to {LogRedactor.Redact(path)}");
-                return CodexRefreshResult.Failure($"Refreshed token could not be written to disk: {ex.Message}");
+                // The grant already consumed the old refresh token server-side, so the on-disk
+                // file now holds a dead refresh token. Surface that loudly, but still hand back
+                // the fresh ACCESS token: it is valid for days and lets the current run
+                // complete instead of failing a request we already have working credentials for.
+                Logger.Error(ex,
+                    $"Failed to persist refreshed Codex tokens to {LogRedactor.Redact(path)} — the stored refresh token " +
+                    "has been consumed and a manual 'codex auth login' will be required.");
+                return CodexRefreshResult.PersistenceFailure(
+                    tokenResponse.AccessToken!,
+                    expiresAt,
+                    $"Refreshed token could not be written to disk ({ex.Message}); the stored refresh token is now " +
+                    "consumed. Run 'codex auth login' to re-authenticate.");
             }
-
-            var expiresAt = CodexJwt.GetExpiry(tokenResponse.AccessToken)
-                            ?? (tokenResponse.ExpiresInSeconds > 0
-                                ? DateTimeOffset.UtcNow.AddSeconds(tokenResponse.ExpiresInSeconds)
-                                : (DateTimeOffset?)null);
 
             Logger.Info("OpenAI Codex token refreshed and persisted.");
             return CodexRefreshResult.Success(tokenResponse.AccessToken!, expiresAt);
+        }
+
+        /// <summary>
+        /// Verifies that a file can be created and replaced in the target directory without
+        /// touching the real auth file: create + delete a uniquely named probe next to it.
+        /// </summary>
+        private static void ProbeWritable(string path)
+        {
+            var dir = Path.GetDirectoryName(path) ?? ".";
+            var probe = Path.Combine(dir, $".{Path.GetFileName(path)}.brainarr-probe-{Guid.NewGuid():N}.tmp");
+            File.WriteAllText(probe, string.Empty, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            try
+            {
+                File.Delete(probe);
+            }
+            catch (Exception ex)
+            {
+                Logger.Debug(ex, "Could not delete writability probe file");
+            }
         }
 
         private static async Task<OAuthTokenResponse> RequestNewTokensAsync(
@@ -171,7 +216,10 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
                 client_id = BrainarrConstants.OpenAICodexOAuthClientId,
                 grant_type = "refresh_token",
                 refresh_token = refreshToken,
-                scope = "openid profile email",
+                // Match the Codex CLI's exact scope: it includes offline_access, without which
+                // the token endpoint may legitimately decline to rotate a refresh_token back —
+                // and a response without a rotated refresh token would brick the next refresh.
+                scope = "openid profile email offline_access",
             };
 
             using var req = new HttpRequestMessage(HttpMethod.Post, BrainarrConstants.OpenAIOAuthTokenUrl);
@@ -210,17 +258,49 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
             var tmp = Path.Combine(dir, $".{Path.GetFileName(path)}.brainarr-{Guid.NewGuid():N}.tmp");
             var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
 
-            File.WriteAllText(tmp, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
-
-            // Match the CLI's private-file permissions before the file becomes visible under the
-            // real name, so the rotated auth.json isn't briefly world-readable on Linux/Synology.
-            if (!OperatingSystem.IsWindows())
+            try
             {
-                try { File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
-                catch (Exception ex) { Logger.Debug(ex, "Could not set unix file mode on temp auth file"); }
-            }
+                File.WriteAllText(tmp, json, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
 
-            File.Move(tmp, path, overwrite: true);
+                // Match the CLI's private-file permissions before the file becomes visible under the
+                // real name, so the rotated auth.json isn't briefly world-readable on Linux/Synology.
+                if (!OperatingSystem.IsWindows())
+                {
+                    try { File.SetUnixFileMode(tmp, UnixFileMode.UserRead | UnixFileMode.UserWrite); }
+                    catch (Exception ex) { Logger.Debug(ex, "Could not set unix file mode on temp auth file"); }
+                }
+
+                MoveWithSharingRetry(tmp, path);
+            }
+            catch
+            {
+                // Never leave a stray temp file behind: it contains the freshly rotated tokens,
+                // and repeated failures would litter one credential-bearing file per attempt.
+                try { File.Delete(tmp); } catch { /* best-effort */ }
+                throw;
+            }
+        }
+
+        /// <summary>
+        /// <see cref="File.Move(string, string, bool)"/> over an existing file fails on Windows
+        /// while ANY reader still holds the destination open (the loader opens with
+        /// FileShare.Read|Delete, but a foreign process may not). Retry briefly — a reader that
+        /// closes within the window lets the atomic replace proceed.
+        /// </summary>
+        private static void MoveWithSharingRetry(string tmp, string path)
+        {
+            for (var attempt = 0; ; attempt++)
+            {
+                try
+                {
+                    File.Move(tmp, path, overwrite: true);
+                    return;
+                }
+                catch (IOException) when (attempt < 5)
+                {
+                    Thread.Sleep(100);
+                }
+            }
         }
 
         private sealed class OAuthTokenResponse
@@ -251,5 +331,14 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
         public static CodexRefreshResult Success(string token, DateTimeOffset? expiresAt)
             => new(true, token, expiresAt, null);
         public static CodexRefreshResult Failure(string error) => new(false, null, null, error);
+
+        /// <summary>
+        /// The rotation itself succeeded but its persistence failed: the server already consumed
+        /// the old refresh token, yet the fresh access token in hand remains valid. Callers
+        /// should complete the current run with that token and surface the error — the next
+        /// refresh will require a manual 'codex auth login'.
+        /// </summary>
+        public static CodexRefreshResult PersistenceFailure(string token, DateTimeOffset? expiresAt, string error)
+            => new(false, token, expiresAt, error);
     }
 }

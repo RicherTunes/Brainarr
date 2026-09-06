@@ -50,6 +50,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Configuration
         public const string DefaultOpenAICodexModel = "gpt-5.6-terra";
 
         /// <summary>
+        /// Default model for the API-KEY (Platform chat/completions) variant of the Codex
+        /// provider. The Platform API rejects the ChatGPT-backend slugs above, so API-key users
+        /// keep the pre-port Platform default instead of being migrated onto a backend id.
+        /// </summary>
+        public const string DefaultOpenAICodexApiModel = "gpt-4o";
+
+        /// <summary>
         /// The model slugs the ChatGPT-backend Codex endpoint accepts for a subscription account,
         /// newest-first. Live-confirmed 2026-08 against a Plus account: everything here returns 200,
         /// while bare <c>gpt-5.6</c>, <c>gpt-5.6-codex</c>, <c>codex-mini-latest</c> and every Platform

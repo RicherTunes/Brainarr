@@ -126,7 +126,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             try
             {
-                var json = File.ReadAllText(path);
+                var json = CredentialFileReader.ReadAllTextShareDelete(path);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -219,7 +219,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
             try
             {
-                var json = File.ReadAllText(path);
+                var json = CredentialFileReader.ReadAllTextShareDelete(path);
                 using var doc = JsonDocument.Parse(json);
                 var root = doc.RootElement;
 
@@ -323,6 +323,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
     /// <summary>
     /// Result of a credential loading operation.
     /// </summary>
+    /// <summary>
+    /// Reads a text file allowing other handles to delete/replace it while we read — required
+    /// so the token refresher's atomic temp+Move replace is not blocked by a concurrent load.
+    /// </summary>
+    internal static class CredentialFileReader
+    {
+        internal static string ReadAllTextShareDelete(string path)
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            using var reader = new StreamReader(stream, System.Text.Encoding.UTF8);
+            return reader.ReadToEnd();
+        }
+    }
+
     public class CredentialResult
     {
         public bool IsSuccess { get; }
@@ -377,6 +391,13 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services
 
         public static CredentialResult Success(string token, DateTimeOffset? expiresAt = null, string? refreshToken = null, string? accountId = null, string? authMode = null)
             => new(true, token, null, expiresAt, refreshToken, accountId, authMode);
+
+        /// <summary>
+        /// Copy of this result with a replaced access token — used when a rotation succeeded
+        /// but could not be persisted, so the current run proceeds on the fresh token.
+        /// </summary>
+        public CredentialResult WithToken(string token)
+            => new(IsSuccess, token, ErrorMessage, ExpiresAt, RefreshToken, AccountId, AuthMode);
         public static CredentialResult Failure(string errorMessage) => new(false, null, errorMessage);
     }
 }

@@ -106,7 +106,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
             _credentialsPath = credentialsPath ?? SubscriptionCredentialLoader.GetDefaultCodexPath();
-            _model = NormalizeCodexModel(model);
+            // Stored raw; resolved per call against the credential's auth mode — the ChatGPT
+            // backend and the Platform API accept different model-id sets.
+            _model = model?.Trim() ?? string.Empty;
             _authCircuit = authCircuit ?? new LlmAuthCircuit(logger);
             _userAgent = $"{BrainarrConstants.OpenAICodexOriginator}/{BrainarrConstants.OpenAICodexClientVersion}";
             _refreshOverride = refreshOverride;
@@ -149,7 +151,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         public void UpdateModel(string modelName)
         {
             if (string.IsNullOrWhiteSpace(modelName)) return;
-            _model = NormalizeCodexModel(modelName);
+            _model = modelName.Trim();
         }
 
         // The ChatGPT-backend Codex endpoint only accepts the slugs in
@@ -184,6 +186,24 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             return BrainarrConstants.DefaultOpenAICodexModel;
         }
 
+        /// <summary>
+        /// Resolves the wire model for one call, per auth mode. ChatGPT mode coerces to the
+        /// backend's accepted slugs (the settings-UI deadlock escape). API-key mode targets the
+        /// Platform chat/completions API whose model ids are a DIFFERENT set — the stored or
+        /// manual model is sent verbatim (the pre-port behavior), with a Platform-valid default
+        /// when unset, so codex slugs are never sent to api.openai.com.
+        /// </summary>
+        private string ResolveWireModel(CredentialResult creds, string? requestModel)
+        {
+            if (IsChatGptMode(creds))
+            {
+                return NormalizeCodexModel(string.IsNullOrWhiteSpace(requestModel) ? _model : requestModel);
+            }
+
+            if (!string.IsNullOrWhiteSpace(requestModel)) return requestModel!;
+            return string.IsNullOrWhiteSpace(_model) ? BrainarrConstants.DefaultOpenAICodexApiModel : _model;
+        }
+
         /// <inheritdoc />
         public async Task<ProviderHealthResult> CheckHealthAsync(CancellationToken cancellationToken = default)
         {
@@ -211,28 +231,48 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
                     MaxTokens = 16,
                 };
 
+                var wireModel = ResolveWireModel(creds, null);
+
+                // One overall test budget bounds the WHOLE probe — initial send, a token refresh,
+                // and the retry — so a slow/blackholed auth.openai.com cannot stretch "Test" to
+                // send-timeout + refresh-timeout + send-timeout.
+                using var budget = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                budget.CancelAfter(TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout));
+
                 if (IsChatGptMode(creds))
                 {
-                    var http = await SendResponsesWithRefreshAsync(creds, probeRequest, useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                    var http = await SendResponsesWithRefreshAsync(creds, probeRequest, useTestTimeout: false, budget.Token).ConfigureAwait(false);
                     sw.Stop();
-                    return http.StatusCode == System.Net.HttpStatusCode.OK
-                        ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "subscription", _model)
-                        : ProviderHealthResult.Unhealthy($"HTTP {(int)http.StatusCode}", sw.Elapsed, ProviderIdConst, "subscription", _model, errorCode: ((int)http.StatusCode).ToString());
+                    if (http.StatusCode != System.Net.HttpStatusCode.OK)
+                    {
+                        return ProviderHealthResult.Unhealthy($"HTTP {(int)http.StatusCode}", sw.Elapsed, ProviderIdConst, "subscription", wireModel, errorCode: ((int)http.StatusCode).ToString());
+                    }
+
+                    // HTTP 200 does not by itself mean healthy: the stream may carry a
+                    // response.failed/error event (the case CompleteAsync deliberately surfaces).
+                    // Reporting Healthy for it would green-light a credential that cannot serve.
+                    var parsed = CodexSseParser.Parse(http.Content);
+                    if (!string.IsNullOrEmpty(parsed.ErrorDetail) && string.IsNullOrWhiteSpace(parsed.Text))
+                    {
+                        return ProviderHealthResult.Unhealthy($"Stream error: {Truncate(parsed.ErrorDetail)}", sw.Elapsed, ProviderIdConst, "subscription", wireModel, errorCode: "StreamFailed");
+                    }
+
+                    return ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "subscription", wireModel);
                 }
 
-                var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(probeRequest), useTestTimeout: true, cancellationToken).ConfigureAwait(false);
+                var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(probeRequest, wireModel), useTestTimeout: false, budget.Token).ConfigureAwait(false);
                 sw.Stop();
                 return response.StatusCode == System.Net.HttpStatusCode.OK
-                    ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", _model)
-                    : ProviderHealthResult.Unhealthy($"HTTP {(int)response.StatusCode}", sw.Elapsed, ProviderIdConst, "apiKey", _model, errorCode: ((int)response.StatusCode).ToString());
+                    ? ProviderHealthResult.Healthy(sw.Elapsed, ProviderIdConst, "apiKey", wireModel)
+                    : ProviderHealthResult.Unhealthy($"HTTP {(int)response.StatusCode}", sw.Elapsed, ProviderIdConst, "apiKey", wireModel, errorCode: ((int)response.StatusCode).ToString());
             }
             catch (LlmProviderException lpe)
             {
-                return ProviderHealthResult.Unhealthy(lpe.Message, sw.Elapsed, ProviderIdConst, "subscription", _model, errorCode: lpe.ErrorCode.ToString());
+                return ProviderHealthResult.Unhealthy(lpe.Message, sw.Elapsed, ProviderIdConst, creds.AuthMode ?? "subscription", _model, errorCode: lpe.ErrorCode.ToString());
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                return ProviderHealthResult.Unhealthy(ex.Message, sw.Elapsed, ProviderIdConst, "subscription", _model);
+                return ProviderHealthResult.Unhealthy(ex.Message, sw.Elapsed, ProviderIdConst, creds.AuthMode ?? "subscription", _model);
             }
         }
 
@@ -305,9 +345,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         {
             var http = await SendResponsesAsync(creds, request, useTestTimeout, cancellationToken).ConfigureAwait(false);
 
-            if (http.StatusCode is System.Net.HttpStatusCode.Unauthorized or System.Net.HttpStatusCode.Forbidden)
+            // Only 401 is treated as a stale token. A 403 is a plan/quota denial at this
+            // backend: rotating the (single-use) refresh token for it would burn a rotation
+            // for nothing and interact badly with a failed persist.
+            if (http.StatusCode == System.Net.HttpStatusCode.Unauthorized)
             {
-                var refreshed = await TryRefreshAsync(cancellationToken).ConfigureAwait(false);
+                var refreshed = await TryRefreshAsync(creds, cancellationToken).ConfigureAwait(false);
                 if (refreshed != null)
                 {
                     http = await SendResponsesAsync(refreshed, request, useTestTimeout, cancellationToken).ConfigureAwait(false);
@@ -358,7 +401,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
         private async Task<HttpCallResult> SendResponsesAsync(CredentialResult creds, LlmRequest request, bool useTestTimeout, CancellationToken cancellationToken)
         {
-            var body = BuildResponsesBody(request);
+            var body = BuildResponsesBody(request, ResolveWireModel(creds, request.Model));
 
             using var req = new HttpRequestMessage(HttpMethod.Post, BrainarrConstants.OpenAICodexResponsesUrl);
             req.Headers.TryAddWithoutValidation("Authorization", $"Bearer {creds.Token}");
@@ -410,7 +453,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
         }
 
-        private async Task<CredentialResult?> TryRefreshAsync(CancellationToken cancellationToken)
+        private async Task<CredentialResult?> TryRefreshAsync(CredentialResult currentCreds, CancellationToken cancellationToken)
         {
             CodexRefreshResult refresh;
             try
@@ -437,6 +480,15 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
             if (!refresh.IsSuccess)
             {
+                if (!string.IsNullOrEmpty(refresh.AccessToken))
+                {
+                    // Persistence failed AFTER the server consumed the old refresh token: the
+                    // fresh access token is still valid, so complete this run with it (the on-disk
+                    // file is stale, hence the loud error), rather than failing a request we hold
+                    // working credentials for.
+                    _logger.Error($"OpenAI Codex token rotation could not be persisted: {refresh.ErrorMessage}");
+                    return currentCreds.WithToken(refresh.AccessToken);
+                }
                 _logger.Warn($"OpenAI Codex token refresh failed: {refresh.ErrorMessage}");
                 return null;
             }
@@ -463,9 +515,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         // `temperature` and `reasoning` are also omitted: temperature is not part of this contract, and
         // reasoning effort measurably does not help (12.6s at effort=none vs 14.8s unset for a full
         // recommendation list — the cost is generation+network, not a reasoning preamble).
-        private object BuildResponsesBody(LlmRequest request)
+        private object BuildResponsesBody(LlmRequest request, string wireModel)
         {
-            var model = !string.IsNullOrWhiteSpace(request.Model) ? NormalizeCodexModel(request.Model) : _model;
+            var model = wireModel;
             var instructions = string.IsNullOrWhiteSpace(request.SystemPrompt) ? "You are a helpful assistant." : request.SystemPrompt;
 
             return new
@@ -492,7 +544,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 
         private async Task<LlmResponse> CompleteViaChatCompletionsAsync(CredentialResult creds, LlmRequest request, CancellationToken cancellationToken)
         {
-            var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(request), useTestTimeout: false, cancellationToken).ConfigureAwait(false);
+            var response = await SendChatCompletionsAsync(creds.Token!, BuildChatCompletionsBody(request, ResolveWireModel(creds, request.Model)), useTestTimeout: false, cancellationToken).ConfigureAwait(false);
 
             if (response.StatusCode != System.Net.HttpStatusCode.OK)
             {
@@ -507,11 +559,11 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             return ParseChatCompletion(response.Content ?? string.Empty);
         }
 
-        private object BuildChatCompletionsBody(LlmRequest request)
+        private object BuildChatCompletionsBody(LlmRequest request, string wireModel)
         {
             var temp = (double?)request.Temperature ?? 0.8;
             var maxTokens = request.MaxTokens ?? 2000;
-            var modelRaw = !string.IsNullOrWhiteSpace(request.Model) ? request.Model : _model;
+            var modelRaw = wireModel;
 
             if (!string.IsNullOrEmpty(request.SystemPrompt))
             {

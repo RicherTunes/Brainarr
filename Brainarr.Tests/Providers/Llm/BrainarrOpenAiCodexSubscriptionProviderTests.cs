@@ -12,6 +12,7 @@ using Lidarr.Plugin.Common.Errors;
 using Moq;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using Xunit;
@@ -249,6 +250,53 @@ namespace Brainarr.Tests.Providers.Llm
             captured.Should().NotBeNull();
             captured!.Headers.GetSingleValue("Authorization").Should().Be("Bearer sk-xyz");
             captured.Url.ToString().Should().Contain("chat/completions");
+
+            // API-key mode targets the Platform API: the stored Platform model must reach the
+            // wire VERBATIM — never a ChatGPT-backend slug coerced into it.
+            var body = System.Text.Encoding.UTF8.GetString(captured.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"model\":\"gpt-4o\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_ApiKeyFallback_ExplicitCodexSlug_IsNotCoerced()
+        {
+            // API-key mode preserves the pre-port contract: whatever model the user stored is sent
+            // as-is. The codex-slug coercion exists to escape the settings-UI deadlock on the
+            // ChatGPT backend, where those slugs are the only accepted ids; applying it here would
+            // silently migrate Platform users onto ids their API rejects.
+            WriteFallbackApiKey("sk-xyz");
+            var provider = new BrainarrOpenAiCodexSubscriptionProvider(
+                _http.Object, _logger, _tempCredentialsPath, "gpt-5.6-terra");
+
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain("\"model\":\"gpt-5.6-terra\"");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_ApiKeyFallback_NoModel_DefaultsToPlatformModel()
+        {
+            WriteFallbackApiKey("sk-xyz");
+            var provider = new BrainarrOpenAiCodexSubscriptionProvider(
+                _http.Object, _logger, _tempCredentialsPath);
+
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(r => captured = r)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+            await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var body = System.Text.Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>());
+            body.Should().Contain($"\"model\":\"{BrainarrConstants.DefaultOpenAICodexApiModel}\"");
         }
 
         [Fact]
