@@ -10,7 +10,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 - Make concurrent bridge-cancellation testing independent of pool-worker startup; retain all five callers, real factory-entry coordination, cancellation assertions and bounded cleanup.
 - Adopt one elapsed-budget implementation across generic and typed HTTP execution, including redirect limits; preserve absolute Retry-After dates and existing retry policies.
-- Re-pin `ext/Lidarr.Plugin.Common` to `61c8cf1615865cec96a5d9e69a7dae65fe8a6d3b`; `commonVersion`: `1.18.0-dev` -> `1.18.0`.
+- Adopt shared inclusive jitter bounds and overflow-safe backoff-plus-jitter admission; defaults and explicit Retry-After precedence are unchanged.
+- Re-pin `ext/Lidarr.Plugin.Common` to `8cb5caea9e9aaefd3d8107f3854183649bdc8ff7`; `commonVersion`: `1.18.0-dev` -> `1.18.0`.
 - Adopt shared cancellation-safe concurrency leases and operation-timeout ownership: cancelled waits and redirects release only owned permits, caller cancellation propagates, and supplied clocks drive timeout expiry.
 - Adopt shared monotonic retry budgets and overflow-safe exponential backoff; clock corrections no longer change elapsed retry admission.
 - Declare minimum Lidarr `3.1.2.4913` to match the compiled host references. Shared packaging and smoke gates reject understated host requirements.
