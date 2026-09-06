@@ -1,6 +1,6 @@
 # User Setup Guide (Clean)
 
-> Compatibility — Requires Lidarr 3.0.0.4855+ on the plugins/nightly branch. See the [README compatibility notice](../README.md) before enabling Brainarr.
+> Compatibility — Requires Lidarr 3.1.2.4913+ on the plugins/nightly branch. See the [README compatibility notice](../README.md) before enabling Brainarr.
 
 ## How to use this guide
 

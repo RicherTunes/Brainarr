@@ -14,8 +14,8 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
   "version": "1.7.0",
   "description": "AI-powered music discovery with 14 providers including local, cloud, subscription, and CLI options",
   "author": "Brainarr Team",
-  "commonVersion": "1.18.0-dev",
-  "minHostVersion": "3.0.0.4855",
+  "commonVersion": "1.18.0",
+  "minHostVersion": "3.1.2.4913",
   "main": "Lidarr.Plugin.Brainarr.dll",
   "homepage": "https://github.com/RicherTunes/Brainarr",
   "owner": "RicherTunes",
@@ -114,12 +114,12 @@ The `plugin.json` file is the manifest that defines your Lidarr plugin's metadat
 **Example:**
 
 ```json
-"minHostVersion": "3.0.0.4855"
+"minHostVersion": "3.1.2.4913"
 ```
 
 **Important Versions:**
 
-- `3.0.0.4855` - Lidarr nightly (plugins branch, required for .NET 8 plugins)
+- `3.1.2.4913` - Minimum supported Lidarr nightly (plugins branch, .NET 8 host)
 
 ### main
 
@@ -210,8 +210,8 @@ Here's a fully-featured manifest with all optional fields:
   "version": "1.7.0",
   "description": "AI-powered music discovery with 14 providers including local, cloud, subscription, and CLI options",
   "author": "Brainarr Team",
-  "commonVersion": "1.18.0-dev",
-  "minHostVersion": "3.0.0.4855",
+  "commonVersion": "1.18.0",
+  "minHostVersion": "3.1.2.4913",
   "main": "Lidarr.Plugin.Brainarr.dll",
   "owner": "RicherTunes",
   "homepage": "https://github.com/RicherTunes/Brainarr",
@@ -262,7 +262,7 @@ Here's a fully-featured manifest with all optional fields:
 
 // Correct
 {
-  "minHostVersion": "3.0.0.4855"
+  "minHostVersion": "3.1.2.4913"
 }
 ```
 
@@ -330,7 +330,7 @@ git push origin v1.1.0
 
 | Plugin Version | Minimum Lidarr | Maximum Lidarr | Notes |
 |---------------|----------------|----------------|-------|
-| 1.6.1 | 3.0.0.4855 | - | Current release |
+| 1.6.1 | 3.0.0.4855 | - | Historical release |
 | 1.5.x | 3.0.0.4855 | - | Previous releases |
 | 1.3.0 | 3.0.0.4855 | - | Planning refactor |
 
