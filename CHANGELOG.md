@@ -8,7 +8,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
-- Re-pin `ext/Lidarr.Plugin.Common` to `e22be313832bf73673279db24a5d47af742f346d`; `commonVersion`: `1.18.0-dev` -> `1.18.0`.
+- Re-pin `ext/Lidarr.Plugin.Common` to `c08799b478945ca8aad0a1060d297e021331cc94`; `commonVersion`: `1.18.0-dev` -> `1.18.0`.
 - Declare minimum Lidarr `3.1.2.4913` to match the compiled host references. Shared packaging and smoke gates reject understated host requirements.
 - Adopt shared retry-budget hardening, authoritative package-version evaluation and ZIP identity checks, and one role-aware Docker smoke runner with run-owned cleanup.
 - Enforce the existing warning budget using shared unique-diagnostic accounting; repeated build output is not new debt and unrepresented summary warnings remain charged.
