@@ -108,7 +108,7 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task FactoryProviderShortRequestTimeoutCancelsBlockedStreamEnumeration()
+        public async Task FactoryProviderShortRequestTimeoutEndsBlockedStreamAsRecoverableTimeout()
         {
             var streamingExecutor = new StreamingHttpExecutor(new BlockingStreamHandler());
             var registry = new ProviderRegistry();
@@ -145,7 +145,8 @@ namespace Brainarr.Tests.Providers.Llm
             if (finished == enumeration)
             {
                 Func<Task> completedEnumeration = () => enumeration;
-                await completedEnumeration.Should().ThrowAsync<OperationCanceledException>();
+                var failure = await completedEnumeration.Should().ThrowAsync<NetworkException>();
+                failure.Which.ErrorCode.Should().Be(LlmErrorCode.Timeout);
                 return;
             }
 
