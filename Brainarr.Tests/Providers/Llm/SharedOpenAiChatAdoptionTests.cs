@@ -1,5 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Net;
+using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -104,6 +107,62 @@ namespace Brainarr.Tests.Providers.Llm
             failure.Which.Message.Should().ContainEquivalentOf("content");
         }
 
+        [Fact]
+        public async Task FactoryProviderShortRequestTimeoutCancelsBlockedStreamEnumeration()
+        {
+            var streamingExecutor = new StreamingHttpExecutor(new BlockingStreamHandler());
+            var registry = new ProviderRegistry();
+            registry.Register(AIProvider.OpenAI, (settings, http, logger) =>
+                new LlmProviderAdapter(
+                    new BrainarrOpenAiProvider(
+                        http,
+                        logger,
+                        settings.OpenAIApiKey,
+                        settings.OpenAIModel,
+                        streamingExecutor),
+                    logger));
+            var adapter = registry.CreateProvider(
+                    AIProvider.OpenAI,
+                    SettingsFor(AIProvider.OpenAI),
+                    _http.Object,
+                    _logger)
+                .Should().BeOfType<LlmProviderAdapter>().Subject;
+
+            using var cleanupCancellation = new CancellationTokenSource();
+            Func<Task> enumerate = async () =>
+            {
+                await foreach (var _ in adapter.Inner.StreamAsync(new LlmRequest
+                {
+                    Prompt = "recommend one album",
+                    Timeout = TimeSpan.FromMilliseconds(50),
+                }, cleanupCancellation.Token)!)
+                {
+                }
+            };
+
+            var enumeration = enumerate();
+            var finished = await Task.WhenAny(enumeration, Task.Delay(TimeSpan.FromSeconds(2)));
+            if (finished == enumeration)
+            {
+                Func<Task> completedEnumeration = () => enumeration;
+                await completedEnumeration.Should().ThrowAsync<OperationCanceledException>();
+                return;
+            }
+
+            cleanupCancellation.Cancel();
+            try
+            {
+                await enumeration;
+            }
+            catch (OperationCanceledException)
+            {
+                // Test cleanup only. The assertion below records the missing request deadline.
+            }
+
+            finished.Should().BeSameAs(enumeration,
+                "the per-request timeout must cover the complete streaming enumeration");
+        }
+
         private static BrainarrSettings SettingsFor(AIProvider providerType)
         {
             return new BrainarrSettings
@@ -118,6 +177,68 @@ namespace Brainarr.Tests.Providers.Llm
                 AnthropicApiKey = "anthropic-test-key",
                 GeminiApiKey = "gemini-test-key",
             };
+        }
+
+        private sealed class BlockingStreamHandler : HttpMessageHandler
+        {
+            protected override Task<HttpResponseMessage> SendAsync(
+                HttpRequestMessage request,
+                CancellationToken cancellationToken)
+            {
+                return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
+                {
+                    Content = new StreamContent(new CancellationBlockingStream()),
+                });
+            }
+        }
+
+        private sealed class CancellationBlockingStream : Stream
+        {
+            private int _seeded;
+
+            public override bool CanRead => true;
+            public override bool CanSeek => false;
+            public override bool CanWrite => false;
+            public override long Length => throw new NotSupportedException();
+            public override long Position
+            {
+                get => throw new NotSupportedException();
+                set => throw new NotSupportedException();
+            }
+
+            public override void Flush() => throw new NotSupportedException();
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                if (Interlocked.Exchange(ref _seeded, 1) == 0)
+                {
+                    var prefix = new byte[] { (byte)'d', (byte)'a', (byte)'t', (byte)'a', (byte)':', (byte)' ' };
+                    Array.Copy(prefix, 0, buffer, offset, prefix.Length);
+                    return prefix.Length;
+                }
+
+                throw new NotSupportedException();
+            }
+            public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+            public override void SetLength(long value) => throw new NotSupportedException();
+            public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+            public override async ValueTask<int> ReadAsync(
+                Memory<byte> buffer,
+                CancellationToken cancellationToken = default)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return 0;
+            }
+
+            public override async Task<int> ReadAsync(
+                byte[] buffer,
+                int offset,
+                int count,
+                CancellationToken cancellationToken)
+            {
+                await Task.Delay(Timeout.InfiniteTimeSpan, cancellationToken);
+                return 0;
+            }
         }
     }
 }
