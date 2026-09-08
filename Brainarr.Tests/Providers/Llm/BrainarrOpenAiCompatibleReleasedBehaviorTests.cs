@@ -1,5 +1,6 @@
 using System;
 using System.Net.Http;
+using System.Net;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
@@ -10,6 +11,7 @@ using Moq;
 using Newtonsoft.Json.Linq;
 using NLog;
 using NzbDrone.Common.Http;
+using NzbDrone.Core.ImportLists.Brainarr.Services;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm;
 using NzbDrone.Core.ImportLists.Brainarr.Services.Resilience;
 using Xunit;
@@ -66,7 +68,36 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CompleteAsync_RequestTimeout_IsIgnoredByReleasedAdapter()
+        public async Task CompleteAsync_RequestTimeout_IsIgnoredInFavorOfExactAmbientOwnerTimeout()
+        {
+            HttpRequest? captured = null;
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(request => captured = request)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+
+            using (TimeoutContext.Push(120))
+            {
+                await CreateProvider().CompleteAsync(new LlmRequest
+                {
+                    Prompt = "hi",
+                    Timeout = TimeSpan.FromSeconds(1),
+                });
+            }
+
+            captured!.RequestTimeout.Should().Be(TimeSpan.FromSeconds(120));
+        }
+
+        [Theory]
+        [InlineData(0.0f, "\"temperature\":0.0")]
+        [InlineData(-0.0f, "\"temperature\":-0.0")]
+        [InlineData(1.0f, "\"temperature\":1.0")]
+        [InlineData(0.33333334f, "\"temperature\":0.3333333432674408")]
+        [InlineData(float.NaN, "\"temperature\":\"NaN\"")]
+        [InlineData(float.PositiveInfinity, "\"temperature\":\"Infinity\"")]
+        public async Task CompleteAsync_FiniteAndNonfiniteFloatTemperature_PreservesReleasedWireValue(
+            float temperature,
+            string expectedFragment)
         {
             HttpRequest? captured = null;
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -77,10 +108,31 @@ namespace Brainarr.Tests.Providers.Llm
             await CreateProvider().CompleteAsync(new LlmRequest
             {
                 Prompt = "hi",
-                Timeout = TimeSpan.FromMilliseconds(1),
+                Temperature = temperature,
             });
 
-            captured!.RequestTimeout.Should().NotBe(TimeSpan.FromMilliseconds(1));
+            Encoding.UTF8.GetString(captured!.ContentData ?? Array.Empty<byte>())
+                .Should().Contain(expectedFragment);
+        }
+
+        [Theory]
+        [InlineData("{\"choices\":[]}", "", false)]
+        [InlineData("{\"choices\":[{\"message\":{}}],\"usage\":null}", "", false)]
+        [InlineData("{\"choices\":{},\"usage\":[]}", "{\"choices\":{},\"usage\":[]}", false)]
+        [InlineData("[]", "[]", false)]
+        [InlineData("{\"choices\":[{\"message\":{\"content\":\"ok\"}}],\"usage\":{\"prompt_tokens\":0,\"completion_tokens\":0}}", "ok", true)]
+        public async Task CompleteAsync_DtoAndUsageShapes_PreserveReleasedFallback(
+            string payload,
+            string expectedContent,
+            bool expectsUsage)
+        {
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(payload));
+
+            var response = await CreateProvider().CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            response.Content.Should().Be(expectedContent);
+            (response.Usage is not null).Should().Be(expectsUsage);
         }
 
         [Fact]
@@ -110,7 +162,7 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
-        public async Task CompleteAsync_AbsentCredential_SendsNoAuthorizationAndUsesNoAuthGate()
+        public async Task CompleteAsync_AbsentCredential_SendsNoAuthorizationHeader()
         {
             HttpRequest? captured = null;
             _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
@@ -128,6 +180,66 @@ namespace Brainarr.Tests.Providers.Llm
             await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
 
             captured!.Headers.Should().NotContainKey("Authorization");
+        }
+
+        [Theory]
+        [InlineData(HttpStatusCode.Unauthorized, typeof(AuthenticationException), LlmErrorCode.AuthenticationFailed)]
+        [InlineData(HttpStatusCode.Forbidden, typeof(AuthenticationException), LlmErrorCode.AuthorizationFailed)]
+        [InlineData((HttpStatusCode)429, typeof(RateLimitException), LlmErrorCode.RateLimited)]
+        public async Task CompleteAsync_KeyedHttpFailure_PreservesReleasedExceptionMapping(
+            HttpStatusCode status,
+            Type expectedType,
+            LlmErrorCode expectedCode)
+        {
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Error(status, "failure"));
+
+            Func<Task> act = () => CreateProvider("mapped-key")
+                .CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            var thrown = await act.Should().ThrowAsync<LlmProviderException>();
+            thrown.Which.Should().BeOfType(expectedType);
+            thrown.Which.ErrorCode.Should().Be(expectedCode);
+        }
+
+        [Fact]
+        public async Task CompleteAsync_KeyedUnauthorizedResponses_OpenCircuitAfterThreeRoundTrips()
+        {
+            const string key = "double-record-key";
+            var circuit = new LlmAuthCircuit(_logger);
+            var provider = new BrainarrOpenAiCompatibleProvider(
+                _http.Object,
+                _logger,
+                "https://compatible.example",
+                "model",
+                key,
+                circuit);
+            _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Error(HttpStatusCode.Unauthorized));
+
+            await FluentActions.Awaiting(() => provider.CompleteAsync(new LlmRequest { Prompt = "one" }))
+                .Should().ThrowAsync<AuthenticationException>();
+            circuit.IsOpen("openai-compatible", key, out _).Should().BeFalse();
+            await FluentActions.Awaiting(() => provider.CompleteAsync(new LlmRequest { Prompt = "two" }))
+                .Should().ThrowAsync<AuthenticationException>();
+            circuit.IsOpen("openai-compatible", key, out _).Should().BeFalse();
+            await FluentActions.Awaiting(() => provider.CompleteAsync(new LlmRequest { Prompt = "three" }))
+                .Should().ThrowAsync<AuthenticationException>();
+
+            circuit.IsOpen("openai-compatible", key, out _).Should().BeTrue(
+                "the released AuthenticationException catch preserves one circuit record per returned 401 response");
+        }
+
+        [Fact]
+        public async Task CompleteAsync_NulOnlyCredential_PreservesRawMakeKeyFailureBeforeTransport()
+        {
+            var provider = CreateProvider("\0");
+
+            Func<Task> act = () => provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+
+            await act.Should().ThrowAsync<ArgumentException>()
+                .WithParameterName("apiKey");
+            _http.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never);
         }
 
         [Fact]
