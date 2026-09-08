@@ -98,11 +98,10 @@ namespace Brainarr.Tests.Services.Providers.Shared
             var request = new HttpRequest("https://example.invalid/");
             var pending = HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
 
-            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            cts.Cancel();
-
             try
             {
+                await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+                cts.Cancel();
                 var exception = await Assert.ThrowsAsync<OperationCanceledException>(
                     () => pending.WaitAsync(TimeSpan.FromSeconds(10)));
                 Assert.Equal(cts.Token, exception.CancellationToken);
