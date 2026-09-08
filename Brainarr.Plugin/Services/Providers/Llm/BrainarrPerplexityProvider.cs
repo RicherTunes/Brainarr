@@ -4,6 +4,8 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Providers.OpenAi;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -15,7 +17,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for Perplexity
     /// (<c>https://api.perplexity.ai/chat/completions</c>), built on
-    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
+    /// <see cref="OpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks:
@@ -34,7 +36,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// 4. The completion request additionally pins <c>Accept: application/json</c>.
     /// </para>
     /// </summary>
-    public sealed class BrainarrPerplexityProvider : BrainarrOpenAiChatProviderBase
+    public sealed class BrainarrPerplexityProvider : OpenAiChatProviderBase, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "perplexity";
         private const string ApiUrl = "https://api.perplexity.ai/chat/completions";
@@ -53,10 +55,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrPerplexityProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
-            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+            : base(new BrainarrOpenAiChatTransport(httpClient, logger, streamingExecutor), BrainarrOpenAiChatPolicy.RequireApiKey(apiKey, "Perplexity"), model,
                    providerId: ProviderIdConst,
                    defaultModel: BrainarrConstants.DefaultPerplexityModel,
-                   keyOwnerName: "Perplexity")
+                   completionTimeout: TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout),
+                   healthTimeout: TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout),
+                   authCircuit: new BrainarrOpenAiChatAuthCircuit(authCircuit ?? new LlmAuthCircuit(logger)))
         {
         }
 
@@ -75,15 +79,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        protected override string ChatCompletionsUrl => ApiUrl;
+        protected override Uri ChatCompletionsEndpoint => new(ApiUrl);
+
+        protected override string NormalizeModel(string model) => ModelIdMapper.ToRawId(ProviderIdConst, model);
+
+        protected override IDisposable? BeginCompletionScope()
+            => PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
         /// <inheritdoc />
         protected override bool SupportsJsonResponseFormat => false;
 
         /// <inheritdoc />
-        protected override void AddCompletionRequestHeaders(HttpRequestBuilder builder)
+        protected override void AddCompletionRequestHeaders(IDictionary<string, string> headers)
         {
-            builder.SetHeader("Accept", "application/json");
+            headers["Accept"] = "application/json";
         }
 
         /// <inheritdoc />
@@ -173,7 +182,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         /// <inheritdoc />
-        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
+        public BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {

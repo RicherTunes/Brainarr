@@ -1,6 +1,8 @@
 using System;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Providers.OpenAi;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -12,7 +14,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for Z.AI (Zhipu) GLM
     /// (<c>https://api.z.ai/api/paas/v4/chat/completions</c>), built on
-    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
+    /// <see cref="OpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Z.AI's PaaS API speaks the OpenAI Chat Completions wire format with
@@ -41,7 +43,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <item><c>glm-4-32b-0414-128k</c> — 32B parameter variant, 128K context</item>
     /// </list>
     /// </summary>
-    public sealed class BrainarrZaiGlmProvider : BrainarrOpenAiChatProviderBase
+    public sealed class BrainarrZaiGlmProvider : OpenAiChatProviderBase, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "zaiglm";
 
@@ -56,10 +58,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrZaiGlmProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
-            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+            : base(new BrainarrOpenAiChatTransport(httpClient, logger, streamingExecutor), BrainarrOpenAiChatPolicy.RequireApiKey(apiKey, "Z.AI"), model,
                    providerId: ProviderIdConst,
                    defaultModel: BrainarrConstants.DefaultZaiGlmModel,
-                   keyOwnerName: "Z.AI")
+                   completionTimeout: TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout),
+                   healthTimeout: TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout),
+                   authCircuit: new BrainarrOpenAiChatAuthCircuit(authCircuit ?? new LlmAuthCircuit(logger)))
         {
         }
 
@@ -83,7 +87,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        protected override string ChatCompletionsUrl => BrainarrConstants.ZaiGlmChatCompletionsUrl;
+        protected override Uri ChatCompletionsEndpoint => new(BrainarrConstants.ZaiGlmChatCompletionsUrl);
+
+        protected override string NormalizeModel(string model) => ModelIdMapper.ToRawId(ProviderIdConst, model);
+
+        protected override IDisposable? BeginCompletionScope()
+            => PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
         /// <inheritdoc />
         protected override LlmProviderException MapHttpError(int statusCode, string? body, TimeSpan? retryAfter, Exception? inner)
@@ -150,7 +159,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         /// <inheritdoc />
-        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
+        public BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {

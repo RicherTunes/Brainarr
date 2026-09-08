@@ -1,7 +1,10 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Providers.OpenAi;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -13,7 +16,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for DeepSeek
     /// (<c>https://api.deepseek.com/chat/completions</c>), built on
-    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
+    /// <see cref="OpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks:
@@ -26,7 +29,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///    <c>response_format = {"type":"json_object"}</c> when requested).
     /// </para>
     /// </summary>
-    public sealed class BrainarrDeepSeekProvider : BrainarrOpenAiChatProviderBase
+    public sealed class BrainarrDeepSeekProvider : OpenAiChatProviderBase, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "deepseek";
 
@@ -41,10 +44,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrDeepSeekProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
-            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+            : base(new BrainarrOpenAiChatTransport(httpClient, logger, streamingExecutor), BrainarrOpenAiChatPolicy.RequireApiKey(apiKey, "DeepSeek"), model,
                    providerId: ProviderIdConst,
                    defaultModel: BrainarrConstants.DefaultDeepSeekModel,
-                   keyOwnerName: "DeepSeek")
+                   completionTimeout: TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout),
+                   healthTimeout: TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout),
+                   authCircuit: new BrainarrOpenAiChatAuthCircuit(authCircuit ?? new LlmAuthCircuit(logger)))
         {
         }
 
@@ -67,7 +72,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        protected override string ChatCompletionsUrl => BrainarrConstants.DeepSeekChatCompletionsUrl;
+        protected override Uri ChatCompletionsEndpoint => new(BrainarrConstants.DeepSeekChatCompletionsUrl);
+
+        protected override string NormalizeModel(string model) => ModelIdMapper.ToRawId(ProviderIdConst, model);
+
+        protected override IDisposable? BeginCompletionScope()
+            => PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
         /// <inheritdoc />
         protected override LlmResponse ParseCompletion(string content)
@@ -105,7 +115,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         /// <inheritdoc />
-        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
+        public BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {
