@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Http;
@@ -162,6 +163,97 @@ namespace Brainarr.Tests.Providers.Llm
 
             finished.Should().BeSameAs(enumeration,
                 "the per-request timeout must cover the complete streaming enumeration");
+        }
+
+        [Fact]
+        public async Task FactoryProviderPreservesLongerInvocationTimeoutForBufferedCompletion()
+        {
+            HttpRequest? captured = null;
+            _http.Setup(client => client.ExecuteAsync(It.IsAny<HttpRequest>()))
+                .Callback<HttpRequest>(request => captured = request)
+                .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                    "{\"choices\":[{\"message\":{\"content\":\"ok\"},\"finish_reason\":\"stop\"}]}"));
+            var adapter = new ProviderRegistry().CreateProvider(
+                    AIProvider.OpenAI,
+                    SettingsFor(AIProvider.OpenAI),
+                    _http.Object,
+                    _logger)
+                .Should().BeOfType<LlmProviderAdapter>().Subject;
+
+            using (TimeoutContext.Push(120))
+            {
+                await adapter.Inner.CompleteAsync(
+                    new LlmRequest
+                    {
+                        Prompt = "recommend one album",
+                        Timeout = TimeSpan.FromSeconds(120),
+                    },
+                    CancellationToken.None);
+            }
+
+            captured.Should().NotBeNull();
+            captured!.RequestTimeout.Should().Be(TimeSpan.FromSeconds(120),
+                "the invocation's configured owner budget may exceed the default 30 seconds");
+        }
+
+        [Fact]
+        public async Task FactoryProviderUsesInvocationTimeoutForStreamingRequestWithoutOverride()
+        {
+            var streamingExecutor = new StreamingHttpExecutor(new BlockingStreamHandler());
+            var registry = new ProviderRegistry();
+            registry.Register(AIProvider.OpenAI, (settings, http, logger) =>
+                new LlmProviderAdapter(
+                    new BrainarrOpenAiProvider(
+                        http,
+                        logger,
+                        settings.OpenAIApiKey,
+                        settings.OpenAIModel,
+                        streamingExecutor),
+                    logger));
+            var adapter = registry.CreateProvider(
+                    AIProvider.OpenAI,
+                    SettingsFor(AIProvider.OpenAI),
+                    _http.Object,
+                    _logger)
+                .Should().BeOfType<LlmProviderAdapter>().Subject;
+
+            using var cleanupCancellation = new CancellationTokenSource();
+            var stopwatch = Stopwatch.StartNew();
+            Func<Task> enumerate = async () =>
+            {
+                using (TimeoutContext.Push(1))
+                {
+                    await foreach (var _ in adapter.Inner.StreamAsync(
+                        new LlmRequest { Prompt = "recommend one album" },
+                        cleanupCancellation.Token)!)
+                    {
+                    }
+                }
+            };
+
+            var enumeration = enumerate();
+            var finished = await Task.WhenAny(enumeration, Task.Delay(TimeSpan.FromSeconds(3)));
+            if (finished == enumeration)
+            {
+                Func<Task> completedEnumeration = () => enumeration;
+                var failure = await completedEnumeration.Should().ThrowAsync<NetworkException>();
+                failure.Which.ErrorCode.Should().Be(LlmErrorCode.Timeout);
+                stopwatch.Elapsed.Should().BeLessThan(TimeSpan.FromSeconds(3));
+                return;
+            }
+
+            cleanupCancellation.Cancel();
+            try
+            {
+                await enumeration;
+            }
+            catch (OperationCanceledException)
+            {
+                // Test cleanup only. The assertion below records the fixed 30-second cap.
+            }
+
+            finished.Should().BeSameAs(enumeration,
+                "an unset request timeout must use the active invocation timeout for the whole stream");
         }
 
         private static BrainarrSettings SettingsFor(AIProvider providerType)
