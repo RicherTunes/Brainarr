@@ -8,6 +8,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+- Pin `ext/Lidarr.Plugin.Common` to `44a642d4c36076a1a33d663741a2390b45078f37` for the per-invocation OpenAI completion-timeout owner hook; plugin source remains unchanged.
+
 - Pin `ext/Lidarr.Plugin.Common` to `382219972de3bce98f0ed6b393181625c9da4c08` for the shared OpenAI Chat Completions contract; plugin source remains unchanged.
 
 - Make concurrent bridge-cancellation testing independent of pool-worker startup; retain all five callers, real factory-entry coordination, cancellation assertions and bounded cleanup.
