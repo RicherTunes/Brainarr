@@ -79,6 +79,29 @@ namespace Brainarr.Tests.Providers.Llm
             _http.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never);
         }
 
+        [Theory]
+        [InlineData("\0")]
+        [InlineData("\r\n\0")]
+        public async Task CompleteAsync_CallerCancellation_WinsBeforeGhostCredentialCircuitFailure(string credential)
+        {
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+            var provider = new BrainarrOpenAiCompatibleProvider(
+                _http.Object,
+                _logger,
+                "https://compatible.example",
+                "model",
+                credential,
+                new LlmAuthCircuit(_logger));
+
+            Func<Task> act = () => provider.CompleteAsync(
+                new LlmRequest { Prompt = "hi" },
+                canceled.Token);
+
+            await act.Should().ThrowExactlyAsync<OperationCanceledException>();
+            _http.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never);
+        }
+
         [Fact]
         public async Task CheckHealthAsync_TransportFailure_RedactsConfiguredCredential()
         {
@@ -96,6 +119,12 @@ namespace Brainarr.Tests.Providers.Llm
 
             result.StatusMessage.Should().NotContain(credential);
             result.StatusMessage.Should().Contain("[REDACTED]");
+            result.IsHealthy.Should().BeTrue("connection failure remains Degraded rather than Unhealthy");
+            result.StatusMessage.Should().StartWith("[Degraded]");
+            result.ProviderId.Should().Be("openai-compatible");
+            result.AuthMethod.Should().Be("apiKey");
+            result.Model.Should().Be("model");
+            result.ErrorCode.Should().Be("ConnectionFailed");
         }
 
         private static int GetCircuitEntryCount(LlmAuthCircuit circuit)

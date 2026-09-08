@@ -376,6 +376,152 @@ namespace Brainarr.Tests.Providers.Llm
         }
 
         [Fact]
+        public void PublicSurfaceAndDefaults_PreserveReleasedContract()
+        {
+            var type = typeof(BrainarrOpenAiCompatibleProvider);
+            type.IsPublic.Should().BeTrue();
+            type.IsSealed.Should().BeTrue();
+            type.GetInterfaces().Should().Contain(new[]
+            {
+                typeof(ILlmProvider),
+                typeof(IBrainarrLlmHintSource),
+                typeof(IBrainarrLlmModelMutable),
+            });
+
+            var fiveParameterConstructor = type.GetConstructors()
+                .Single(constructor => constructor.GetParameters().Length == 5);
+            var fiveParameters = fiveParameterConstructor.GetParameters();
+            fiveParameters.Select(parameter => parameter.Name).Should().Equal(
+                "httpClient", "logger", "baseUrl", "model", "apiKey");
+            fiveParameters[4].HasDefaultValue.Should().BeTrue();
+            fiveParameters[4].DefaultValue.Should().BeNull();
+
+            var sixParameters = type.GetConstructors()
+                .Single(constructor => constructor.GetParameters().Length == 6)
+                .GetParameters();
+            sixParameters.Select(parameter => parameter.Name).Should().Equal(
+                "httpClient", "logger", "baseUrl", "model", "apiKey", "authCircuit");
+            sixParameters.Should().OnlyContain(parameter => !parameter.HasDefaultValue);
+
+            var provider = CreateProvider();
+            provider.ProviderId.Should().Be("openai-compatible");
+            provider.DisplayName.Should().Be("OpenAI-Compatible");
+            provider.Capabilities.Flags.Should().Be(
+                LlmCapabilityFlags.TextCompletion |
+                LlmCapabilityFlags.Streaming |
+                LlmCapabilityFlags.SystemPrompt);
+            provider.Capabilities.UsesOpenAiCompatibleApi.Should().BeTrue();
+            provider.Capabilities.Flags.HasFlag(LlmCapabilityFlags.JsonMode).Should().BeFalse();
+            provider.StreamAsync(new LlmRequest { Prompt = "hi" }).Should().BeNull();
+        }
+
+        [Theory]
+        [InlineData("")]
+        [InlineData("   ")]
+        [InlineData("\0")]
+        [InlineData("\r\n\0")]
+        public async Task CompleteAsync_GhostCredential_PreflightStillPrecedesCallerCancellation(string credential)
+        {
+            using var canceled = new CancellationTokenSource();
+            canceled.Cancel();
+
+            Func<Task> act = () => CreateProvider(credential).CompleteAsync(
+                new LlmRequest { Prompt = "hi" },
+                canceled.Token);
+
+            if (string.IsNullOrWhiteSpace(credential))
+            {
+                await act.Should().ThrowExactlyAsync<OperationCanceledException>();
+            }
+            else
+            {
+                await act.Should().ThrowAsync<ArgumentException>()
+                    .WithParameterName("apiKey");
+            }
+
+            _http.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Never);
+        }
+
+        public static TheoryData<HttpStatusCode?, bool> AbsentCredentialOutcomes => new()
+        {
+            { HttpStatusCode.OK, false },
+            { HttpStatusCode.Unauthorized, false },
+            { HttpStatusCode.Forbidden, false },
+            { (HttpStatusCode)429, false },
+            { HttpStatusCode.InternalServerError, false },
+            { null, true },
+        };
+
+        [Theory]
+        [MemberData(nameof(AbsentCredentialOutcomes))]
+        public async Task CompleteAsync_AbsentCredential_PerformsZeroAuthCircuitCallbacks(
+            HttpStatusCode? status,
+            bool transportThrows)
+        {
+            var circuit = new LlmAuthCircuit(_logger);
+            if (transportThrows)
+            {
+                _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                    .ThrowsAsync(new HttpRequestException("offline"));
+            }
+            else if (status == HttpStatusCode.OK)
+            {
+                _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                    .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Ok(
+                        "{\"choices\":[{\"message\":{\"content\":\"ok\"}}]}"));
+            }
+            else
+            {
+                _http.Setup(x => x.ExecuteAsync(It.IsAny<HttpRequest>()))
+                    .ReturnsAsync(Brainarr.Tests.Helpers.HttpResponseFactory.Error(status!.Value, "failure"));
+            }
+
+            var provider = new BrainarrOpenAiCompatibleProvider(
+                _http.Object, _logger, "https://compatible.example", "model", null, circuit);
+            try
+            {
+                await provider.CompleteAsync(new LlmRequest { Prompt = "hi" });
+            }
+            catch (LlmProviderException)
+            {
+            }
+
+            GetCircuitEntryCount(circuit).Should().Be(0,
+                "each released circuit callback creates an entry before doing any bookkeeping, so zero entries proves zero callback invocations for absent auth");
+            _http.Verify(x => x.ExecuteAsync(It.IsAny<HttpRequest>()), Times.Once);
+        }
+
+        [Fact]
+        public void LlmAuthCircuit_CallbacksExposeReleasedInvalidKeyExceptions()
+        {
+            var circuit = new LlmAuthCircuit(_logger);
+
+            FluentActions.Invoking(() => circuit.IsOpen("openai-compatible", "\0", out _))
+                .Should().Throw<ArgumentException>().WithParameterName("apiKey");
+            FluentActions.Invoking(() => circuit.RecordAuthFailure("openai-compatible", "\0"))
+                .Should().Throw<ArgumentException>().WithParameterName("apiKey");
+            FluentActions.Invoking(() => circuit.RecordSuccess("openai-compatible", "\0"))
+                .Should().Throw<ArgumentException>().WithParameterName("apiKey");
+            GetCircuitEntryCount(circuit).Should().Be(0);
+        }
+
+        [Fact]
+        public void LlmAuthCircuit_EachSuccessfulCallbackCreatesObservableEntry()
+        {
+            foreach (var callback in new Action<LlmAuthCircuit>[]
+            {
+                circuit => circuit.IsOpen("openai-compatible", "key", out _),
+                circuit => circuit.RecordAuthFailure("openai-compatible", "key"),
+                circuit => circuit.RecordSuccess("openai-compatible", "key"),
+            })
+            {
+                var circuit = new LlmAuthCircuit(_logger);
+                callback(circuit);
+                GetCircuitEntryCount(circuit).Should().Be(1);
+            }
+        }
+
+        [Fact]
         public async Task CompleteAsync_NulOnlyCredential_PreservesRawMakeKeyFailureBeforeTransport()
         {
             var provider = CreateProvider("\0");
