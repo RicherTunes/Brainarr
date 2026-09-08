@@ -121,7 +121,7 @@ namespace Brainarr.Tests.Providers.Llm
             result.StatusMessage.Should().Contain("[REDACTED]");
             result.IsHealthy.Should().BeTrue("connection failure remains Degraded rather than Unhealthy");
             result.StatusMessage.Should().StartWith("[Degraded]");
-            result.ProviderId.Should().Be("openai-compatible");
+            result.Provider.Should().Be("openai-compatible");
             result.AuthMethod.Should().Be("apiKey");
             result.Model.Should().Be("model");
             result.ErrorCode.Should().Be("ConnectionFailed");
