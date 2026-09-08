@@ -496,11 +496,11 @@ namespace Brainarr.Tests.Providers.Llm
         {
             var circuit = new LlmAuthCircuit(_logger);
 
-            FluentActions.Invoking(() => circuit.IsOpen("openai-compatible", "\0", out _))
+            FluentActions.Invoking(() => circuit.IsOpen("openai-compatible", " ", out _))
                 .Should().Throw<ArgumentException>().WithParameterName("apiKey");
-            FluentActions.Invoking(() => circuit.RecordAuthFailure("openai-compatible", "\0"))
+            FluentActions.Invoking(() => circuit.RecordAuthFailure("openai-compatible", " "))
                 .Should().Throw<ArgumentException>().WithParameterName("apiKey");
-            FluentActions.Invoking(() => circuit.RecordSuccess("openai-compatible", "\0"))
+            FluentActions.Invoking(() => circuit.RecordSuccess("openai-compatible", " "))
                 .Should().Throw<ArgumentException>().WithParameterName("apiKey");
             GetCircuitEntryCount(circuit).Should().Be(0);
         }
