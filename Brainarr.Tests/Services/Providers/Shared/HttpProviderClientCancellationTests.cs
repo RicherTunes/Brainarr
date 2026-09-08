@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics;
 using System.Net;
+using System.Runtime.ExceptionServices;
 using System.Threading;
 using System.Threading.Tasks;
 using FluentAssertions;
@@ -97,6 +98,8 @@ namespace Brainarr.Tests.Services.Providers.Shared
             using var cts = new CancellationTokenSource();
             var request = new HttpRequest("https://example.invalid/");
             var pending = HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
+            ExceptionDispatchInfo? primaryFailure = null;
+            Exception? cleanupFailure = null;
 
             try
             {
@@ -108,11 +111,44 @@ namespace Brainarr.Tests.Services.Providers.Shared
                 Assert.False(underlying.Task.IsCompleted,
                     "the caller must observe cancellation without waiting for Lidarr's uncancellable HTTP task");
             }
+            catch (Exception ex)
+            {
+                primaryFailure = ExceptionDispatchInfo.Capture(ex);
+            }
             finally
             {
                 underlying.TrySetCanceled();
-                try { await pending.WaitAsync(TimeSpan.FromSeconds(10)); }
-                catch (OperationCanceledException) { }
+                try
+                {
+                    await pending.WaitAsync(TimeSpan.FromSeconds(10));
+                }
+                catch (OperationCanceledException)
+                {
+                }
+                catch (Exception ex)
+                {
+                    cleanupFailure = ex;
+                    _ = pending.ContinueWith(
+                        task => _ = task.Exception,
+                        CancellationToken.None,
+                        TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                        TaskScheduler.Default);
+                }
+            }
+
+            if (primaryFailure is not null)
+            {
+                if (cleanupFailure is not null)
+                {
+                    primaryFailure.SourceException.Data["CleanupFailure"] = cleanupFailure.ToString();
+                }
+
+                primaryFailure.Throw();
+            }
+
+            if (cleanupFailure is not null)
+            {
+                ExceptionDispatchInfo.Capture(cleanupFailure).Throw();
             }
         }
 
