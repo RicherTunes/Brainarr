@@ -85,6 +85,39 @@ namespace Brainarr.Tests.Services.Providers.Shared
         }
 
         [Fact]
+        public async Task ExecuteWithCt_WhenTokenCancelled_CompletesWhileUnderlyingHttpTaskRemainsPending()
+        {
+            var started = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var underlying = new TaskCompletionSource<HttpResponse>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var slowClient = new FakeHttpClient(_ =>
+            {
+                started.SetResult(null);
+                return underlying.Task;
+            });
+            using var cts = new CancellationTokenSource();
+            var request = new HttpRequest("https://example.invalid/");
+            var pending = HttpProviderClient.ExecuteWithCt(slowClient, request, cts.Token);
+
+            await started.Task.WaitAsync(TimeSpan.FromSeconds(10));
+            cts.Cancel();
+
+            try
+            {
+                var exception = await Assert.ThrowsAsync<OperationCanceledException>(
+                    () => pending.WaitAsync(TimeSpan.FromSeconds(10)));
+                Assert.Equal(cts.Token, exception.CancellationToken);
+                Assert.False(underlying.Task.IsCompleted,
+                    "the caller must observe cancellation without waiting for Lidarr's uncancellable HTTP task");
+            }
+            finally
+            {
+                underlying.TrySetCanceled();
+                try { await pending.WaitAsync(TimeSpan.FromSeconds(10)); }
+                catch (OperationCanceledException) { }
+            }
+        }
+
+        [Fact]
         public async Task ExecuteWithCt_WhenTokenAlreadyCancelled_ThrowsImmediately()
         {
             var slowClient = new FakeHttpClient(_ =>
