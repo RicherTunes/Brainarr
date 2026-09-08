@@ -8,6 +8,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+- Pin `ext/Lidarr.Plugin.Common` to `382219972de3bce98f0ed6b393181625c9da4c08` for the shared OpenAI Chat Completions contract; plugin source remains unchanged.
+
 - Make concurrent bridge-cancellation testing independent of pool-worker startup; retain all five callers, real factory-entry coordination, cancellation assertions and bounded cleanup.
 - Adopt one elapsed-budget implementation across generic and typed HTTP execution, including redirect limits; preserve absolute Retry-After dates and existing retry policies.
 - Adopt shared inclusive jitter bounds and overflow-safe backoff-plus-jitter admission; defaults and explicit Retry-After precedence are unchanged.
