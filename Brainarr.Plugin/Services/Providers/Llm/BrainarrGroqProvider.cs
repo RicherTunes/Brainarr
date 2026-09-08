@@ -55,6 +55,9 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         /// <inheritdoc />
         public override string DisplayName => "Groq";
 
+        protected override TimeSpan ResolveCompletionTimeout() =>
+            BrainarrOpenAiChatPolicy.ResolveCompletionTimeout();
+
         /// <inheritdoc />
         public override LlmProviderCapabilities Capabilities => new()
         {

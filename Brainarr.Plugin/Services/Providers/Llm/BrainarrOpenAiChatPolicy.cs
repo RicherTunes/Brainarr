@@ -1,4 +1,5 @@
 using System;
+using NzbDrone.Core.ImportLists.Brainarr.Configuration;
 
 namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
 {
@@ -12,6 +13,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
             }
 
             return apiKey;
+        }
+
+        public static TimeSpan ResolveCompletionTimeout()
+        {
+            return TimeSpan.FromSeconds(
+                TimeoutContext.GetSecondsOrDefault(BrainarrConstants.DefaultAITimeout));
         }
     }
 }
