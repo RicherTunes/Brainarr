@@ -1,5 +1,8 @@
+using System;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Providers.OpenAi;
 using NLog;
 using NzbDrone.Common.Http;
 using NzbDrone.Core.ImportLists.Brainarr.Configuration;
@@ -10,7 +13,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for Groq
     /// (<c>https://api.groq.com/openai/v1/chat/completions</c>), built on
-    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
+    /// <see cref="OpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks:
@@ -25,7 +28,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// 4. Health probe pins <c>temperature = 0</c> (deterministic cheap probe).
     /// </para>
     /// </summary>
-    public sealed class BrainarrGroqProvider : BrainarrOpenAiChatProviderBase
+    public sealed class BrainarrGroqProvider : OpenAiChatProviderBase, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "groq";
 
@@ -40,15 +43,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrGroqProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
-            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+            : base(new BrainarrOpenAiChatTransport(httpClient, logger, streamingExecutor), BrainarrOpenAiChatPolicy.RequireApiKey(apiKey, "Groq"), model,
                    providerId: ProviderIdConst,
                    defaultModel: BrainarrConstants.DefaultGroqModel,
-                   keyOwnerName: "Groq")
+                   completionTimeout: TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout),
+                   healthTimeout: TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout),
+                   authCircuit: new BrainarrOpenAiChatAuthCircuit(authCircuit ?? new LlmAuthCircuit(logger)))
         {
         }
 
         /// <inheritdoc />
         public override string DisplayName => "Groq";
+
+        protected override TimeSpan ResolveCompletionTimeout() =>
+            BrainarrOpenAiChatPolicy.ResolveCompletionTimeout();
 
         /// <inheritdoc />
         public override LlmProviderCapabilities Capabilities => new()
@@ -63,7 +71,12 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        protected override string ChatCompletionsUrl => BrainarrConstants.GroqChatCompletionsUrl;
+        protected override Uri ChatCompletionsEndpoint => new(BrainarrConstants.GroqChatCompletionsUrl);
+
+        protected override string NormalizeModel(string model) => ModelIdMapper.ToRawId(ProviderIdConst, model);
+
+        protected override IDisposable? BeginCompletionScope()
+            => PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
         /// <inheritdoc />
         protected override object BuildHealthProbeBody()
@@ -79,7 +92,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         /// <inheritdoc />
-        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
+        public BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {

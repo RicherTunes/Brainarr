@@ -2,6 +2,8 @@ using System.Collections.Generic;
 using System.Linq;
 using Lidarr.Plugin.Common.Abstractions.Llm;
 using Lidarr.Plugin.Common.Errors;
+using Lidarr.Plugin.Common.Observability;
+using Lidarr.Plugin.Common.Providers.OpenAi;
 using Newtonsoft.Json;
 using NLog;
 using NzbDrone.Common.Http;
@@ -13,7 +15,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     /// <summary>
     /// <see cref="ILlmProvider"/> implementation for OpenRouter
     /// (<c>https://openrouter.ai/api/v1/chat/completions</c>), built on
-    /// <see cref="BrainarrOpenAiChatProviderBase"/> (B-201 / #46 dedup).
+    /// <see cref="OpenAiChatProviderBase"/> (B-201 / #46 dedup).
     ///
     /// <para>
     /// Provider-specific quirks captured here:
@@ -31,7 +33,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
     ///    client requested <c>openrouter/auto</c>.
     /// </para>
     /// </summary>
-    public sealed class BrainarrOpenRouterProvider : BrainarrOpenAiChatProviderBase
+    public sealed class BrainarrOpenRouterProvider : OpenAiChatProviderBase, IBrainarrLlmHintSource, IBrainarrLlmModelMutable
     {
         private const string ProviderIdConst = "openrouter";
 
@@ -46,15 +48,20 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         public BrainarrOpenRouterProvider(IHttpClient httpClient, Logger logger, string apiKey, string? model, StreamingHttpExecutor? streamingExecutor, LlmAuthCircuit? authCircuit)
-            : base(httpClient, logger, apiKey, model, streamingExecutor, authCircuit,
+            : base(new BrainarrOpenAiChatTransport(httpClient, logger, streamingExecutor), BrainarrOpenAiChatPolicy.RequireApiKey(apiKey, "OpenRouter"), model,
                    providerId: ProviderIdConst,
                    defaultModel: BrainarrConstants.DefaultOpenRouterModel,
-                   keyOwnerName: "OpenRouter")
+                   completionTimeout: TimeSpan.FromSeconds(BrainarrConstants.DefaultAITimeout),
+                   healthTimeout: TimeSpan.FromSeconds(BrainarrConstants.TestConnectionTimeout),
+                   authCircuit: new BrainarrOpenAiChatAuthCircuit(authCircuit ?? new LlmAuthCircuit(logger)))
         {
         }
 
         /// <inheritdoc />
         public override string DisplayName => "OpenRouter";
+
+        protected override TimeSpan ResolveCompletionTimeout() =>
+            BrainarrOpenAiChatPolicy.ResolveCompletionTimeout();
 
         /// <inheritdoc />
         public override LlmProviderCapabilities Capabilities => new()
@@ -73,28 +80,28 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         };
 
         /// <inheritdoc />
-        protected override string ChatCompletionsUrl => BrainarrConstants.OpenRouterChatCompletionsUrl;
+        protected override Uri ChatCompletionsEndpoint => new(BrainarrConstants.OpenRouterChatCompletionsUrl);
+
+        protected override string NormalizeModel(string model) => ModelIdMapper.ToRawId(ProviderIdConst, model);
+
+        protected override IDisposable? BeginCompletionScope()
+            => PluginLogContext.Push("Brainarr", "LlmComplete", provider: ProviderIdConst);
 
         /// <inheritdoc />
         protected override double DefaultTemperature => 0.8;
 
         /// <inheritdoc />
-        protected override void AddCompletionRequestHeaders(HttpRequestBuilder builder)
+        protected override void AddCompletionRequestHeaders(IDictionary<string, string> headers)
         {
-            builder
-                .SetHeader("HTTP-Referer", BrainarrConstants.ProjectReferer)
-                .SetHeader("X-Title", BrainarrConstants.OpenRouterTitle);
+            headers["HTTP-Referer"] = BrainarrConstants.ProjectReferer;
+            headers["X-Title"] = BrainarrConstants.OpenRouterTitle;
         }
 
         /// <inheritdoc />
-        protected override IReadOnlyList<KeyValuePair<string, string>> BuildStreamingHeaders()
+        protected override void AddStreamingRequestHeaders(IDictionary<string, string> headers)
         {
-            var headers = new List<KeyValuePair<string, string>>(base.BuildStreamingHeaders())
-            {
-                new KeyValuePair<string, string>("HTTP-Referer", BrainarrConstants.ProjectReferer),
-                new KeyValuePair<string, string>("X-Title", BrainarrConstants.OpenRouterTitle),
-            };
-            return headers;
+            headers["HTTP-Referer"] = BrainarrConstants.ProjectReferer;
+            headers["X-Title"] = BrainarrConstants.OpenRouterTitle;
         }
 
         /// <inheritdoc />
@@ -154,7 +161,7 @@ namespace NzbDrone.Core.ImportLists.Brainarr.Services.Providers.Llm
         }
 
         /// <inheritdoc />
-        protected override BrainarrLlmHint? GetUserHint(LlmProviderException exception)
+        public BrainarrLlmHint? GetUserHint(LlmProviderException exception)
         {
             return exception.ErrorCode switch
             {
