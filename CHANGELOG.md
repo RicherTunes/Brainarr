@@ -8,6 +8,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+- Pin `ext/Lidarr.Plugin.Common` to `5fce62b79918c6157426f19c9f460da41addd148` to adopt bounded legacy retry-body hints and invariant raw `Retry-After` parsing; plugin source remains unchanged.
 - Pin `ext/Lidarr.Plugin.Common` to `f7fe12abb13937f853e89e816d129479a908553b` to adopt invariant raw `Retry-After` parsing and dispatched disposal ownership; plugin source remains unchanged.
 - Pin `ext/Lidarr.Plugin.Common` to `bd17cdb02dc0b6cebbfbc0c0c93aab7f7ee703c8` to adopt bounded SSE physical-line reads and encoded event-size accounting; plugin source remains unchanged.
 - Adopt Common's OpenAI Chat Completions provider base for OpenAI, DeepSeek, Groq, OpenRouter, Perplexity, and Z.AI GLM. Brainarr now keeps only its Lidarr HTTP/streaming and auth-circuit adapters plus each provider's headers, model normalization, response quirks, and logging scope; Anthropic, Gemini, Codex Responses, optional-auth OpenAI-compatible, and Z.AI Coding retain their distinct contracts.
