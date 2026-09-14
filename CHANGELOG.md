@@ -8,6 +8,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ### Changed
 
+- Pin `ext/Lidarr.Plugin.Common` and `ext-common-sha.txt` to Common `48e0b39c45f9edfe2a3cf38c9c298ce2c61ad5ca` to adopt Common strict-JSON Retry-After body-hint resolver and bounded full-body display (Common PR #142, 48e0b39c); plugin source remains unchanged.
+
 - Pin `ext/Lidarr.Plugin.Common` and `ext-common-sha.txt` to Common `89222b4060814f8f683227f722d9bf9b1690b1f1` for the H3 runtime-cache capacity-callback fix; plugin source remains unchanged.
 
 - Pin `ext/Lidarr.Plugin.Common` to `5fce62b79918c6157426f19c9f460da41addd148` to adopt bounded legacy retry-body hints and invariant raw `Retry-After` parsing; plugin source remains unchanged.
